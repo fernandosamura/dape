@@ -389,7 +389,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                         {selectedChannel === "facebook"
                           ? "pages_messaging e pages_manage_metadata"
                           : "instagram_basic e instagram_manage_messages"}
-                        . Configure o webhook em: <b>https://dape.pubplus.com.br/api/webhook</b> com o token de verificação: <b>dape_webhook_2024</b>
+                        . Configure o webhook em: <b>https://daple.pubplus.com.br/api/webhook</b> com o token de verificação: <b>dape_webhook_2024</b>
                       </Typography>
                     </Box>
                   </Box>

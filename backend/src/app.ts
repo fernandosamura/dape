@@ -28,8 +28,8 @@ app.use(bodyParser.json({ limit: '10mb' }));
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  'https://dape.pubplus.com.br',
-  'http://dape.pubplus.com.br',
+  'https://daple.pubplus.com.br',
+  'http://daple.pubplus.com.br',
   'http://2.25.196.154',
   'https://2.25.196.154',
 ].filter(Boolean);

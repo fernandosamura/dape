@@ -110,7 +110,7 @@ Possíveis evoluções futuras:
 - Relatório semanal automático por email
 
 ## Infraestrutura (referência)
-- Servidor: root@dape.pubplus.com.br
+- Servidor: root@daple.pubplus.com.br
 - DB: docker exec dape-postgres-1 psql -U postgres codatende
 - Rede Docker: dape_app-network
 - Nginx: 80/443 → frontend:3001, /api/ → backend:3000
