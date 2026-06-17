@@ -60,6 +60,12 @@ class Plan extends Model<Plan> {
 
   @Column
   useIntegrations: boolean;
+
+  @Column
+  useFacebook: boolean;
+
+  @Column
+  useInstagram: boolean;
 }
 
 export default Plan;

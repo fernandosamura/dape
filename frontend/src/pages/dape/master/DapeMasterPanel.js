@@ -132,7 +132,7 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
           {[
             ["use_campaigns","Campanhas"], ["use_schedules","Agendamentos"],
             ["use_internal_chat","Chat Interno"], ["use_external_api","API Externa"],
-            ["use_kanban","Kanban"], ["use_openai","OpenAI"], ["use_integrations","Integrações"]
+            ["use_kanban","Kanban"], ["use_openai","OpenAI"], ["use_integrations","Integrações"], ["use_facebook","Facebook"], ["use_instagram","Instagram"]
           ].map(([k, l]) => (
             <Grid item xs={6} md={3} key={k}>
               <FormControlLabel control={<Switch checked={!!form[k]} onChange={e => set(k, e.target.checked)} color="primary" size="small" />} label={l} />

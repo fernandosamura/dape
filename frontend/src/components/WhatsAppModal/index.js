@@ -129,7 +129,9 @@ const SessionSchema = Yup.object().shape({
     .required(i18n.t("whatsappModal.formErrors.name.required")),
 });
 
-const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
+const WhatsAppModal = ({ open, onClose, whatsAppId, planChannels }) => {
+  const allowFacebook = !planChannels || planChannels.useFacebook !== false;
+  const allowInstagram = !planChannels || planChannels.useInstagram !== false;
   const classes = useStyles();
   const initialState = {
     name: "",
@@ -293,6 +295,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     <WhatsApp style={{ fontSize: 20, color: "#25D366" }} />
                     WhatsApp
                   </Box>
+                  {allowFacebook && (
                   <Box
                     className={`${classes.channelBtn} ${classes.channelBtnFacebook} ${selectedChannel === "facebook" ? "selected" : ""}`}
                     onClick={() => setSelectedChannel("facebook")}
@@ -300,6 +303,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     <Facebook style={{ fontSize: 20, color: "#1877F2" }} />
                     Facebook
                   </Box>
+                  )}
+                  {allowInstagram && (
                   <Box
                     className={`${classes.channelBtn} ${classes.channelBtnInstagram} ${selectedChannel === "instagram" ? "selected" : ""}`}
                     onClick={() => setSelectedChannel("instagram")}
@@ -307,6 +312,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     <Instagram style={{ fontSize: 20, color: "#E1306C" }} />
                     Instagram
                   </Box>
+                  )}
                 </Box>
 
                 <Divider style={{ marginBottom: 16 }} />

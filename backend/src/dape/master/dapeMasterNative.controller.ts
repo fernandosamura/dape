@@ -27,6 +27,8 @@ export const listUnifiedPlans = async (req: Request, res: Response) => {
         dp.use_kanban,
         dp.use_openai,
         dp.use_integrations,
+        dp.use_facebook,
+        dp.use_instagram,
         dp.is_master,
         dp.created_at,
         dp.updated_at,
@@ -56,6 +58,7 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
       max_connections, max_queues,
       use_campaigns, use_schedules, use_internal_chat,
       use_external_api, use_kanban, use_openai, use_integrations,
+      use_facebook, use_instagram,
       modules
     } = req.body;
 
@@ -71,8 +74,8 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
 
     // 1. Create native Plan
     const [nativePlan] = await sequelize.query(
-      `INSERT INTO "Plans" (name, users, connections, queues, value, "useCampaigns", "useSchedules", "useInternalChat", "useExternalApi", "useKanban", "useOpenAi", "useIntegrations", "createdAt", "updatedAt")
-       VALUES (:name, :users, :connections, :queues, :value, :useCampaigns, :useSchedules, :useInternalChat, :useExternalApi, :useKanban, :useOpenAi, :useIntegrations, NOW(), NOW())
+      `INSERT INTO "Plans" (name, users, connections, queues, value, "useCampaigns", "useSchedules", "useInternalChat", "useExternalApi", "useKanban", "useOpenAi", "useIntegrations", "useFacebook", "useInstagram", "createdAt", "updatedAt")
+       VALUES (:name, :users, :connections, :queues, :value, :useCampaigns, :useSchedules, :useInternalChat, :useExternalApi, :useKanban, :useOpenAi, :useIntegrations, :useFacebook, :useInstagram, NOW(), NOW())
        RETURNING id`,
       {
         replacements: {
@@ -85,7 +88,9 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
           useExternalApi: use_external_api !== undefined ? use_external_api : true,
           useKanban: use_kanban !== undefined ? use_kanban : true,
           useOpenAi: use_openai !== undefined ? use_openai : true,
-          useIntegrations: use_integrations !== undefined ? use_integrations : true
+          useIntegrations: use_integrations !== undefined ? use_integrations : true,
+          useFacebook: use_facebook !== undefined ? use_facebook : true,
+          useInstagram: use_instagram !== undefined ? use_instagram : true
         },
         type: QueryTypes.SELECT
       }
@@ -95,8 +100,8 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
 
     // 2. Create dape_plans record
     const [dapePlan] = await sequelize.query(
-      `INSERT INTO dape_plans (name, slug, description, price_monthly, max_users, max_contacts, max_connections, max_queues, use_campaigns, use_schedules, use_internal_chat, use_external_api, use_kanban, use_openai, use_integrations, native_plan_id, created_at, updated_at)
-       VALUES (:name, :slug, :description, :price, :max_users, :max_contacts, :max_connections, :max_queues, :use_campaigns, :use_schedules, :use_internal_chat, :use_external_api, :use_kanban, :use_openai, :use_integrations, :native_plan_id, NOW(), NOW())
+      `INSERT INTO dape_plans (name, slug, description, price_monthly, max_users, max_contacts, max_connections, max_queues, use_campaigns, use_schedules, use_internal_chat, use_external_api, use_kanban, use_openai, use_integrations, use_facebook, use_instagram, native_plan_id, created_at, updated_at)
+       VALUES (:name, :slug, :description, :price, :max_users, :max_contacts, :max_connections, :max_queues, :use_campaigns, :use_schedules, :use_internal_chat, :use_external_api, :use_kanban, :use_openai, :use_integrations, :use_facebook, :use_instagram, :native_plan_id, NOW(), NOW())
        RETURNING id`,
       {
         replacements: {
@@ -107,7 +112,10 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
           use_campaigns: use_campaigns || false, use_schedules: use_schedules || false,
           use_internal_chat: use_internal_chat || false, use_external_api: use_external_api || false,
           use_kanban: use_kanban || false, use_openai: use_openai || false,
-          use_integrations: use_integrations || false, native_plan_id: nativePlanId
+          use_integrations: use_integrations || false,
+          use_facebook: use_facebook !== undefined ? use_facebook : true,
+          use_instagram: use_instagram !== undefined ? use_instagram : true,
+          native_plan_id: nativePlanId
         },
         type: QueryTypes.SELECT
       }
@@ -143,6 +151,7 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
       max_connections, max_queues,
       use_campaigns, use_schedules, use_internal_chat,
       use_external_api, use_kanban, use_openai, use_integrations,
+      use_facebook, use_instagram,
       modules
     } = req.body;
 
@@ -157,7 +166,7 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
        max_connections=:max_connections, max_queues=:max_queues,
        use_campaigns=:use_campaigns, use_schedules=:use_schedules, use_internal_chat=:use_internal_chat,
        use_external_api=:use_external_api, use_kanban=:use_kanban, use_openai=:use_openai,
-       use_integrations=:use_integrations, updated_at=NOW()
+       use_integrations=:use_integrations, use_facebook=:use_facebook, use_instagram=:use_instagram, updated_at=NOW()
        WHERE id=:id`,
       {
         replacements: {
@@ -168,7 +177,9 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
           use_campaigns: use_campaigns || false, use_schedules: use_schedules || false,
           use_internal_chat: use_internal_chat || false, use_external_api: use_external_api || false,
           use_kanban: use_kanban || false, use_openai: use_openai || false,
-          use_integrations: use_integrations || false
+          use_integrations: use_integrations || false,
+          use_facebook: use_facebook !== undefined ? use_facebook : true,
+          use_instagram: use_instagram !== undefined ? use_instagram : true
         },
         type: QueryTypes.UPDATE
       }
@@ -179,7 +190,7 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
         `UPDATE "Plans" SET name=:name, users=:users, connections=:connections, queues=:queues, value=:value,
          "useCampaigns"=:useCampaigns, "useSchedules"=:useSchedules, "useInternalChat"=:useInternalChat,
          "useExternalApi"=:useExternalApi, "useKanban"=:useKanban, "useOpenAi"=:useOpenAi,
-         "useIntegrations"=:useIntegrations, "updatedAt"=NOW() WHERE id=:nativeId`,
+         "useIntegrations"=:useIntegrations, "useFacebook"=:useFacebook, "useInstagram"=:useInstagram, "updatedAt"=NOW() WHERE id=:nativeId`,
         {
           replacements: {
             name, users: max_users || 5, connections: max_connections || 3, queues: max_queues || 3,
@@ -187,7 +198,10 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
             useCampaigns: use_campaigns || false, useSchedules: use_schedules || false,
             useInternalChat: use_internal_chat || false, useExternalApi: use_external_api || false,
             useKanban: use_kanban || false, useOpenAi: use_openai || false,
-            useIntegrations: use_integrations || false, nativeId: (existing as any).native_plan_id
+            useIntegrations: use_integrations || false,
+            useFacebook: use_facebook !== undefined ? use_facebook : true,
+            useInstagram: use_instagram !== undefined ? use_instagram : true,
+            nativeId: (existing as any).native_plan_id
           },
           type: QueryTypes.UPDATE
         }

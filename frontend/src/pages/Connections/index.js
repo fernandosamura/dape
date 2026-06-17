@@ -44,6 +44,7 @@ import { WhatsAppsContext } from "../../context/WhatsApp/WhatsAppsContext";
 import toastError from "../../errors/toastError";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
+import usePlans from "../../hooks/usePlans";
 import { Can } from "../../components/Can";
 
 const useStyles = makeStyles(theme => ({
@@ -145,6 +146,23 @@ const Connections = () => {
 
 	const { user } = useContext(AuthContext);
 	const { whatsApps, loading } = useContext(WhatsAppsContext);
+	const { getPlanCompany } = usePlans();
+	const [planChannels, setPlanChannels] = React.useState({ useFacebook: true, useInstagram: true });
+
+	React.useEffect(() => {
+		if (user?.companyId) {
+			getPlanCompany(undefined, user.companyId)
+				.then(data => {
+					if (data?.plan) {
+						setPlanChannels({
+							useFacebook: data.plan.useFacebook !== false,
+							useInstagram: data.plan.useInstagram !== false,
+						});
+					}
+				})
+				.catch(() => {});
+		}
+	}, [user]);
 	const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
 	const [qrModalOpen, setQrModalOpen] = useState(false);
 	const [selectedWhatsApp, setSelectedWhatsApp] = useState(null);
@@ -396,6 +414,7 @@ const Connections = () => {
 				open={whatsAppModalOpen}
 				onClose={handleCloseWhatsAppModal}
 				whatsAppId={!qrModalOpen && selectedWhatsApp?.id}
+				planChannels={planChannels}
 			/>
 			<MainHeader>
 				<Title>{i18n.t("connections.title")}</Title>
@@ -458,7 +477,13 @@ const Connections = () => {
 						) : (
 							<>
 								{whatsApps?.length > 0 &&
-									whatsApps.map(whatsApp => (
+									whatsApps
+										.filter(w => {
+											if (w.channel === "facebook" && !planChannels.useFacebook) return false;
+											if (w.channel === "instagram" && !planChannels.useInstagram) return false;
+											return true;
+										})
+										.map(whatsApp => (
 										<TableRow key={whatsApp.id}>
 											<TableCell align="center">
 												<ChannelBadge channel={whatsApp.channel || "whatsapp"} />
