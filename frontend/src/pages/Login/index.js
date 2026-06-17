@@ -16,7 +16,7 @@ import { i18n } from "../../translate/i18n";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import api from "../../services/api";
 import logo from "../../assets/daple-logo.png";
-import sammy from "../../assets/sammy.png";
+import dapleMascote from "../../assets/daple-mascote.png";
 import LanguageControl from "../../components/LanguageControl";
 
 const Copyright = () => (
@@ -239,7 +239,7 @@ const Login = () => {
         <div className={classes.bgDecor2} />
         <div className={classes.card} style={{ maxWidth: 480, minHeight: "auto" }}>
           <div className={classes.rightPanel} style={{ alignItems: "center", textAlign: "center", padding: "56px 40px" }}>
-            <img src={sammy} alt="DAPLE" style={{ width: 130, marginBottom: 24, animation: "none", opacity: 0.85 }} />
+            <img src={dapleMascote} alt="DAPLE" style={{ width: 130, marginBottom: 24, animation: "none", opacity: 0.85 }} />
             <div style={{ fontSize: 48, marginBottom: 12 }}>⏳</div>
             <Typography style={{ color: "#F5C300", fontWeight: 800, fontSize: 22, marginBottom: 8 }}>
               Aguardando Aprovação
@@ -292,7 +292,7 @@ const Login = () => {
           <div className={classes.leftDecorCircle} />
           <div className={classes.leftDecorCircle2} />
           <img src={logo} alt="DAPLE" className={classes.logoLeft} />
-          <img src={sammy} alt="Sammy" className={classes.sammyImg} />
+          <img src={dapleMascote} alt="DAPLE Mascote" className={classes.sammyImg} />
           <Typography className={classes.tagline}>
             Seu atendimento<br />inteligente começa aqui
           </Typography>

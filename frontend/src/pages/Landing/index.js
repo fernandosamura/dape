@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useHistory, Link as RouterLink } from "react-router-dom";
 import { openApi } from "../../services/api";
 import logo from "../../assets/daple-logo.png";
-import sammy from "../../assets/sammy.png";
+import dapleMascote from "../../assets/daple-mascote.png";
+import dapleAnalisando from "../../assets/daple-analisando.png";
+import dapleComemorando from "../../assets/daple-comemorando.png";
+import dapleDecolando from "../../assets/daple-decolando.png";
+import dapleFoguete from "../../assets/daple-foguete.png";
 
 const styles = {
   root: {
@@ -657,10 +661,29 @@ function getModuleLabel(key) {
   return DAPE_MODULE_LABELS[key] || key;
 }
 
+const PLAN_TAGLINES = {
+  "Basic":      "Para quem quer começar com o pé direito.",
+  "Starter":    "Decole suas vendas com inteligência.",
+  "Pro":        "Escale resultados com dados reais.",
+  "Enterprise": "Domine o mercado sem limites.",
+};
+
+const PLAN_MASCOTS = {
+  "Basic":      dapleMascote,
+  "Starter":    dapleAnalisando,
+  "Pro":        dapleComemorando,
+  "Enterprise": dapleFoguete,
+};
+
+
+
 const PlanCard = ({ plan, history }) => {
   const color = getPlanColor(plan.name);
   const popular = isPopularPlan(plan.name);
   const modules = Array.isArray(plan.modules) ? plan.modules : [];
+
+  const tagline = PLAN_TAGLINES[plan.name];
+  const mascotImg = PLAN_MASCOTS[plan.name];
 
   return (
     <div
@@ -670,8 +693,18 @@ const PlanCard = ({ plan, history }) => {
       }}
     >
       {popular && <div style={styles.popularBadge}>⭐ Mais Popular</div>}
+      {mascotImg && (
+        <div style={{ position: "absolute", top: "16px", right: "16px", opacity: 0.9 }}>
+          <img src={mascotImg} alt="DAPLE mascote" style={{ width: "60px" }} />
+        </div>
+      )}
       <div style={{ ...styles.planColorBar, background: `linear-gradient(90deg, ${color}, ${color}aa)` }} />
       <div style={{ ...styles.planName, color }}>{plan.name}</div>
+      {tagline && (
+        <div style={{ fontSize: "13px", fontStyle: "italic", color: "rgba(255,255,255,0.6)", marginBottom: "8px" }}>
+          {tagline}
+        </div>
+      )}
       <div style={styles.planDesc}>{plan.description || "Plano ideal para sua empresa"}</div>
 
       <div style={styles.planPrice}>
@@ -725,7 +758,7 @@ const PlanCard = ({ plan, history }) => {
       {modules.length > 0 && (
         <>
           <div style={styles.planDivider} />
-          <div style={styles.planSectionTitle}>Módulos DAPE</div>
+          <div style={styles.planSectionTitle}>Módulos DAPLE</div>
           <div style={styles.modulesList}>
             {modules.map(m => (
               <span key={m} style={styles.moduleBadge}>{getModuleLabel(m)}</span>
@@ -831,7 +864,7 @@ const Landing = () => {
               </div>
               <div style={styles.statItem}>
                 <span style={styles.statNum}>7</span>
-                <span style={styles.statLabel}>Módulos DAPE</span>
+                <span style={styles.statLabel}>Módulos DAPLE</span>
               </div>
               <div style={styles.statItem}>
                 <span style={styles.statNum}>99.9%</span>
@@ -846,9 +879,9 @@ const Landing = () => {
               <div style={styles.heroDecorRing} />
               <div style={styles.sammyGlow} />
               <img
-                src={sammy}
+                src={dapleFoguete}
                 alt="DAPLE Mascote"
-                style={{ ...styles.sammyImg, animation: "float 3s ease-in-out infinite" }}
+                style={{ width: "280px", position: "relative", zIndex: 1, filter: "drop-shadow(0 16px 48px rgba(245,195,0,0.3))", animation: "float 3s ease-in-out infinite" }}
               />
             </div>
           </div>
@@ -951,6 +984,7 @@ const Landing = () => {
         <div style={styles.ctaDecor1} />
         <div style={styles.ctaDecor2} />
         <div style={styles.ctaInner}>
+          <img src={dapleDecolando} alt="DAPLE decolando" style={{ width: "120px", marginBottom: "16px" }} />
           <h2 style={styles.ctaTitle}>Pronto para transformar seu atendimento?</h2>
           <p style={styles.ctaSubtitle}>
             Junte-se a mais de 500 empresas que já usam o DAPLE para crescer mais rápido, atender melhor e vender mais.

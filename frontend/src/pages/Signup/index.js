@@ -14,7 +14,7 @@ import Typography from "@material-ui/core/Typography";
 import { makeStyles } from "@material-ui/core/styles";
 import InputMask from 'react-input-mask';
 import logo from "../../assets/daple-logo.png";
-import sammy from "../../assets/sammy.png";
+import dapleMascote from "../../assets/daple-mascote.png";
 import { i18n } from "../../translate/i18n";
 import { openApi } from "../../services/api";
 import toastError from "../../errors/toastError";
@@ -359,7 +359,7 @@ const SignUp = () => {
           <div className={classes.leftDecorCircle} />
           <div className={classes.leftDecorCircle2} />
           <img src={logo} alt="DAPLE" className={classes.logoLeft} />
-          <img src={sammy} alt="Sammy" className={classes.sammyImg} />
+          <img src={dapleMascote} alt="DAPLE Mascote" className={classes.sammyImg} />
           <Typography className={classes.tagline}>
             Comece sua jornada<br />inteligente hoje
           </Typography>
