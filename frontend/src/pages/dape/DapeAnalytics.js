@@ -112,7 +112,7 @@ function AnalyticsDashboard() {
     <div style={containerStyle}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>📊 DAPE Analytics</div>
+        <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>📊 DAPLE Analytics</div>
         <div style={{ display: "flex", gap: 6 }}>
           {PERIODS.map(p => (
             <button key={p.value} onClick={() => setPeriod(p.value)} style={{

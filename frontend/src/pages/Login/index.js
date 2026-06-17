@@ -14,7 +14,7 @@ import { versionSystem } from "../../../package.json";
 import { nomeEmpresa } from "../../../package.json";
 import { i18n } from "../../translate/i18n";
 import { AuthContext } from "../../context/Auth/AuthContext";
-import logo from "../../assets/logo-clean.png";
+import logo from "../../assets/daple-logo.png";
 import sammy from "../../assets/sammy.png";
 import LanguageControl from "../../components/LanguageControl";
 
@@ -248,7 +248,7 @@ const Login = () => {
         <div className={classes.leftPanel}>
           <div className={classes.leftDecorCircle} />
           <div className={classes.leftDecorCircle2} />
-          <img src={logo} alt="DAPE" className={classes.logoLeft} />
+          <img src={logo} alt="DAPLE" className={classes.logoLeft} />
           <img src={sammy} alt="Sammy" className={classes.sammyImg} />
           <Typography className={classes.tagline}>
             Seu atendimento<br />inteligente começa aqui

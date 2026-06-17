@@ -602,7 +602,7 @@ const MainListItems = (props) => {
             )}
             <ListItemLink
               to="/dape/master"
-              primary="⚡ DAPE Master"
+              primary="⚡ DAPLE Master"
               icon={<StarsIcon />}
             />
             <ListItemLink

@@ -74,7 +74,7 @@ export default function DapeIASummary({ ticketId }) {
   return (
     <div style={s.wrap}>
       <div style={s.header}>
-        <span style={s.title}>🤖 DAPE IA — Resumo</span>
+        <span style={s.title}>🤖 DAPLE IA — Resumo</span>
         <button style={s.btnPrimary} onClick={handleGenerate} disabled={generating}>
           {generating ? "Gerando..." : "✨ Gerar Resumo"}
         </button>

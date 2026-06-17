@@ -219,7 +219,7 @@ export default function DapeRadarPage() {
   return (
     <Box className={classes.root}>
       <Box className={classes.header}>
-        <Typography variant="h5" style={{ fontWeight: "bold" }}>📡 DAPE Radar — Oportunidades</Typography>
+        <Typography variant="h5" style={{ fontWeight: "bold" }}>📡 DAPLE Radar — Oportunidades</Typography>
         <Box style={{ display: "flex", gap: 8 }}>
           <Button startIcon={<CloudUploadIcon />} variant="outlined" onClick={() => setImportOpen(true)}>
             Importar JSON

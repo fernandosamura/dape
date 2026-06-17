@@ -37,7 +37,7 @@ function IntelligenceDashboard() {
   return (
     <div style={{ padding: "20px 24px", fontFamily: "inherit", background: "#F9FAFB", minHeight: "100vh" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>🏢 DAPE Intelligence</div>
+        <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>🏢 DAPLE Intelligence</div>
         <div style={{ fontSize: 13, color: "#6B7280" }}>{total} perfis analisados</div>
       </div>
 

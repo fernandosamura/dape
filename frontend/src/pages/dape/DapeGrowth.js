@@ -321,7 +321,7 @@ function GrowthDashboard() {
   return (
     <div style={{ padding: "20px 24px", fontFamily: "inherit", background: "#F9FAFB", minHeight: "100vh" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>🚀 DAPE Growth</div>
+        <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>🚀 DAPLE Growth</div>
         <button onClick={() => { setEditCampaign(null); setModalOpen(true); }} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#22C55E", color: "#fff", fontWeight: "bold", fontSize: 13, cursor: "pointer" }}>+ Nova Campanha</button>
       </div>
 

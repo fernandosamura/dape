@@ -113,13 +113,13 @@ export default function DapeLeadScoreWidget({ contactId, ticketId }) {
     setShowEvents(!showEvents);
   }
 
-  if (loading) return <div style={styles.widget}><div style={styles.loading}>Carregando DAPE Score...</div></div>;
+  if (loading) return <div style={styles.widget}><div style={styles.loading}>Carregando DAPLE Score...</div></div>;
   if (!scoreData) return null;
 
   return (
     <div style={styles.widget}>
       <div style={styles.header}>
-        <span style={styles.title}>⚡ DAPE Score</span>
+        <span style={styles.title}>⚡ DAPLE Score</span>
         <button style={styles.btnPrimary} onClick={() => setModalOpen(true)}>+ Evento</button>
       </div>
 

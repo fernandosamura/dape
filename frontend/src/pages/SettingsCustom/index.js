@@ -193,11 +193,11 @@ const SettingsCustom = () => {
               >
                 <div style={{ padding: "24px", background: "#fff8e1", borderRadius: 8, border: "1px solid #ffe082" }}>
                   <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: "#e65100" }}>
-                    ⚡ Gestão centralizada no DAPE Master
+                    ⚡ Gestão centralizada no DAPLE Master
                   </p>
                   <p style={{ margin: "8px 0 16px", color: "#555", fontSize: 14 }}>
                     Empresas e Planos agora são gerenciados em um único painel integrado — 
-                    incluindo planos do sistema, planos DAPE e configuração de módulos por empresa.
+                    incluindo planos do sistema, planos DAPLE e configuração de módulos por empresa.
                   </p>
                   <Link to="/dape/master" style={{ 
                     display: "inline-block", padding: "10px 20px",
@@ -225,7 +225,7 @@ const SettingsCustom = () => {
               >
                 <div style={{ padding: "24px", background: "#fff8e1", borderRadius: 8, border: "1px solid #ffe082", marginBottom: 16 }}>
                   <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: "#e65100" }}>
-                    ⚡ Gestão centralizada no DAPE Master
+                    ⚡ Gestão centralizada no DAPLE Master
                   </p>
                   <p style={{ margin: "8px 0 16px", color: "#555", fontSize: 14 }}>
                     Os planos do sistema e DAPE agora podem ser gerenciados juntos no painel integrado.

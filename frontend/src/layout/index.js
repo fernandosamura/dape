@@ -21,7 +21,7 @@ import BackdropLoading from "../components/BackdropLoading";
 import { i18n } from "../translate/i18n";
 import toastError from "../errors/toastError";
 import AnnouncementsPopover from "../components/AnnouncementsPopover";
-import logo from "../assets/logo-clean.png";
+import logo from "../assets/daple-logo.png";
 import sammy from "../assets/sammy.png";
 import { SocketContext } from "../context/Socket/SocketContext";
 import ChatPopover from "../pages/Chat/ChatPopover";
@@ -218,7 +218,7 @@ const LoggedInLayout = ({ children }) => {
       >
         {/* LOGO HEADER */}
         <div className={classes.toolbarIcon}>
-          <img src={logo} className={classes.logo} alt="DAPE" />
+          <img src={logo} className={classes.logo} alt="DAPLE" />
           <IconButton onClick={() => setDrawerOpen(!drawerOpen)} className={classes.chevronBtn}>
             <ChevronLeftIcon />
           </IconButton>
@@ -237,7 +237,7 @@ const LoggedInLayout = ({ children }) => {
         {drawerOpen ? (
           <div className={classes.sammyContainer}>
             <img src={sammy} alt="Sammy" className={classes.sammyImg} />
-            <Typography className={classes.sammyText}>Assistente DAPE</Typography>
+            <Typography className={classes.sammyText}>Assistente DAPLE</Typography>
           </div>
         ) : (
           <div className={classes.sammyContainerClosed}>

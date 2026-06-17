@@ -139,7 +139,7 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
             </Grid>
           ))}
 
-          <Grid item xs={12}><Divider /><Typography variant="subtitle2" style={{ fontWeight: 600, marginTop: 8 }}>Módulos DAPE</Typography></Grid>
+          <Grid item xs={12}><Divider /><Typography variant="subtitle2" style={{ fontWeight: 600, marginTop: 8 }}>Módulos DAPLE</Typography></Grid>
           {MODULE_KEYS.map(m => (
             <Grid item xs={6} md={4} key={m.key}>
               <FormControlLabel
@@ -378,7 +378,7 @@ export default function DapeMasterPanel() {
     <Box className={classes.root}>
       <Box className={classes.header}>
         <Typography variant="h5" style={{ fontWeight: 700 }}>
-          ⚡ Central de Administração DAPE
+          ⚡ Central de Administração DAPLE
         </Typography>
         <IconButton onClick={loadAll} disabled={loading}>
           <RefreshIcon />
