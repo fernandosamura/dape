@@ -37,6 +37,7 @@ import Files from "../pages/Files/";
 import Prompts from "../pages/Prompts";
 import QueueIntegration from "../pages/QueueIntegration";
 import ForgetPassword from "../pages/ForgetPassWord/"; // Reset PassWd
+import Landing from "../pages/Landing";
 import CampaignsPhrase from "../pages/CampaignsPhrase";
 import FlowBuilder from "../pages/FlowBuilder";
 import FlowBuilderConfig from "../pages/FlowBuilderConfig";
@@ -62,6 +63,7 @@ const Routes = () => {
       <AuthProvider>
         <TicketsContextProvider>
           <Switch>
+            <Route exact path="/landing" component={Landing} />
             <Route exact path="/login" component={Login} />
             <Route exact path="/signup" component={Signup} />
             <Route exact path="/forgetpsw" component={ForgetPassword} />

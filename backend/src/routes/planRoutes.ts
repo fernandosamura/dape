@@ -3,8 +3,12 @@ import isAuth from "../middleware/isAuth";
 import isSuper from "../middleware/isSuper";
 
 import * as PlanController from "../controllers/PlanController";
+import { landingPlans } from "../controllers/LandingPlansController";
 
 const planRoutes = express.Router();
+
+// Public route - no auth required
+planRoutes.get("/plans/landing", landingPlans);
 
 planRoutes.get("/plans", isAuth, PlanController.index);
 

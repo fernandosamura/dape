@@ -307,6 +307,18 @@ const Login = () => {
                 </Link>
               </Grid>
             </Grid>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '16px 0 4px' }}>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+              <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '12px', whiteSpace: 'nowrap' }}>ou</span>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+            </div>
+            <Grid container justifyContent="center">
+              <Grid item>
+                <Link component={RouterLink} to="/landing" style={{ color: '#F5C300', fontSize: '13px', textDecoration: 'none' }}>
+                  Ver nossos planos →
+                </Link>
+              </Grid>
+            </Grid>
           </form>
 
           <Box mt={4} width="100%">
