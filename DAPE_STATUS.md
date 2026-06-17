@@ -18,8 +18,8 @@
 Legenda: ✅ Completo | 🔄 Em andamento | ⬜ Pendente | ❌ Com erro
 
 ## Último backup realizado
-Local: /home/backup/dape_auto_20260615_143722
-Data: 2026-06-15 14:37:22
+Local: /home/backup/dape_20260617_002747
+Data: 2026-06-17 00:27:47
 
 ## DAPE Automation — COMPLETO (2026-06-15)
 
