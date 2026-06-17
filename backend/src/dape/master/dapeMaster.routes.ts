@@ -36,6 +36,7 @@ router.get('/native/companies', unifiedCtrl.listCompanies);
 router.post('/native/companies', unifiedCtrl.createCompany);
 router.put('/native/companies/:id', unifiedCtrl.updateCompany);
 router.delete('/native/companies/:id', unifiedCtrl.removeCompany);
+router.put('/native/companies/:id/approve', unifiedCtrl.approveCompany);
 
 // ── Plans nativas (aliases) ───────────────────────────────────────────────────
 router.get('/native/plans', unifiedCtrl.listUnifiedPlans);

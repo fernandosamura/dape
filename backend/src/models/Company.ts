@@ -43,6 +43,9 @@ class Company extends Model<Company> {
   status: boolean;
 
   @Column
+  approved: boolean;
+
+  @Column
   dueDate: string;
 
   @Column

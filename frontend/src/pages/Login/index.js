@@ -14,6 +14,7 @@ import { versionSystem } from "../../../package.json";
 import { nomeEmpresa } from "../../../package.json";
 import { i18n } from "../../translate/i18n";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import api from "../../services/api";
 import logo from "../../assets/daple-logo.png";
 import sammy from "../../assets/sammy.png";
 import LanguageControl from "../../components/LanguageControl";
@@ -210,14 +211,56 @@ const useStyles = makeStyles(theme => ({
 const Login = () => {
   const classes = useStyles();
   const [user, setUser] = useState({ email: "", password: "" });
+  const [pendingApproval, setPendingApproval] = useState(false);
   const [anchorElLanguage, setAnchorElLanguage] = useState(null);
   const [menuLanguageOpen, setMenuLanguageOpen] = useState(false);
   const { handleLogin } = useContext(AuthContext);
 
   const handleChangeInput = e => setUser({ ...user, [e.target.name]: e.target.value });
-  const handlSubmit = e => { e.preventDefault(); handleLogin(user); };
+  const handlSubmit = async e => {
+    e.preventDefault();
+    try {
+      await api.post("/auth/login", user);
+    } catch (err) {
+      if (err?.response?.data?.error === "ERR_COMPANY_PENDING_APPROVAL") {
+        setPendingApproval(true);
+        return;
+      }
+    }
+    handleLogin(user);
+  };
   const handlemenuLanguage = e => { setAnchorElLanguage(e.currentTarget); setMenuLanguageOpen(true); };
   const handleCloseMenuLanguage = () => { setAnchorElLanguage(null); setMenuLanguageOpen(false); };
+
+  if (pendingApproval) {
+    return (
+      <div className={classes.root}>
+        <div className={classes.bgDecor} />
+        <div className={classes.bgDecor2} />
+        <div className={classes.card} style={{ maxWidth: 480, minHeight: "auto" }}>
+          <div className={classes.rightPanel} style={{ alignItems: "center", textAlign: "center", padding: "56px 40px" }}>
+            <img src={sammy} alt="DAPLE" style={{ width: 130, marginBottom: 24, animation: "none", opacity: 0.85 }} />
+            <div style={{ fontSize: 48, marginBottom: 12 }}>⏳</div>
+            <Typography style={{ color: "#F5C300", fontWeight: 800, fontSize: 22, marginBottom: 8 }}>
+              Aguardando Aprovação
+            </Typography>
+            <Typography style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+              Sua conta foi criada com sucesso!<br />
+              Um administrador precisa aprovar o acesso antes que você possa entrar no sistema.<br /><br />
+              Entre em contato com o suporte para agilizar a liberação.
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={() => setPendingApproval(false)}
+              style={{ borderColor: "rgba(245,195,0,0.4)", color: "#F5C300", borderRadius: 10 }}
+            >
+              ← Voltar ao login
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={classes.root}>

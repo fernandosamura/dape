@@ -46,6 +46,10 @@ const AuthUserService = async ({
     throw new AppError("ERR_INVALID_CREDENTIALS", 401);
   }
 
+  if (user.company && user.company.approved === false) {
+    throw new AppError("ERR_COMPANY_PENDING_APPROVAL", 403);
+  }
+
   const token = createAccessToken(user);
   const refreshToken = createRefreshToken(user);
 

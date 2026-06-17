@@ -65,7 +65,8 @@ const CreateCompanyService = async (
     status,
     planId,
     dueDate,
-    recurrence
+    recurrence,
+    approved: false
   });
 
   const passwordHash = await hash(password || "123456", 8);

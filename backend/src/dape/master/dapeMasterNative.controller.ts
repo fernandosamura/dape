@@ -286,7 +286,7 @@ export const listCompanies = async (req: Request, res: Response) => {
   try {
     const companies = await sequelize.query(
       `SELECT 
-        c.id, c.name, c.email, c."planId", c.phone, c.status, c."dueDate", c."createdAt",
+        c.id, c.name, c.email, c."planId", c.phone, c.status, c."approved", c."dueDate", c."createdAt",
         dp.id AS dape_plan_id, dp.name AS plan_name, dp.price_monthly AS plan_price,
         dtp.is_master, dtp.plan_ends_at,
         (SELECT COUNT(*) FROM "Users" u WHERE u."companyId" = c.id) AS user_count
@@ -450,6 +450,19 @@ export const setModuleOverride = async (req: Request, res: Response) => {
     return res.json({ success: true });
   } catch (err: any) {
     console.error("[DAPE] setModuleOverride error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const approveCompany = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await sequelize.query(
+      `UPDATE "Companies" SET "approved" = true WHERE id = :id`,
+      { replacements: { id }, type: QueryTypes.UPDATE }
+    );
+    return res.json({ success: true });
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 };

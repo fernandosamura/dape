@@ -7,7 +7,7 @@ import {
   Card, CardContent, CardActions, Divider, Alert
 } from "@material-ui/core";
 import {
-  Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon,
+  Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, HowToReg as ApproveIcon,
   Business as BusinessIcon, Assignment as PlanIcon,
   Settings as SettingsIcon, BarChart as StatsIcon,
   Refresh as RefreshIcon, CheckCircle, Cancel, Warning
@@ -368,6 +368,17 @@ export default function DapeMasterPanel() {
     }
   };
 
+  const handleApproveCompany = async (company) => {
+    if (!window.confirm(`Aprovar acesso da empresa "${company.name}"?`)) return;
+    try {
+      await api.put(`/dape/master/native/companies/${company.id}/approve`);
+      toast.success("Empresa aprovada! Agora pode acessar o sistema.");
+      loadCompanies();
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Erro ao aprovar empresa");
+    }
+  };
+
   const statusChip = (status) => {
     const isActive = status === true || status === "active";
     return <Chip label={isActive ? "Ativo" : "Inativo"} size="small"
@@ -411,6 +422,7 @@ export default function DapeMasterPanel() {
                   <TableCell>Valor</TableCell>
                   <TableCell>Vencimento</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Aprovação</TableCell>
                   <TableCell>Usuários</TableCell>
                   <TableCell>Ações</TableCell>
                 </TableRow>
@@ -428,6 +440,13 @@ export default function DapeMasterPanel() {
                     <TableCell>{c.plan_price ? `R$ ${parseFloat(c.plan_price).toFixed(2)}` : "—"}</TableCell>
                     <TableCell>{c.dueDate && new Date(c.dueDate).getFullYear() > 1970 ? new Date(c.dueDate).toLocaleDateString("pt-BR") : "—"}</TableCell>
                     <TableCell>{statusChip(c.status)}</TableCell>
+                    <TableCell>
+                      {c.approved ? (
+                        <Chip label="Aprovada" size="small" style={{ background: "#e8f5e9", color: "#388e3c", fontWeight: 600 }} />
+                      ) : (
+                        <Chip label="Pendente" size="small" style={{ background: "#fff3e0", color: "#e65100", fontWeight: 600 }} />
+                      )}
+                    </TableCell>
                     <TableCell>{c.user_count || 0}</TableCell>
                     <TableCell>
                       <Tooltip title="Editar empresa">
@@ -440,6 +459,13 @@ export default function DapeMasterPanel() {
                           <SettingsIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      {!c.is_master && !c.approved && (
+                        <Tooltip title="Aprovar empresa">
+                          <IconButton size="small" onClick={() => handleApproveCompany(c)} style={{ color: "#4CAF50" }}>
+                            <ApproveIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       {!c.is_master && (
                         <Tooltip title="Excluir empresa">
                           <IconButton size="small" onClick={() => handleDeleteCompany(c)}>

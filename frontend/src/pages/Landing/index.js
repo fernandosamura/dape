@@ -31,7 +31,7 @@ const styles = {
     boxShadow: "0 4px 30px rgba(0,0,0,0.5)",
   },
   navLogo: {
-    height: "38px",
+    height: "60px",
   },
   navActions: {
     display: "flex",
@@ -567,7 +567,7 @@ const styles = {
     gap: "16px",
   },
   footerLogo: {
-    height: "28px",
+    height: "48px",
     opacity: 0.7,
   },
   footerText: {
@@ -631,6 +631,7 @@ function formatLimit(val) {
 }
 
 const FEATURES = [
+  { key: "_whatsapp", label: "WhatsApp", always: true },
   { key: "use_campaigns", label: "Campanhas" },
   { key: "use_schedules", label: "Agendamentos" },
   { key: "use_internal_chat", label: "Chat Interno" },
@@ -707,7 +708,7 @@ const PlanCard = ({ plan, history }) => {
       <div style={styles.planSectionTitle}>Funcionalidades</div>
       <ul style={styles.planFeaturesList}>
         {FEATURES.map(f => {
-          const enabled = Boolean(plan[f.key]);
+          const enabled = f.always ? true : Boolean(plan[f.key]);
           return (
             <li key={f.key} style={styles.planFeatureItem}>
               <span style={enabled ? styles.planFeatureCheck : styles.planFeatureCross}>
@@ -813,7 +814,7 @@ const Landing = () => {
             </p>
             <div style={styles.heroButtons}>
               <RouterLink to="/signup" style={styles.btnHeroPrimary}>
-                🚀 Começar Gratuitamente
+                Assinar um Plano →
               </RouterLink>
               <a href="#planos" style={styles.btnHeroSecondary}>
                 Ver Planos ↓
@@ -955,7 +956,7 @@ const Landing = () => {
             Junte-se a mais de 500 empresas que já usam o DAPLE para crescer mais rápido, atender melhor e vender mais.
           </p>
           <RouterLink to="/signup" style={styles.ctaBtn}>
-            🚀 Começar Gratuitamente
+            Assinar um Plano →
           </RouterLink>
         </div>
       </section>
