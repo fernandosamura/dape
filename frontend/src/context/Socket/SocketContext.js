@@ -115,7 +115,8 @@ const SocketManager = {
         return new DummySocket();
       }
       
-      this.currentSocket = openSocket(process.env.REACT_APP_BACKEND_URL, {
+      const backendUrl = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/api\/?$/, "");
+      this.currentSocket = openSocket(backendUrl, {
         transports: ["websocket", "polling"],
         pingTimeout: 18000,
         pingInterval: 18000,
