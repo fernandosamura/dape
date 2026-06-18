@@ -441,7 +441,7 @@ export const setModuleOverride = async (req: Request, res: Response) => {
     if (!companyId || !moduleKey) return res.status(400).json({ error: "companyId e moduleKey obrigatórios" });
 
     await sequelize.query(
-      `INSERT INTO dape_module_overrides (company_id, module_key, is_enabled, created_at, updated_at)
+      `INSERT INTO dape_tenant_module_overrides (company_id, module_key, is_enabled, created_at, updated_at)
        VALUES (:cid, :key, :enabled, NOW(), NOW())
        ON CONFLICT (company_id, module_key) DO UPDATE SET is_enabled = :enabled, updated_at = NOW()`,
       { replacements: { cid: companyId, key: moduleKey, enabled: isEnabled }, type: QueryTypes.INSERT }

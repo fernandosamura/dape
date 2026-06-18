@@ -22,8 +22,10 @@ async function runDailySnapshot(): Promise<void> {
       `SELECT DISTINCT tp.company_id
        FROM dape_tenant_plans tp
        JOIN dape_plan_modules pm ON pm.plan_id = tp.plan_id
-       JOIN dape_available_modules am ON am.id = pm.module_id
-       WHERE am.module_key = 'dape_analytics' AND pm.enabled = true`,
+       WHERE pm.module_key = 'dape_analytics'
+         AND pm.is_enabled = true
+         AND tp.is_active = true
+         AND (tp.plan_ends_at IS NULL OR tp.plan_ends_at >= CURRENT_DATE)`,
       { type: QueryTypes.SELECT }
     );
 

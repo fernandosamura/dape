@@ -221,13 +221,12 @@ const Login = () => {
     e.preventDefault();
     try {
       await api.post("/auth/login", user);
+      handleLogin(user);
     } catch (err) {
       if (err?.response?.data?.error === "ERR_COMPANY_PENDING_APPROVAL") {
         setPendingApproval(true);
-        return;
       }
     }
-    handleLogin(user);
   };
   const handlemenuLanguage = e => { setAnchorElLanguage(e.currentTarget); setMenuLanguageOpen(true); };
   const handleCloseMenuLanguage = () => { setAnchorElLanguage(null); setMenuLanguageOpen(false); };
