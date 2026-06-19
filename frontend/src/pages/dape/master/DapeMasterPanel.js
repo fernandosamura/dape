@@ -162,7 +162,7 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
             <TextField fullWidth label="Descrição" value={form.description} onChange={e => set("description", e.target.value)} variant="outlined" size="small" multiline rows={2} />
           </Grid>
           <Grid item xs={12}>
-            <TextField fullWidth label="Modelos de IA Permitidos (separados por vírgula)" value={form.allowed_ia_models} onChange={e => set("allowed_ia_models", e.target.value)} variant="outlined" size="small" placeholder="Ex: gpt-4,gpt-3.5-turbo,claude-3 (vazio = sem restrição)" helperText="Deixe vazio para permitir todos os modelos" />
+            <TextField fullWidth label="Modelos de IA Permitidos (separados por vírgula)" value={form.allowed_ia_models} onChange={e => set("allowed_ia_models", e.target.value)} variant="outlined" size="small" placeholder="Ex: gpt-4,gpt-3.5-turbo,claude-3 (vazio = sem restrição)" helperText="Deixe vazio para liberar todos. Ou digite: openai, anthropic, gemini, manus" />
           </Grid>
 
           <Grid item xs={12}><Typography variant="subtitle2" style={{ fontWeight: 600 }}>Limites do Sistema</Typography></Grid>
