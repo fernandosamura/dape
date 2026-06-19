@@ -2468,6 +2468,40 @@ const handleMessage = async (
       }
     }
 
+    // Non-blocking Pipeline stage analysis every 5 inbound messages
+    if (!msg.key.fromMe && unreadMessages > 0 && unreadMessages % 5 === 0) {
+      (async () => {
+        try {
+          const { PipelineAgent } = await import('../../dape/agents/PipelineAgent');
+          const agent = new PipelineAgent(companyId);
+          const result = await agent.analyzeConversationAndSuggestStage(
+            contact.id,
+            ticket.id,
+            companyId
+          );
+
+          if (result && result.shouldAdvance && result.confidence === 'high') {
+            // Auto-advance the deal stage
+            const DapeDeal = (await import('../../models/DapeDeal')).default;
+            await DapeDeal.update(
+              { stage: result.suggestedStage },
+              { where: { id: result.dealId, companyId, status: 'open' } }
+            );
+            console.log(
+              
+            );
+          } else if (result && result.shouldAdvance && result.confidence === 'medium') {
+            // Log suggestion for human review (don't auto-update)
+            console.log(
+              
+            );
+          }
+        } catch (err) {
+          console.error('[wbotMessageListener] PipelineAgent error (non-blocking):', err);
+        }
+      })();
+    }
+
     const currentSchedule = await VerifyCurrentSchedule(companyId);
     const scheduleType = await Setting.findOne({
       where: {
