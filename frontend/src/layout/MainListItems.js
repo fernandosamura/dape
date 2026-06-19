@@ -572,6 +572,13 @@ const MainListItems = (props) => {
                 icon={<TrendingUpIcon />}
               />
             )}
+            {hasPipeline && (
+              <ListItemLink
+                to="/dape/kanban"
+                primary="🏆 Kanban"
+                icon={<TrendingUpIcon />}
+              />
+            )}
             {hasAnalytics && (
               <ListItemLink
                 to="/dape/analytics"
