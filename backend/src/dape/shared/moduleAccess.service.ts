@@ -166,18 +166,18 @@ export const moduleAccessService = {
     } catch { /* log failure should not break the request */ }
   },
 
-  async getPlanFeatures(companyId: number): Promise<{ use_facebook: boolean; use_instagram: boolean; allowedIaModels: string[] }> {
+  async getPlanFeatures(companyId: number): Promise<{ use_facebook: boolean; use_instagram: boolean; allowedIaModels: string[]; use_ia_audio_reply: boolean }> {
     const cacheKey = `plan_features:${companyId}`;
-    const cached = cacheGet<{ use_facebook: boolean; use_instagram: boolean; allowedIaModels: string[] }>(cacheKey);
+    const cached = cacheGet<{ use_facebook: boolean; use_instagram: boolean; allowedIaModels: string[]; use_ia_audio_reply: boolean }>(cacheKey);
     if (cached) return cached;
 
     if (await isMasterCompany(companyId)) {
-      const result = { use_facebook: true, use_instagram: true, allowedIaModels: [] };
+      const result = { use_facebook: true, use_instagram: true, allowedIaModels: [], use_ia_audio_reply: true };
       cacheSet(cacheKey, result);
       return result;
     }
 
-    const sql = `SELECT dp.use_facebook, dp.use_instagram, dp.allowed_ia_models
+    const sql = `SELECT dp.use_facebook, dp.use_instagram, dp.allowed_ia_models, dp.use_ia_audio_reply
        FROM dape_tenant_plans tp
        JOIN dape_plans dp ON dp.id = tp.plan_id
        WHERE tp.company_id = :companyId AND tp.is_active = TRUE
@@ -190,6 +190,7 @@ export const moduleAccessService = {
       use_facebook: rows[0]?.use_facebook !== false,
       use_instagram: rows[0]?.use_instagram !== false,
       allowedIaModels: Array.isArray(rows[0]?.allowed_ia_models) ? rows[0].allowed_ia_models : [],
+      use_ia_audio_reply: rows[0]?.use_ia_audio_reply === true,
     };
     cacheSet(cacheKey, result);
     return result;

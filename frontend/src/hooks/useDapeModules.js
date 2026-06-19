@@ -10,6 +10,7 @@ export function useDapeModules() {
   const { user } = useContext(AuthContext);
   const [enabledModules, setEnabledModules] = useState(cachedModules?.enabledModules || []);
   const [modules, setModules] = useState(cachedModules?.modules || []);
+  const [planFeatures, setPlanFeatures] = useState(cachedModules?.planFeatures || {});
   const [isLoading, setIsLoading] = useState(!cachedModules);
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export function useDapeModules() {
         cacheTime = Date.now();
         setEnabledModules(data.enabledModules || []);
         setModules(data.modules || []);
+        setPlanFeatures(data.planFeatures || {});
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -37,6 +39,7 @@ export function useDapeModules() {
   return {
     enabledModules,
     modules,
+    planFeatures,
     hasModule,
     isLoading,
     isMaster: hasModule("dape_pipeline") && hasModule("dape_radar"), // master has all

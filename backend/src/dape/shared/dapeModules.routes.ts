@@ -12,7 +12,8 @@ router.get('/my-access', async (req: Request, res: Response) => {
     const companyId = (req as any).user?.companyId;
     const enabledModules = await moduleAccessService.getEnabledModules(companyId);
     const allStatus = await moduleAccessService.getAllModulesStatus(companyId);
-    res.json({ enabledModules, modules: allStatus });
+    const planFeatures = await moduleAccessService.getPlanFeatures(companyId);
+    res.json({ enabledModules, modules: allStatus, planFeatures });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar módulos' });
   }

@@ -11,10 +11,11 @@ import Title from "../Title";
 import Paper from "@material-ui/core/Paper";
 import Typography from "@material-ui/core/Typography";
 import useSettings from "../../hooks/useSettings";
+import { useDapeModules } from "../../hooks/useDapeModules";
 import { ToastContainer, toast } from 'react-toastify';
 import { makeStyles } from "@material-ui/core/styles";
 import { grey, blue } from "@material-ui/core/colors";
-import { Tabs, Tab } from "@material-ui/core";
+import { Tabs, Tab, Switch, FormControlLabel } from "@material-ui/core";
 import { i18n } from "../../translate/i18n";
 
 //import 'react-toastify/dist/ReactToastify.css';
@@ -124,6 +125,8 @@ export default function Options(props) {
   const [loadingManusApiKey, setLoadingManusApiKey] = useState(false);
   const [manusBaseUrl, setManusBaseUrl] = useState("");
   const [loadingManusBaseUrl, setLoadingManusBaseUrl] = useState(false);
+  const [iaAudioReplyEnabled, setIaAudioReplyEnabled] = useState(false);
+  const [loadingIaAudioReply, setLoadingIaAudioReply] = useState(false);
   
   // recursos a mais da plw design
 
@@ -137,6 +140,7 @@ export default function Options(props) {
   const [loadingSendGreetingMessageOneQueues, setLoadingSendGreetingMessageOneQueues] = useState(false);
 
   const { update } = useSettings();
+  const { planFeatures } = useDapeModules();
 
   useEffect(() => {
     if (Array.isArray(settings) && settings.length) {
@@ -232,6 +236,9 @@ export default function Options(props) {
 
       const manusBaseUrlSetting = settings.find((s) => s.key === "manusBaseUrl");
       if (manusBaseUrlSetting) setManusBaseUrl(manusBaseUrlSetting.value || "");
+
+      const iaAudioReplySetting = settings.find((s) => s.key === "iaAudioReplyEnabled");
+      if (iaAudioReplySetting) setIaAudioReplyEnabled(iaAudioReplySetting.value === "true");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
@@ -918,6 +925,32 @@ export default function Options(props) {
           <FormHelperText>{loadingManusBaseUrl ? "Salvando..." : "Endpoint compatível com OpenAI (deixe vazio para padrão)"}</FormHelperText>
         </FormControl>
       </Grid>
+
+      {planFeatures?.use_ia_audio_reply && (
+        <Grid xs={12} sm={6} md={6} item>
+          <FormControl className={classes.selectContainer}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={iaAudioReplyEnabled}
+                  onChange={async (e) => {
+                    const newVal = e.target.checked;
+                    setIaAudioReplyEnabled(newVal);
+                    setLoadingIaAudioReply(true);
+                    await update({ key: "iaAudioReplyEnabled", value: newVal ? "true" : "false" });
+                    setLoadingIaAudioReply(false);
+                  }}
+                  color="primary"
+                />
+              }
+              label="Resposta em Áudio (TTS)"
+            />
+            <FormHelperText>
+              {loadingIaAudioReply ? "Salvando..." : "Habilitar respostas automáticas em áudio via TTS"}
+            </FormHelperText>
+          </FormControl>
+        </Grid>
+      )}
 
     </>
   );

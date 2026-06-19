@@ -1,0 +1,1 @@
+ALTER TABLE dape_plans ADD COLUMN IF NOT EXISTS use_ia_audio_reply BOOLEAN DEFAULT FALSE;

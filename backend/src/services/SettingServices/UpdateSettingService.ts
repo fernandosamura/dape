@@ -1,5 +1,7 @@
 import AppError from "../../errors/AppError";
 import Setting from "../../models/Setting";
+import Company from "../../models/Company";
+import Plan from "../../models/Plan";
 
 interface Request {
   key: string;
@@ -12,6 +14,13 @@ const UpdateSettingService = async ({
   value,
   companyId
 }: Request): Promise<Setting | undefined> => {
+  if (key === "iaAudioReplyEnabled" && (value === "true" || value === true as any)) {
+    const company = await Company.findByPk(companyId, { include: [{ model: Plan, as: "plan" }] });
+    if (!company?.plan?.useIaAudioReply) {
+      throw new AppError("Funcionalidade não habilitada no plano", 403);
+    }
+  }
+
   const [setting] = await Setting.findOrCreate({
     where: {
       key,

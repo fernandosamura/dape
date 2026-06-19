@@ -44,6 +44,7 @@ const EMPTY_PLAN = {
   max_connections: 3, max_queues: 3,
   use_campaigns: false, use_schedules: false, use_internal_chat: false,
   use_external_api: false, use_kanban: false, use_openai: false, use_integrations: false,
+  use_ia_audio_reply: false,
   allowed_ia_models: "",
   modules: {
     dape_pipeline: false, dape_analytics: false, dape_ia: false,
@@ -78,6 +79,7 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
         use_kanban: plan.use_kanban || false,
         use_openai: plan.use_openai || false,
         use_integrations: plan.use_integrations || false,
+        use_ia_audio_reply: plan.use_ia_audio_reply || false,
         allowed_ia_models: Array.isArray(plan.allowed_ia_models) ? plan.allowed_ia_models.join(", ") : (plan.allowed_ia_models || ""),
         modules: plan.modules || EMPTY_PLAN.modules
       });
@@ -141,7 +143,7 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
           {[
             ["use_campaigns","Campanhas"], ["use_schedules","Agendamentos"],
             ["use_internal_chat","Chat Interno"], ["use_external_api","API Externa"],
-            ["use_kanban","Kanban"], ["use_openai","OpenAI"], ["use_integrations","Integrações"], ["use_facebook","Facebook"], ["use_instagram","Instagram"]
+            ["use_kanban","Kanban"], ["use_openai","OpenAI"], ["use_integrations","Integrações"], ["use_facebook","Facebook"], ["use_instagram","Instagram"], ["use_ia_audio_reply","Resposta em Áudio (TTS)"]
           ].map(([k, l]) => (
             <Grid item xs={6} md={3} key={k}>
               <FormControlLabel control={<Switch checked={!!form[k]} onChange={e => set(k, e.target.checked)} color="primary" size="small" />} label={l} />

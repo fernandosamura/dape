@@ -70,6 +70,10 @@ class Plan extends Model<Plan> {
 
   @Column(DataType.JSONB)
   allowedIaModels: string[];
+
+  @Column
+  useIaAudioReply: boolean;
 }
 
 export default Plan;
+
