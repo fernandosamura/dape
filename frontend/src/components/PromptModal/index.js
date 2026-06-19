@@ -101,7 +101,9 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
     const classes = useStyles();
     const [selectedProvider, setSelectedProvider] = useState("openai");
     const [selectedModel, setSelectedModel] = useState("gpt-3.5-turbo-1106");
+    const [selectedTtsProvider, setSelectedTtsProvider] = useState("azure");
     const [showApiKey, setShowApiKey] = useState(false);
+    const [showVoiceKey, setShowVoiceKey] = useState(false);
 
     const handleToggleApiKey = () => setShowApiKey(!showApiKey);
 
@@ -115,7 +117,11 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
         queueId: "",
         maxMessages: 10,
         provider: "openai",
-        baseUrl: ""
+        baseUrl: "",
+        voice: "texto",
+        voiceKey: "",
+        voiceRegion: "",
+        ttsProvider: "azure"
     };
 
     const [prompt, setPrompt] = useState(initialState);
@@ -134,6 +140,7 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                 const prov = data.provider || "openai";
                 setSelectedProvider(prov);
                 setSelectedModel(data.model || (PROVIDER_MODELS[prov] || [])[0] || "");
+                setSelectedTtsProvider(data.ttsProvider || "azure");
             } catch (err) {
                 toastError(err);
             }
@@ -145,6 +152,7 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
         setPrompt(initialState);
         setSelectedProvider("openai");
         setSelectedModel("gpt-3.5-turbo-1106");
+        setSelectedTtsProvider("azure");
         onClose();
     };
 
@@ -160,7 +168,8 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
         const promptData = {
             ...values,
             model: selectedModel,
-            provider: selectedProvider
+            provider: selectedProvider,
+            ttsProvider: selectedTtsProvider
         };
         if (!values.queueId) {
             toastError(i18n.t("promptModal.setor"));
@@ -333,9 +342,75 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                                     />
                                 </div>
 
+                                {/* ── Configuração de Resposta em Áudio TTS ── */}
+                                <Typography variant="subtitle2" style={{ marginTop: 16, marginBottom: 2, fontWeight: 600 }}>
+                                    🔊 Resposta em Áudio (Text-to-Speech)
+                                </Typography>
+                                <Typography variant="caption" style={{ color: "#555", display: "block", marginBottom: 8 }}>
+                                    Deixe o campo Voz como "texto" para responder por texto. Informe o nome de uma voz do Azure ou Google para ativar respostas em áudio OGG/Opus (compatível com todos os providers de IA).
+                                </Typography>
+
+                                <div className={classes.multFieldLine}>
+                                    <FormControl fullWidth margin="dense" variant="outlined">
+                                        <InputLabel>Provider TTS</InputLabel>
+                                        <Select
+                                            value={selectedTtsProvider}
+                                            onChange={(e) => setSelectedTtsProvider(e.target.value)}
+                                            labelWidth={95}
+                                        >
+                                            <MenuItem value="azure">Microsoft Azure Speech</MenuItem>
+                                            <MenuItem value="google">Google Cloud TTS</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                    <Field
+                                        as={TextField}
+                                        label="Voz"
+                                        name="voice"
+                                        variant="outlined"
+                                        margin="dense"
+                                        fullWidth
+                                        placeholder="texto"
+                                        helperText={selectedTtsProvider === "azure" ? "Ex: pt-BR-FranciscaNeural" : "Ex: pt-BR-Wavenet-B"}
+                                    />
+                                </div>
+
+                                <div className={classes.multFieldLine}>
+                                    <FormControl fullWidth margin="dense" variant="outlined">
+                                        <Field
+                                            as={TextField}
+                                            label={selectedTtsProvider === "azure" ? "Azure Speech Key" : "Google Cloud API Key"}
+                                            name="voiceKey"
+                                            type={showVoiceKey ? "text" : "password"}
+                                            variant="outlined"
+                                            margin="dense"
+                                            fullWidth
+                                            InputProps={{
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton onClick={() => setShowVoiceKey(!showVoiceKey)}>
+                                                            {showVoiceKey ? <VisibilityOff /> : <Visibility />}
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+                                    </FormControl>
+                                    {selectedTtsProvider === "azure" && (
+                                        <Field
+                                            as={TextField}
+                                            label="Região Azure"
+                                            name="voiceRegion"
+                                            variant="outlined"
+                                            margin="dense"
+                                            fullWidth
+                                            placeholder="brazilsouth"
+                                        />
+                                    )}
+                                </div>
+
                                 {selectedProvider !== "openai" && (
-                                    <Typography variant="caption" style={{ color: "#666", display: "block", marginTop: 8 }}>
-                                        ℹ️ A transcrição de áudio (Whisper) está disponível apenas para OpenAI. Para os demais providers, mensagens de áudio não serão processadas pela IA.
+                                    <Typography variant="caption" style={{ color: "#888", display: "block", marginTop: 6 }}>
+                                        ℹ️ Transcrição de áudio de entrada (Whisper) disponível apenas para OpenAI. Resposta em áudio (TTS) funciona com todos os providers.
                                     </Typography>
                                 )}
                             </DialogContent>

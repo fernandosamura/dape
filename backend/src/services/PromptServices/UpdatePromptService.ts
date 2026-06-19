@@ -19,6 +19,10 @@ interface PromptData {
     model: string;
     provider?: string;
     baseUrl?: string;
+    voice?: string;
+    voiceKey?: string;
+    voiceRegion?: string;
+    ttsProvider?: string;
 }
 
 interface Request {
@@ -42,7 +46,7 @@ const UpdatePromptService = async ({
         maxMessages: Yup.number().required("ERR_PROMPT_MAX_MESSAGES_INVALID")
     });
 
-    const { name, apiKey, prompt, maxTokens, temperature, promptTokens, completionTokens, totalTokens, queueId, maxMessages, model, provider, baseUrl } = promptData;
+    const { name, apiKey, prompt, maxTokens, temperature, promptTokens, completionTokens, totalTokens, queueId, maxMessages, model, provider, baseUrl, voice, voiceKey, voiceRegion, ttsProvider } = promptData;
 
     try {
         await promptSchema.validate({ name, apiKey, prompt, maxTokens, temperature, promptTokens, completionTokens, totalTokens, queueId, maxMessages });
@@ -50,7 +54,7 @@ const UpdatePromptService = async ({
         throw new AppError(`${JSON.stringify(err, undefined, 2)}`);
     }
 
-    await promptTable.update({ name, apiKey, prompt, maxTokens, temperature, promptTokens, completionTokens, totalTokens, queueId, maxMessages, model, provider, baseUrl });
+    await promptTable.update({ name, apiKey, prompt, maxTokens, temperature, promptTokens, completionTokens, totalTokens, queueId, maxMessages, model, provider, baseUrl, voice, voiceKey, voiceRegion, ttsProvider });
     await promptTable.reload();
     return promptTable;
 };

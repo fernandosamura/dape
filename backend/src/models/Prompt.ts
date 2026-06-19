@@ -60,6 +60,20 @@ class Prompt extends Model<Prompt> {
   @Column
   baseUrl: string;
 
+  @Column({ defaultValue: "texto" })
+  voice: string;
+
+  @AllowNull(true)
+  @Column
+  voiceKey: string;
+
+  @AllowNull(true)
+  @Column
+  voiceRegion: string;
+
+  @Column({ defaultValue: "azure" })
+  ttsProvider: string;
+
   @AllowNull
   @ForeignKey(() => Queue)
   @Column

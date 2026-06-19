@@ -55,6 +55,7 @@ import {
   SpeechSynthesizer,
   AudioConfig
 } from "microsoft-cognitiveservices-speech-sdk";
+import { execSync } from "child_process";
 import typebotListener from "../TypebotServices/typebotListener";
 import QueueIntegrations from "../../models/QueueIntegrations";
 import ShowQueueIntegrationService from "../QueueIntegrationServices/ShowQueueIntegrationService";
@@ -594,67 +595,95 @@ const sanitizeName = (name: string): string => {
   return sanitized.substring(0, 60);
 };
 
-export const convertTextToSpeechAndSaveToFile = (
+// ── Converte qualquer áudio para OGG/Opus (exigido pelo WhatsApp Web/Baileys)
+const convertToOggOpus = (inputPath: string, outputPath: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    try {
+      execSync(
+        `ffmpeg -i "${inputPath}" -c:a libopus -b:a 32k -vbr on -compression_level 10 "${outputPath}" -y`,
+        { stdio: "pipe" }
+      );
+      resolve();
+    } catch (err) {
+      reject(new Error(`Erro ao converter para OGG/Opus: ${err}`));
+    }
+  });
+};
+
+// ── Azure Cognitive Services TTS ───────────────────────────────────────────
+const convertTextToSpeechAzure = (
   text: string,
   filename: string,
   subscriptionKey: string,
   serviceRegion: string,
-  voice: string = "pt-BR-FabioNeural",
-  audioToFormat: string = "mp3"
+  voice: string
 ): Promise<void> => {
   return new Promise((resolve, reject) => {
-    const speechConfig = SpeechConfig.fromSubscription(
-      subscriptionKey,
-      serviceRegion
-    );
+    const speechConfig = SpeechConfig.fromSubscription(subscriptionKey, serviceRegion);
     speechConfig.speechSynthesisVoiceName = voice;
     const audioConfig = AudioConfig.fromAudioFileOutput(`${filename}.wav`);
     const synthesizer = new SpeechSynthesizer(speechConfig, audioConfig);
     synthesizer.speakTextAsync(
       text,
       result => {
-        if (result) {
-          convertWavToAnotherFormat(
-            `${filename}.wav`,
-            `${filename}.${audioToFormat}`,
-            audioToFormat
-          )
-            .then(output => {
-              resolve();
-            })
-            .catch(error => {
-              console.error(error);
-              reject(error);
-            });
-        } else {
-          reject(new Error("No result from synthesizer"));
-        }
         synthesizer.close();
+        if (result) {
+          resolve();
+        } else {
+          reject(new Error("Azure TTS: sem resultado do sintetizador"));
+        }
       },
       error => {
-        console.error(`Error: ${error}`);
         synthesizer.close();
-        reject(error);
+        reject(new Error(`Azure TTS erro: ${error}`));
       }
     );
   });
 };
 
-const convertWavToAnotherFormat = (
-  inputPath: string,
-  outputPath: string,
-  toFormat: string
-) => {
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(inputPath)
-      .toFormat(toFormat)
-      .on("end", () => resolve(outputPath))
-      .on("error", (err: { message: any }) =>
-        reject(new Error(`Error converting file: ${err.message}`))
-      )
-      .save(outputPath);
+// ── Google Cloud TTS ───────────────────────────────────────────────────────
+const convertTextToSpeechGoogle = async (
+  text: string,
+  filename: string,
+  apiKey: string,
+  voice: string
+): Promise<void> => {
+  const textToSpeech = require("@google-cloud/text-to-speech");
+  const client = new textToSpeech.TextToSpeechClient({ apiKey });
+
+  // Detecta languageCode a partir do nome da voz (ex: pt-BR-Wavenet-A → pt-BR)
+  const langMatch = voice.match(/^([a-z]{2}-[A-Z]{2})/);
+  const languageCode = langMatch ? langMatch[1] : "pt-BR";
+
+  const [response] = await client.synthesizeSpeech({
+    input: { text },
+    voice: { languageCode, name: voice },
+    audioConfig: { audioEncoding: "LINEAR16" } // retorna WAV
   });
+
+  fs.writeFileSync(`${filename}.wav`, response.audioContent, "binary");
+};
+
+// ── Função principal exportada ─────────────────────────────────────────────
+// Gera áudio via TTS (Azure ou Google) e converte para OGG/Opus (WhatsApp)
+export const convertTextToSpeechAndSaveToFile = async (
+  text: string,
+  filename: string,
+  voiceKey: string,
+  voiceRegion: string,
+  voice: string = "pt-BR-FabioNeural",
+  ttsProvider: string = "azure"
+): Promise<void> => {
+  // Etapa 1: gerar WAV via provider TTS
+  if (ttsProvider === "google") {
+    await convertTextToSpeechGoogle(text, filename, voiceKey, voice);
+  } else {
+    // Azure (padrão)
+    await convertTextToSpeechAzure(text, filename, voiceKey, voiceRegion, voice);
+  }
+
+  // Etapa 2: converter WAV → OGG/Opus (exigido pelo WhatsApp Web/Baileys)
+  await convertToOggOpus(`${filename}.wav`, `${filename}.ogg`);
 };
 
 const deleteFileSync = (path: string): void => {
@@ -765,10 +794,41 @@ const handleOpenAi = async (
         .trim();
     }
 
-    const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-      text: response!
-    });
-    await verifyMessage(sentMessage!, ticket, contact);
+    if (!prompt.voice || prompt.voice === "texto") {
+      // Resposta em texto
+      const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+        text: response!
+      });
+      await verifyMessage(sentMessage!, ticket, contact);
+    } else {
+      // Resposta em áudio OGG/Opus (compatível com WhatsApp Web/Baileys)
+      const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
+      try {
+        await convertTextToSpeechAndSaveToFile(
+          keepOnlySpecifiedChars(response!),
+          `${publicFolder}/${fileNameWithOutExtension}`,
+          prompt.voiceKey || "",
+          prompt.voiceRegion || "",
+          prompt.voice,
+          prompt.ttsProvider || "azure"
+        );
+        const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+          audio: { url: `${publicFolder}/${fileNameWithOutExtension}.ogg` },
+          mimetype: "audio/ogg; codecs=opus",
+          ptt: true
+        });
+        await verifyMediaMessage(sendMessage!, ticket, contact, ticketTraking, false, false, wbot);
+        deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.ogg`);
+        deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
+      } catch (error) {
+        logger.error(`[AI] Erro ao gerar resposta de áudio: ${error}`);
+        // Fallback: envia como texto se TTS falhar
+        const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+          text: response!
+        });
+        await verifyMessage(sentMessage!, ticket, contact);
+      }
+    }
 
   } else if (msg.message?.audioMessage) {
     // Transcrição de áudio via Whisper (apenas OpenAI e Manus)
@@ -821,10 +881,38 @@ const handleOpenAi = async (
         .trim();
     }
 
-    const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-      text: response!
-    });
-    await verifyMessage(sentMessage!, ticket, contact);
+    if (!prompt.voice || prompt.voice === "texto") {
+      const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+        text: response!
+      });
+      await verifyMessage(sentMessage!, ticket, contact);
+    } else {
+      const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
+      try {
+        await convertTextToSpeechAndSaveToFile(
+          keepOnlySpecifiedChars(response!),
+          `${publicFolder}/${fileNameWithOutExtension}`,
+          prompt.voiceKey || "",
+          prompt.voiceRegion || "",
+          prompt.voice,
+          prompt.ttsProvider || "azure"
+        );
+        const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+          audio: { url: `${publicFolder}/${fileNameWithOutExtension}.ogg` },
+          mimetype: "audio/ogg; codecs=opus",
+          ptt: true
+        });
+        await verifyMediaMessage(sendMessage!, ticket, contact, ticketTraking, false, false, wbot);
+        deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.ogg`);
+        deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
+      } catch (error) {
+        logger.error(`[AI] Erro ao gerar resposta de áudio: ${error}`);
+        const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+          text: response!
+        });
+        await verifyMessage(sentMessage!, ticket, contact);
+      }
+    }
   }
   messagesAI = [];
 };

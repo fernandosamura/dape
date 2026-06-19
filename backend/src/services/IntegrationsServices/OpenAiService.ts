@@ -43,6 +43,7 @@ interface IOpenAi {
   voice: string;
   voiceKey: string;
   voiceRegion: string;
+  ttsProvider?: string;
   maxTokens: number;
   temperature: number;
   apiKey: string;
@@ -161,15 +162,15 @@ export const handleOpenAi = async (
       convertTextToSpeechAndSaveToFile(
         keepOnlySpecifiedChars(response!),
         `${publicFolder}/${fileNameWithOutExtension}`,
-        openAiSettings.voiceKey,
-        openAiSettings.voiceRegion,
+        openAiSettings.voiceKey || "",
+        openAiSettings.voiceRegion || "",
         openAiSettings.voice,
-        "mp3"
+        openAiSettings.ttsProvider || "azure"
       ).then(async () => {
         try {
           const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-            audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
-            mimetype: "audio/mpeg",
+            audio: { url: `${publicFolder}/${fileNameWithOutExtension}.ogg` },
+            mimetype: "audio/ogg; codecs=opus",
             ptt: true
           });
           await verifyMediaMessage(
@@ -181,7 +182,7 @@ export const handleOpenAi = async (
             false,
             wbot
           );
-          deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
+          deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.ogg`);
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
         } catch (error) {
           console.log(`Erro para responder com audio: ${error}`);
@@ -249,15 +250,15 @@ export const handleOpenAi = async (
       convertTextToSpeechAndSaveToFile(
         keepOnlySpecifiedChars(response!),
         `${publicFolder}/${fileNameWithOutExtension}`,
-        openAiSettings.voiceKey,
-        openAiSettings.voiceRegion,
+        openAiSettings.voiceKey || "",
+        openAiSettings.voiceRegion || "",
         openAiSettings.voice,
-        "mp3"
+        openAiSettings.ttsProvider || "azure"
       ).then(async () => {
         try {
           const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-            audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
-            mimetype: "audio/mpeg",
+            audio: { url: `${publicFolder}/${fileNameWithOutExtension}.ogg` },
+            mimetype: "audio/ogg; codecs=opus",
             ptt: true
           });
           await verifyMediaMessage(
@@ -269,7 +270,7 @@ export const handleOpenAi = async (
             false,
             wbot
           );
-          deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
+          deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.ogg`);
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
         } catch (error) {
           console.log(`Erro para responder com audio: ${error}`);
