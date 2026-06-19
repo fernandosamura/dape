@@ -102,7 +102,7 @@ function AnalyticsDashboard() {
   useEffect(() => { load(); }, [load]);
 
   const containerStyle = {
-    padding: "20px 24px",
+    padding: "12px 16px",
     fontFamily: "inherit",
     background: "#F9FAFB",
     minHeight: "100vh",
@@ -111,7 +111,7 @@ function AnalyticsDashboard() {
   return (
     <div style={containerStyle}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
         <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>📊 DAPLE Analytics</div>
         <div style={{ display: "flex", gap: 6 }}>
           {PERIODS.map(p => (
@@ -172,7 +172,8 @@ function AnalyticsDashboard() {
           {daily.length > 0 && (
             <>
               <SectionTitle>Evolução de Tickets por Dia</SectionTitle>
-              <div style={{ background: "#fff", borderRadius: 12, padding: "16px 8px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+              <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflowX: "auto" }}>
+                <div style={{ padding: "16px 8px", minWidth: 320 }}>
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={daily} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
@@ -182,6 +183,7 @@ function AnalyticsDashboard() {
                     <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} dot={false} name="Tickets" />
                   </LineChart>
                 </ResponsiveContainer>
+                </div>
               </div>
             </>
           )}
@@ -190,7 +192,8 @@ function AnalyticsDashboard() {
           {channels.length > 0 && (
             <>
               <SectionTitle>Tickets por Canal</SectionTitle>
-              <div style={{ background: "#fff", borderRadius: 12, padding: "16px 8px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+              <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflowX: "auto" }}>
+                <div style={{ padding: "16px 8px", minWidth: 320 }}>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={channels} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
@@ -206,6 +209,7 @@ function AnalyticsDashboard() {
                     <Bar dataKey="closed" name="Fechados" fill="#22C55E" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+                </div>
               </div>
             </>
           )}
@@ -214,7 +218,8 @@ function AnalyticsDashboard() {
           {funnel.length > 0 && (
             <>
               <SectionTitle>Funil de Conversão</SectionTitle>
-              <div style={{ background: "#fff", borderRadius: 12, padding: "16px 8px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+              <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", overflowX: "auto" }}>
+                <div style={{ padding: "16px 8px", minWidth: 280 }}>
                 <ResponsiveContainer width="100%" height={200}>
                   <FunnelChart>
                     <Tooltip />
@@ -226,6 +231,7 @@ function AnalyticsDashboard() {
                     </Funnel>
                   </FunnelChart>
                 </ResponsiveContainer>
+                </div>
               </div>
             </>
           )}
@@ -234,7 +240,7 @@ function AnalyticsDashboard() {
           {channels.length > 0 && (
             <>
               <SectionTitle>Detalhes por Canal</SectionTitle>
-              <div style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+              <div style={{ background: "#fff", borderRadius: 12, overflowX: "auto", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "#F9FAFB" }}>

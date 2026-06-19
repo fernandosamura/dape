@@ -62,7 +62,7 @@ function CampaignModal({ open, onClose, onSave, initial }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 500, maxWidth: "92vw", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: "100%", maxWidth: 500, margin: "0 16px", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 16, fontWeight: "bold", marginBottom: 18 }}>{initial ? "Editar Campanha" : "Nova Campanha"}</div>
 
         <div style={{ marginBottom: 12 }}>
@@ -320,7 +320,7 @@ function GrowthDashboard() {
 
   return (
     <div style={{ padding: "20px 24px", fontFamily: "inherit", background: "#F9FAFB", minHeight: "100vh" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
         <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>🚀 DAPLE Growth</div>
         <button onClick={() => { setEditCampaign(null); setModalOpen(true); }} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#22C55E", color: "#fff", fontWeight: "bold", fontSize: 13, cursor: "pointer" }}>+ Nova Campanha</button>
       </div>
@@ -334,7 +334,7 @@ function GrowthDashboard() {
       <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#374151" }}>📋 Campanhas</div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {["all", "active", "draft", "paused", "finished"].map(s => (
               <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: "4px 10px", borderRadius: 14, fontSize: 11, cursor: "pointer", border: "none", fontWeight: filterStatus === s ? "bold" : "normal", background: filterStatus === s ? "#3B82F6" : "#E5E7EB", color: filterStatus === s ? "#fff" : "#374151" }}>
                 {s === "all" ? "Todas" : STATUS_CONFIG[s]?.label}
@@ -356,7 +356,7 @@ function GrowthDashboard() {
                   {c.target_segment && <span style={{ fontSize: 11, color: "#9CA3AF" }}>· {c.target_segment}</span>}
                 </div>
                 {/* Progress bars */}
-                <div style={{ display: "flex", gap: 16 }}>
+<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {[
                     ["Leads", c.total_leads || c.totalLeads, c.goal_leads || c.goalLeads, "#3B82F6"],
                     ["Reuniões", c.total_meetings || c.totalMeetings, c.goal_meetings || c.goalMeetings, "#8B5CF6"],
@@ -372,7 +372,7 @@ function GrowthDashboard() {
                   })}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
                 <button onClick={e => { e.stopPropagation(); setResultModal(c.id); }} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#3B82F6", color: "#fff", fontSize: 11, cursor: "pointer" }}>+ Resultado</button>
                 <button onClick={e => { e.stopPropagation(); setEditCampaign(c); setModalOpen(true); }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #D1D5DB", background: "#fff", fontSize: 11, cursor: "pointer" }}>✏️</button>
                 <button onClick={e => { e.stopPropagation(); handleDelete(c.id); }} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #FCA5A5", background: "#FEF2F2", fontSize: 11, cursor: "pointer", color: "#991B1B" }}>🗑️</button>
@@ -387,7 +387,8 @@ function GrowthDashboard() {
                 {!campaignResults[c.id] || campaignResults[c.id].length === 0 ? (
                   <p style={{ fontSize: 12, color: "#9CA3AF" }}>Nenhum resultado lançado ainda.</p>
                 ) : (
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 480 }}>
                     <thead>
                       <tr>{["Data","Leads","Reuniões","Contratos","Receita","Obs"].map(h => (
                         <th key={h} style={{ textAlign: "left", padding: "5px 8px", color: "#9CA3AF", fontWeight: 600, borderBottom: "1px solid #E5E7EB" }}>{h}</th>
@@ -406,6 +407,7 @@ function GrowthDashboard() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             )}

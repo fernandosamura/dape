@@ -218,9 +218,9 @@ export default function DapeRadarPage() {
 
   return (
     <Box className={classes.root}>
-      <Box className={classes.header}>
+      <Box className={classes.header} style={{ flexWrap: "wrap", gap: 8 }}>
         <Typography variant="h5" style={{ fontWeight: "bold" }}>📡 DAPLE Radar — Oportunidades</Typography>
-        <Box style={{ display: "flex", gap: 8 }}>
+        <Box style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Button startIcon={<CloudUploadIcon />} variant="outlined" onClick={() => setImportOpen(true)}>
             Importar JSON
           </Button>
@@ -284,7 +284,7 @@ export default function DapeRadarPage() {
       </Paper>
 
       {/* Table */}
-      <Paper>
+      <Paper style={{ overflowX: "auto" }}>
         {loading ? (
           <Box style={{ display: "flex", justifyContent: "center", padding: 40 }}>
             <CircularProgress />

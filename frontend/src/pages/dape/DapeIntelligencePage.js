@@ -35,14 +35,14 @@ function IntelligenceDashboard() {
   const inp = { padding: "6px 10px", border: "1px solid #D1D5DB", borderRadius: 6, fontSize: 12, outline: "none" };
 
   return (
-    <div style={{ padding: "20px 24px", fontFamily: "inherit", background: "#F9FAFB", minHeight: "100vh" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+    <div style={{ padding: "12px 16px", fontFamily: "inherit", background: "#F9FAFB", minHeight: "100vh" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 20, fontWeight: "bold", color: "#111827" }}>🏢 DAPLE Intelligence</div>
         <div style={{ fontSize: 13, color: "#6B7280" }}>{total} perfis analisados</div>
       </div>
 
       {/* Filters */}
-      <div style={{ background: "#fff", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", gap: 12, alignItems: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
         <div>
           <label style={{ fontSize: 11, color: "#9CA3AF", display: "block", marginBottom: 3 }}>Potencial</label>
           <select style={inp} value={filter.growthPotential} onChange={e => setFilter(f => ({ ...f, growthPotential: e.target.value }))}>
@@ -67,8 +67,8 @@ function IntelligenceDashboard() {
           Nenhum perfil encontrado. Abra um ticket e clique em "🔍 Analisar" no painel Intelligence.
         </div>
       ) : (
-        <div style={{ background: "#fff", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ background: "#fff", borderRadius: 12, overflowX: "auto", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 600 }}>
             <thead>
               <tr style={{ background: "#F9FAFB" }}>
                 {["Empresa/Contato","Segmento","Presença Digital","Conversão","Relacionamento","Score Geral","Potencial"].map(h => (

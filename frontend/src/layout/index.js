@@ -35,7 +35,7 @@ const useStyles = makeStyles((theme) => ({
   root: {
     display: "flex",
     height: "100vh",
-    [theme.breakpoints.down("sm")]: { height: "calc(100vh - 56px)" },
+    [theme.breakpoints.down("md")]: { height: "calc(100vh - 56px)" },
     backgroundColor: theme.palette.fancyBackground,
     "& .MuiButton-outlinedPrimary": {
       color: "#FFF",
@@ -74,7 +74,7 @@ const useStyles = makeStyles((theme) => ({
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
     }),
-    [theme.breakpoints.down("sm")]: { display: "none" },
+    [theme.breakpoints.down("md")]: { display: "none" },
   },
   menuButton: { marginRight: 36 },
   menuButtonHidden: { display: "none" },
@@ -88,7 +88,7 @@ const useStyles = makeStyles((theme) => ({
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
     }),
-    [theme.breakpoints.down("sm")]: { width: "100%" },
+    [theme.breakpoints.down("md")]: { width: "100%" },
     ...theme.scrollbarStylesSoft,
     display: "flex",
     flexDirection: "column",
@@ -101,7 +101,7 @@ const useStyles = makeStyles((theme) => ({
     }),
     width: theme.spacing(7),
     [theme.breakpoints.up("sm")]: { width: theme.spacing(9) },
-    [theme.breakpoints.down("sm")]: { width: "100%" },
+    [theme.breakpoints.down("md")]: { width: "100%" },
   },
   appBarSpacer: { minHeight: "48px" },
   content: { flex: 1, overflow: "auto" },
@@ -116,7 +116,7 @@ const useStyles = makeStyles((theme) => ({
     height: "auto",
     maxWidth: 160,
     filter: "drop-shadow(0 2px 8px rgba(245,195,0,0.3))",
-    [theme.breakpoints.down("sm")]: { width: "auto", height: "48px", maxWidth: 160 },
+    [theme.breakpoints.down("md")]: { width: "auto", height: "48px", maxWidth: 160 },
   },
   sammyContainer: {
     display: "flex",
@@ -164,11 +164,12 @@ const LoggedInLayout = ({ children }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const { handleLogout, loading } = useContext(AuthContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerVariant, setDrawerVariant] = useState("permanent");
   const { user } = useContext(AuthContext);
   const theme = useTheme();
   const { colorMode } = useContext(ColorModeContext);
   const greaterThenSm = useMediaQuery(theme.breakpoints.up("sm"));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const drawerVariant = isMobile ? "temporary" : "permanent";
   const [volume, setVolume] = useState(localStorage.getItem("volume") || 1);
   const { dateToClient } = useDate();
   const [anchorElLanguage, setAnchorElLanguage] = useState(null);
@@ -176,10 +177,6 @@ const LoggedInLayout = ({ children }) => {
   const socketManager = useContext(SocketContext);
 
   useEffect(() => { if (document.body.offsetWidth > 1200) setDrawerOpen(true); }, []);
-  useEffect(() => {
-    setDrawerVariant(document.body.offsetWidth < 600 ? "temporary" : "permanent");
-  }, [drawerOpen]);
-
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
     const userId = localStorage.getItem("userId");
@@ -201,9 +198,9 @@ const LoggedInLayout = ({ children }) => {
   const handleCloseMenuLanguage = () => { setAnchorElLanguage(null); setMenuLanguageOpen(false); };
   const handleOpenUserModal = () => { setUserModalOpen(true); handleCloseMenu(); };
   const handleClickLogout = () => { handleCloseMenu(); handleLogout(); };
-  const drawerClose = () => { if (document.body.offsetWidth < 600) setDrawerOpen(false); };
+  const drawerClose = () => { if (document.body.offsetWidth < 960) setDrawerOpen(false); };
   const handleRefreshPage = () => window.location.reload(false);
-  const handleMenuItemClick = () => { if (window.innerWidth <= 600) setDrawerOpen(false); };
+  const handleMenuItemClick = () => { if (window.innerWidth < 960) setDrawerOpen(false); };
   const toggleColorMode = () => colorMode.toggleColorMode();
 
   if (loading) return <BackdropLoading />;
@@ -215,6 +212,7 @@ const LoggedInLayout = ({ children }) => {
         className={drawerOpen ? classes.drawerPaper : classes.drawerPaperClose}
         classes={{ paper: clsx(classes.drawerPaper, !drawerOpen && classes.drawerPaperClose) }}
         open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
       >
         {/* LOGO HEADER */}
         <div className={classes.toolbarIcon}>
@@ -259,7 +257,7 @@ const LoggedInLayout = ({ children }) => {
             edge="start"
             aria-label="open drawer"
             onClick={() => setDrawerOpen(!drawerOpen)}
-            className={clsx(classes.menuButton, drawerOpen && classes.menuButtonHidden)}
+            className={clsx(classes.menuButton, drawerOpen && drawerVariant !== "temporary" && classes.menuButtonHidden)}
             style={{ color: "#F5C300" }}
           >
             <MenuIcon />
