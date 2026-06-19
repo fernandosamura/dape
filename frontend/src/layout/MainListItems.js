@@ -600,11 +600,13 @@ const MainListItems = (props) => {
                 icon={<TrackChangesOutlinedIcon />}
               />
             )}
-            <ListItemLink
-              to="/dape/master"
-              primary="⚡ DAPLE Master"
-              icon={<StarsIcon />}
-            />
+            {user.super && (
+              <ListItemLink
+                to="/dape/master"
+                primary="⚡ DAPLE Master"
+                icon={<StarsIcon />}
+              />
+            )}
             <ListItemLink
               to="/settings"
               primary={i18n.t("mainDrawer.listItems.settings")}
