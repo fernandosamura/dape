@@ -59,10 +59,13 @@ const UpdateContactService = async ({
     );
   }
 
+  // If the user manually changes the number on a LID contact, clear the isLid flag
+  const updatedIsLid = contact.isLid && number && number !== contact.number ? false : contact.isLid;
   await contact.update({
     name,
     number,
-    email
+    email,
+    isLid: updatedIsLid
   });
 
   await contact.reload({

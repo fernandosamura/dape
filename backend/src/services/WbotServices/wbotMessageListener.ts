@@ -521,6 +521,25 @@ const downloadMedia = async (msg: proto.IWebMessageInfo) => {
   return media;
 };
 
+const resolveLidToPhone = async (lidJid: string, whatsappId: number): Promise<string> => {
+  try {
+    const Baileys = require("../../models/Baileys").default;
+    const baileysRecord = await Baileys.findOne({ where: { whatsappId } });
+    if (baileysRecord?.contacts) {
+      const contacts = JSON.parse(baileysRecord.contacts);
+      const lidNumber = lidJid.replace(/[^0-9]/g, "");
+      // Procura contato onde lid corresponde ao lidJid
+      const match = contacts.find((c: any) =>
+        c.lid && c.lid.replace(/[^0-9]/g, "") === lidNumber && c.id && !c.id.includes("@lid")
+      );
+      if (match) {
+        return match.id.replace(/[^0-9]/g, "");
+      }
+    }
+  } catch (_) {}
+  return lidJid.replace(/[^0-9]/g, "");
+};
+
 const verifyContact = async (
   msgContact: IMe,
   wbot: Session,
@@ -534,13 +553,19 @@ const verifyContact = async (
     profilePicUrl = `${process.env.FRONTEND_URL}/nopicture.png`;
   }
 
+  const isLid = msgContact.id.includes("@lid");
+  const resolvedNumber = isLid
+    ? await resolveLidToPhone(msgContact.id, wbot.id!)
+    : msgContact.id.replace(/\D/g, "");
+
   const contactData = {
-    name: msgContact?.name || msgContact.id.replace(/\D/g, ""),
-    number: msgContact.id.replace(/\D/g, ""),
+    name: msgContact?.name || resolvedNumber,
+    number: resolvedNumber,
     profilePicUrl,
     isGroup: msgContact.id.includes("g.us"),
     companyId,
-    whatsappId: wbot.id
+    whatsappId: wbot.id,
+    isLid
   };
 
   const contact = CreateOrUpdateContactService(contactData);

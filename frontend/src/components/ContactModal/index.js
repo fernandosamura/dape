@@ -187,6 +187,11 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave }) => {
 									variant="outlined"
 									margin="dense"
 								/>
+								{contact.isLid && (
+									<Typography variant="caption" style={{color: '#e65100', display: 'block', marginBottom: 8}}>
+										⚠️ Este contato usa Privacidade Avançada do WhatsApp. O número exibido é um identificador interno. Você pode editar e informar o número real de telefone acima.
+									</Typography>
+								)}
 
 								<div>
 									<Field

@@ -116,6 +116,27 @@ const wbotMonitor = async (
         whatsappId: whatsapp.id,
         contacts,
       });
+
+      // Resolver LID → número real: quando contact.id tem telefone e contact.lid é @lid
+      for (const contact of contacts) {
+        try {
+          if (contact.lid && contact.id && !contact.id.includes("@lid")) {
+            const lidNumber = contact.lid.replace(/[^0-9]/g, "");
+            const realNumber = contact.id.replace(/[^0-9]/g, "");
+            if (lidNumber && realNumber && lidNumber !== realNumber) {
+              const existing = await Contact.findOne({
+                where: { number: lidNumber, companyId }
+              });
+              if (existing) {
+                logger.info(`[LID] Resolvendo ${lidNumber} → ${realNumber} (${existing.name})`);
+                await existing.update({ number: realNumber });
+              }
+            }
+          }
+        } catch (e) {
+          logger.error(`[LID] Erro ao resolver contato: ${e}`);
+        }
+      }
     });
 
   } catch (err) {

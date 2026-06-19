@@ -353,7 +353,7 @@ const Contacts = () => {
                     {<Avatar src={contact.profilePicUrl} />}
                   </TableCell>
                   <TableCell>{contact.name}</TableCell>
-                  <TableCell align="center">{contact.number}</TableCell>
+                  <TableCell align="center">{contact.isLid ? <span style={{color:"#888",fontStyle:"italic"}}>🔒 Privado</span> : contact.number}</TableCell>
                   <TableCell align="center">{contact.email}</TableCell>
                   <TableCell align="center">
                     <IconButton

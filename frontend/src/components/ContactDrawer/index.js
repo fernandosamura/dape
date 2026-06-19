@@ -147,7 +147,13 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 								subheader={
 									<>
 										<Typography style={{fontSize: 12}}>
-											<Link href={`tel:${contact.number}`}>{contact.number}</Link>
+											{contact.isLid ? (
+												<span style={{color: '#888', fontStyle: 'italic'}}>
+													🔒 Número Privado (WhatsApp)
+												</span>
+											) : (
+												<Link href={`tel:${contact.number}`}>{contact.number}</Link>
+											)}
 										</Typography>
 										<Typography style={{fontSize: 12}}>
 											<Link href={`mailto:${contact.email}`}>{contact.email}</Link>
