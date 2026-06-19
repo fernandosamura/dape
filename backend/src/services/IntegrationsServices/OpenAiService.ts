@@ -13,7 +13,7 @@ import { isNil, isNull } from "lodash";
 import fs from "fs";
 import path, { join } from "path";
 
-import OpenAI, {Configuration, OpenAIApi} from "openai";
+import { Configuration, OpenAIApi } from "openai";
 import Ticket from "../../models/Ticket";
 import Contact from "../../models/Contact";
 import Message from "../../models/Message";
@@ -21,6 +21,7 @@ import TicketTraking from "../../models/TicketTraking";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import Whatsapp from "../../models/Whatsapp";
 import { logger } from "../../utils/logger";
+import { callAIProvider, AIProvider, AIMessage } from "../AIProviderService/AIProviderRouter";
 
 type Session = WASocket & {
   id?: number;
@@ -36,11 +37,6 @@ interface IMe {
   id: string;
 }
 
-interface SessionOpenAi extends OpenAIApi {
-  id?: number;
-}
-const sessionsOpenAi: SessionOpenAi[] = [];
-
 interface IOpenAi {
   name: string;
   prompt: string;
@@ -52,6 +48,9 @@ interface IOpenAi {
   apiKey: string;
   queueId: number;
   maxMessages: number;
+  model?: string;
+  provider?: string;
+  baseUrl?: string;
 }
 
 const deleteFileSync = (path: string): void => {
@@ -84,7 +83,6 @@ export const handleOpenAi = async (
 
   const bodyMessage = getBodyMessage(msg);
   if (!bodyMessage) return;
-  // console.log("GETTING WHATSAPP HANDLE OPENAI", ticket.whatsappId, ticket.id)
 
   if (!openAiSettings) return;
 
@@ -99,19 +97,8 @@ export const handleOpenAi = async (
     `company${ticket.companyId}`
   );
 
-  let openai: OpenAIApi | any;
-  const openAiIndex = sessionsOpenAi.findIndex(s => s.id === ticket.id);
-
-  if (openAiIndex === -1) {
-    const configuration = new Configuration({
-      apiKey: openAiSettings.apiKey
-    });
-    openai = new OpenAIApi(configuration);
-    openai.id = ticket.id;
-    sessionsOpenAi.push(openai);
-  } else {
-    openai = sessionsOpenAi[openAiIndex];
-  }
+  const provider = (openAiSettings.provider || "openai") as AIProvider;
+  const model = openAiSettings.model || "gpt-3.5-turbo-1106";
 
   const messages = await Message.findAll({
     where: { ticketId: ticket.id },
@@ -126,44 +113,37 @@ export const handleOpenAi = async (
   } tokens e cuide para não truncar o final.\nSempre que possível, mencione o nome dele para ser mais personalizado o atendimento e mais educado. Quando a resposta requer uma transferência para o setor de atendimento, comece sua resposta com 'Ação: Transferir para o setor de atendimento'.\n
                 ${openAiSettings.prompt}\n`;
 
-  let messagesOpenAi = [];
+  let messagesAI: AIMessage[] = [];
 
   if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
-    console.log(135, "OpenAiService");
-    messagesOpenAi = [];
-    messagesOpenAi.push({ role: "system", content: promptSystem });
-    for (
-      let i = 0;
-      i < Math.min(openAiSettings.maxMessages, messages.length);
-      i++
-    ) {
+    messagesAI = [];
+    messagesAI.push({ role: "system", content: promptSystem });
+    for (let i = 0; i < Math.min(openAiSettings.maxMessages, messages.length); i++) {
       const message = messages[i];
       if (
         message.mediaType === "conversation" ||
         message.mediaType === "extendedTextMessage"
       ) {
         if (message.fromMe) {
-          messagesOpenAi.push({ role: "assistant", content: message.body });
+          messagesAI.push({ role: "assistant", content: message.body });
         } else {
-          messagesOpenAi.push({ role: "user", content: message.body });
+          messagesAI.push({ role: "user", content: message.body });
         }
       }
     }
-    messagesOpenAi.push({ role: "user", content: bodyMessage! });
+    messagesAI.push({ role: "user", content: bodyMessage! });
 
-    console.log(156, "OpenAiService");
-
-    const chat = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo-1106",
-      messages: messagesOpenAi,
-      max_tokens: openAiSettings.maxTokens,
-      temperature: openAiSettings.temperature
+    let response = await callAIProvider({
+      provider,
+      apiKey: openAiSettings.apiKey,
+      model,
+      messages: messagesAI,
+      maxTokens: openAiSettings.maxTokens,
+      temperature: openAiSettings.temperature,
+      baseUrl: openAiSettings.baseUrl
     });
 
-    let response = chat.data.choices[0].message?.content;
-
     if (response?.includes("Ação: Transferir para o setor de atendimento")) {
-      console.log(166, "OpenAiService");
       await transferQueue(openAiSettings.queueId, ticket, contact);
       response = response
         .replace("Ação: Transferir para o setor de atendimento", "")
@@ -171,15 +151,12 @@ export const handleOpenAi = async (
     }
 
     if (openAiSettings.voice === "texto") {
-      console.log(173, "OpenAiService");
-      logger.info(chat.data.choices[0].message);
       logger.info(response);
       const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
         text: `\u200e ${response!}`
       });
       await verifyMessage(sentMessage!, ticket, contact);
     } else {
-      console.log(179, "OpenAiService");
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
       convertTextToSpeechAndSaveToFile(
         keepOnlySpecifiedChars(response!),
@@ -190,7 +167,6 @@ export const handleOpenAi = async (
         "mp3"
       ).then(async () => {
         try {
-          console.log(194, "OpenAiService");
           const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
             audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
             mimetype: "audio/mpeg",
@@ -213,44 +189,48 @@ export const handleOpenAi = async (
       });
     }
   } else if (msg.message?.audioMessage) {
-    console.log(201, "OpenAiService");
+    // Transcrição via Whisper: apenas disponível para OpenAI e Manus (OpenAI-compatible)
+    if (provider !== "openai" && provider !== "manus") {
+      logger.info(`[AI] Transcrição de áudio não suportada pelo provider: ${provider}`);
+      return;
+    }
+
     const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
     const file = fs.createReadStream(`${publicFolder}/${mediaUrl}`) as any;
 
-    const transcription = await openai.audio.transcriptions.create({
-      model: "whisper-1",
-      file: file
+    const whisperConfig = new Configuration({
+      apiKey: openAiSettings.apiKey,
+      ...(provider === "manus" && openAiSettings.baseUrl ? { basePath: openAiSettings.baseUrl } : {})
     });
+    const openaiClient = new OpenAIApi(whisperConfig);
+    const transcription = await openaiClient.createTranscription(file, "whisper-1");
 
-    messagesOpenAi = [];
-    messagesOpenAi.push({ role: "system", content: promptSystem });
-    for (
-      let i = 0;
-      i < Math.min(openAiSettings.maxMessages, messages.length);
-      i++
-    ) {
+    messagesAI = [];
+    messagesAI.push({ role: "system", content: promptSystem });
+    for (let i = 0; i < Math.min(openAiSettings.maxMessages, messages.length); i++) {
       const message = messages[i];
       if (
         message.mediaType === "conversation" ||
         message.mediaType === "extendedTextMessage"
       ) {
-        console.log(238, "OpenAiService");
-
         if (message.fromMe) {
-          messagesOpenAi.push({ role: "assistant", content: message.body });
+          messagesAI.push({ role: "assistant", content: message.body });
         } else {
-          messagesOpenAi.push({ role: "user", content: message.body });
+          messagesAI.push({ role: "user", content: message.body });
         }
       }
     }
-    messagesOpenAi.push({ role: "user", content: transcription.text });
-    const chat = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo-1106",
-      messages: messagesOpenAi,
-      max_tokens: openAiSettings.maxTokens,
-      temperature: openAiSettings.temperature
+    messagesAI.push({ role: "user", content: transcription.data.text });
+
+    let response = await callAIProvider({
+      provider,
+      apiKey: openAiSettings.apiKey,
+      model,
+      messages: messagesAI,
+      maxTokens: openAiSettings.maxTokens,
+      temperature: openAiSettings.temperature,
+      baseUrl: openAiSettings.baseUrl
     });
-    let response = chat.choices[0].message?.content;
 
     if (response?.includes("Ação: Transferir para o setor de atendimento")) {
       await transferQueue(openAiSettings.queueId, ticket, contact);
@@ -258,6 +238,7 @@ export const handleOpenAi = async (
         .replace("Ação: Transferir para o setor de atendimento", "")
         .trim();
     }
+
     if (openAiSettings.voice === "texto") {
       const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
         text: `\u200e ${response!}`
@@ -296,5 +277,5 @@ export const handleOpenAi = async (
       });
     }
   }
-  messagesOpenAi = [];
+  messagesAI = [];
 };

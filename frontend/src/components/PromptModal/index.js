@@ -13,14 +13,37 @@ import DialogActions from "@material-ui/core/DialogActions";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import Typography from "@material-ui/core/Typography";
 import { i18n } from "../../translate/i18n";
-import { MenuItem, FormControl, InputLabel, Select, Menu, Grid } from "@material-ui/core";
+import { MenuItem, FormControl, InputLabel, Select, Grid } from "@material-ui/core";
 import { Visibility, VisibilityOff } from "@material-ui/icons";
 import { InputAdornment, IconButton } from "@material-ui/core";
 import QueueSelectSingle from "../../components/QueueSelectSingle";
 
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
+
+// ── Providers e modelos disponíveis ──────────────────────────────────────────
+const PROVIDER_MODELS = {
+  openai:    ["gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4o-mini", "gpt-4o", "gpt-4-turbo"],
+  anthropic: ["claude-3-haiku-20240307", "claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-opus-4-5", "claude-sonnet-4-5"],
+  gemini:    ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-exp"],
+  manus:     ["manus-default"]
+};
+
+const PROVIDER_LABELS = {
+  openai:    "OpenAI (ChatGPT)",
+  anthropic: "Anthropic (Claude)",
+  gemini:    "Google (Gemini)",
+  manus:     "Manus IA (Custom)"
+};
+
+const PROVIDER_KEY_LABEL = {
+  openai:    "OpenAI API Key",
+  anthropic: "Anthropic API Key",
+  gemini:    "Google Gemini API Key",
+  manus:     "Manus API Key"
+};
 
 const useStyles = makeStyles(theme => ({
     root: {
@@ -33,11 +56,9 @@ const useStyles = makeStyles(theme => ({
             marginRight: theme.spacing(1),
         },
     },
-
     btnWrapper: {
         position: "relative",
     },
-
     buttonProgress: {
         color: green[500],
         position: "absolute",
@@ -54,12 +75,21 @@ const useStyles = makeStyles(theme => ({
         width: 20,
         height: 20,
     },
+    providerBadge: {
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 4,
+        fontSize: 11,
+        fontWeight: 600,
+        marginLeft: 6,
+        backgroundColor: "#e3f2fd",
+        color: "#1565c0"
+    }
 }));
 
 const PromptSchema = Yup.object().shape({
     name: Yup.string().min(5, i18n.t("promptModal.formErrors.name.short")).max(100, i18n.t("promptModal.formErrors.name.long")).required(i18n.t("promptModal.formErrors.name.required")),
     prompt: Yup.string().min(50, i18n.t("promptModal.formErrors.prompt.short")).required(i18n.t("promptModal.formErrors.prompt.required")),
-    model: Yup.string().required(i18n.t("promptModal.formErrors.modal.required")),
     maxTokens: Yup.number().required(i18n.t("promptModal.formErrors.maxTokens.required")),
     temperature: Yup.number().required(i18n.t("promptModal.formErrors.temperature.required")),
     apiKey: Yup.string().required(i18n.t("promptModal.formErrors.apikey.required")),
@@ -69,12 +99,11 @@ const PromptSchema = Yup.object().shape({
 
 const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
     const classes = useStyles();
+    const [selectedProvider, setSelectedProvider] = useState("openai");
     const [selectedModel, setSelectedModel] = useState("gpt-3.5-turbo-1106");
     const [showApiKey, setShowApiKey] = useState(false);
 
-    const handleToggleApiKey = () => {
-        setShowApiKey(!showApiKey);
-    };
+    const handleToggleApiKey = () => setShowApiKey(!showApiKey);
 
     const initialState = {
         name: "",
@@ -83,8 +112,10 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
         maxTokens: 100,
         temperature: 1,
         apiKey: "",
-        queueId: '',
-        maxMessages: 10
+        queueId: "",
+        maxMessages: 10,
+        provider: "openai",
+        baseUrl: ""
     };
 
     const [prompt, setPrompt] = useState(initialState);
@@ -93,36 +124,44 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
         const fetchPrompt = async () => {
             if (!promptId) {
                 setPrompt(initialState);
+                setSelectedProvider("openai");
+                setSelectedModel("gpt-3.5-turbo-1106");
                 return;
             }
             try {
                 const { data } = await api.get(`/prompt/${promptId}`);
-                setPrompt(prevState => {
-                    return { ...prevState, ...data };
-                });
-                
-                setSelectedModel(data.model);
-            } catch (err) { 
+                setPrompt(prevState => ({ ...prevState, ...data }));
+                const prov = data.provider || "openai";
+                setSelectedProvider(prov);
+                setSelectedModel(data.model || (PROVIDER_MODELS[prov] || [])[0] || "");
+            } catch (err) {
                 toastError(err);
             }
         };
-
         fetchPrompt();
     }, [promptId, open]);
 
     const handleClose = () => {
         setPrompt(initialState);
+        setSelectedProvider("openai");
         setSelectedModel("gpt-3.5-turbo-1106");
         onClose();
     };
 
-    const handleChangeModel = (e) => {
-        setSelectedModel(e.target.value);
+    const handleChangeProvider = (e) => {
+        const prov = e.target.value;
+        setSelectedProvider(prov);
+        setSelectedModel((PROVIDER_MODELS[prov] || [])[0] || "");
     };
 
+    const handleChangeModel = (e) => setSelectedModel(e.target.value);
+
     const handleSavePrompt = async values => {
-        const promptData = { ...values, model: selectedModel };
-        console.log(promptData);
+        const promptData = {
+            ...values,
+            model: selectedModel,
+            provider: selectedProvider
+        };
         if (!values.queueId) {
             toastError(i18n.t("promptModal.setor"));
             return;
@@ -134,7 +173,7 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                 await api.post("/prompt", promptData);
             }
             toast.success(i18n.t("promptModal.success"));
-            refreshPrompts(  )
+            refreshPrompts();
         } catch (err) {
             toastError(err);
         }
@@ -143,17 +182,12 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
 
     return (
         <div className={classes.root}>
-            <Dialog
-                open={open}
-                onClose={handleClose}
-                maxWidth="md"
-                scroll="paper"
-                fullWidth
-            >
+            <Dialog open={open} onClose={handleClose} maxWidth="md" scroll="paper" fullWidth>
                 <DialogTitle id="form-dialog-title">
                     {promptId
                         ? `${i18n.t("promptModal.title.edit")}`
                         : `${i18n.t("promptModal.title.add")}`}
+                    <span className={classes.providerBadge}>{PROVIDER_LABELS[selectedProvider]}</span>
                 </DialogTitle>
                 <Formik
                     initialValues={prompt}
@@ -179,12 +213,28 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                                     margin="dense"
                                     fullWidth
                                 />
+
+                                {/* ── Provedor de IA ── */}
+                                <FormControl fullWidth margin="dense" variant="outlined">
+                                    <InputLabel>Provedor de IA</InputLabel>
+                                    <Select
+                                        value={selectedProvider}
+                                        onChange={handleChangeProvider}
+                                        labelWidth={100}
+                                    >
+                                        {Object.entries(PROVIDER_LABELS).map(([value, label]) => (
+                                            <MenuItem key={value} value={value}>{label}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                {/* ── API Key (label muda conforme provider) ── */}
                                 <FormControl fullWidth margin="dense" variant="outlined">
                                     <Field
                                         as={TextField}
-                                        label={i18n.t("promptModal.form.apikey")}
+                                        label={PROVIDER_KEY_LABEL[selectedProvider] || "API Key"}
                                         name="apiKey"
-                                        type={showApiKey ? 'text' : 'password'}
+                                        type={showApiKey ? "text" : "password"}
                                         error={touched.apiKey && Boolean(errors.apiKey)}
                                         helperText={touched.apiKey && errors.apiKey}
                                         variant="outlined"
@@ -201,6 +251,21 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                                         }}
                                     />
                                 </FormControl>
+
+                                {/* ── Base URL (apenas Manus) ── */}
+                                {selectedProvider === "manus" && (
+                                    <Field
+                                        as={TextField}
+                                        label="URL Base (endpoint Manus IA)"
+                                        name="baseUrl"
+                                        variant="outlined"
+                                        margin="dense"
+                                        fullWidth
+                                        placeholder="https://api.manus.ai/v1"
+                                        helperText="Endpoint compatível com OpenAI. Deixe vazio para usar o padrão."
+                                    />
+                                )}
+
                                 <Field
                                     as={TextField}
                                     label={i18n.t("promptModal.form.prompt")}
@@ -213,24 +278,22 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                                     rows={10}
                                     multiline={true}
                                 />
-                                <QueueSelectSingle touched={touched} errors={errors}/>
+                                <QueueSelectSingle touched={touched} errors={errors} />
+
                                 <div className={classes.multFieldLine}>
+                                    {/* ── Modelo (filtrado por provider) ── */}
                                     <FormControl fullWidth margin="dense" variant="outlined">
-                                    <InputLabel>{i18n.t("promptModal.form.model")}</InputLabel>
+                                        <InputLabel>{i18n.t("promptModal.form.model")}</InputLabel>
                                         <Select
-                                            id="type-select"
                                             labelWidth={60}
                                             name="model"
                                             value={selectedModel}
                                             onChange={handleChangeModel}
                                             multiple={false}
                                         >
-                                            <MenuItem key={"gpt-3.5"} value={"gpt-3.5-turbo-1106"}>
-                                                GPT 3.5 turbo
-                                            </MenuItem>
-                                            <MenuItem key={"gpt-4"} value={"gpt-4o-mini"}>
-                                                GPT 4.0
-                                            </MenuItem>
+                                            {(PROVIDER_MODELS[selectedProvider] || []).map(m => (
+                                                <MenuItem key={m} value={m}>{m}</MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                     <Field
@@ -243,14 +306,10 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                                         margin="dense"
                                         fullWidth
                                         type="number"
-                                        inputProps={{
-                                            step: "0.1",
-                                            min: "0",
-                                            max: "1"
-                                        }}
+                                        inputProps={{ step: "0.1", min: "0", max: "1" }}
                                     />
                                 </div>
-                                
+
                                 <div className={classes.multFieldLine}>
                                     <Field
                                         as={TextField}
@@ -273,14 +332,15 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                                         fullWidth
                                     />
                                 </div>
+
+                                {selectedProvider !== "openai" && (
+                                    <Typography variant="caption" style={{ color: "#666", display: "block", marginTop: 8 }}>
+                                        ℹ️ A transcrição de áudio (Whisper) está disponível apenas para OpenAI. Para os demais providers, mensagens de áudio não serão processadas pela IA.
+                                    </Typography>
+                                )}
                             </DialogContent>
                             <DialogActions>
-                                <Button
-                                    onClick={handleClose}
-                                    color="secondary"
-                                    disabled={isSubmitting}
-                                    variant="outlined"
-                                >
+                                <Button onClick={handleClose} color="secondary" disabled={isSubmitting} variant="outlined">
                                     {i18n.t("promptModal.buttons.cancel")}
                                 </Button>
                                 <Button
@@ -294,10 +354,7 @@ const PromptModal = ({ open, onClose, promptId, refreshPrompts }) => {
                                         ? `${i18n.t("promptModal.buttons.okEdit")}`
                                         : `${i18n.t("promptModal.buttons.okAdd")}`}
                                     {isSubmitting && (
-                                        <CircularProgress
-                                            size={24}
-                                            className={classes.buttonProgress}
-                                        />
+                                        <CircularProgress size={24} className={classes.buttonProgress} />
                                     )}
                                 </Button>
                             </DialogActions>

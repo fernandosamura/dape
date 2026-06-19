@@ -108,6 +108,22 @@ export default function Options(props) {
 
   const [asaasType, setAsaasType] = useState("");
   const [loadingAsaasType, setLoadingAsaasType] = useState(false);
+
+  // ── Multi-provider IA ───────────────────────────────────
+  const [aiProvider, setAiProvider] = useState("openai");
+  const [loadingAiProvider, setLoadingAiProvider] = useState(false);
+  const [aiModel, setAiModel] = useState("");
+  const [loadingAiModel, setLoadingAiModel] = useState(false);
+  const [openaiApiKey, setOpenaiApiKey] = useState("");
+  const [loadingOpenaiApiKey, setLoadingOpenaiApiKey] = useState(false);
+  const [anthropicApiKey, setAnthropicApiKey] = useState("");
+  const [loadingAnthropicApiKey, setLoadingAnthropicApiKey] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [loadingGeminiApiKey, setLoadingGeminiApiKey] = useState(false);
+  const [manusApiKey, setManusApiKey] = useState("");
+  const [loadingManusApiKey, setLoadingManusApiKey] = useState(false);
+  const [manusBaseUrl, setManusBaseUrl] = useState("");
+  const [loadingManusBaseUrl, setLoadingManusBaseUrl] = useState(false);
   
   // recursos a mais da plw design
 
@@ -194,6 +210,28 @@ export default function Options(props) {
       if (asaasType) {
         setAsaasType(asaasType.value);
       }
+
+      // ── Multi-provider IA ──────────────────────────────
+      const aiProviderSetting = settings.find((s) => s.key === "aiProvider");
+      if (aiProviderSetting) setAiProvider(aiProviderSetting.value || "openai");
+
+      const aiModelSetting = settings.find((s) => s.key === "aiModel");
+      if (aiModelSetting) setAiModel(aiModelSetting.value || "");
+
+      const openaiApiKeySetting = settings.find((s) => s.key === "openaiApiKey");
+      if (openaiApiKeySetting) setOpenaiApiKey(openaiApiKeySetting.value || "");
+
+      const anthropicApiKeySetting = settings.find((s) => s.key === "anthropicApiKey");
+      if (anthropicApiKeySetting) setAnthropicApiKey(anthropicApiKeySetting.value || "");
+
+      const geminiApiKeySetting = settings.find((s) => s.key === "geminiApiKey");
+      if (geminiApiKeySetting) setGeminiApiKey(geminiApiKeySetting.value || "");
+
+      const manusApiKeySetting = settings.find((s) => s.key === "manusApiKey");
+      if (manusApiKeySetting) setManusApiKey(manusApiKeySetting.value || "");
+
+      const manusBaseUrlSetting = settings.find((s) => s.key === "manusBaseUrl");
+      if (manusBaseUrlSetting) setManusBaseUrl(manusBaseUrlSetting.value || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
@@ -722,6 +760,165 @@ export default function Options(props) {
           </FormControl>
         </Grid>
       </Grid>
+
+      {/* ════════════════════════════════════════════════════════
+           CONFIGURAÇÕES DE IA — Multi-Provider
+          ════════════════════════════════════════════════════════ */}
+      <Grid xs={12} item>
+        <Typography variant="h6" gutterBottom style={{ marginTop: 24, fontWeight: 600 }}>
+          🤖 Configurações de IA
+        </Typography>
+        <Typography variant="body2" color="textSecondary" gutterBottom>
+          Escolha o provider padrão para as funcionalidades avançadas de IA (resumo de tickets, sugestões de resposta, próxima ação).
+          Para o chatbot por fila, configure o provider diretamente em cada Prompt.
+        </Typography>
+      </Grid>
+
+      <Grid xs={12} sm={6} md={6} item>
+        <FormControl className={classes.selectContainer}>
+          <InputLabel id="ai-provider-label">Provider de IA Padrão</InputLabel>
+          <Select
+            labelId="ai-provider-label"
+            value={aiProvider}
+            onChange={async (e) => {
+              const val = e.target.value;
+              setAiProvider(val);
+              setLoadingAiProvider(true);
+              await update({ key: "aiProvider", value: val });
+              setLoadingAiProvider(false);
+            }}
+          >
+            <MenuItem value="openai">OpenAI (ChatGPT)</MenuItem>
+            <MenuItem value="anthropic">Anthropic (Claude)</MenuItem>
+            <MenuItem value="gemini">Google (Gemini)</MenuItem>
+            <MenuItem value="manus">Manus IA (Custom)</MenuItem>
+          </Select>
+          <FormHelperText>
+            {loadingAiProvider ? "Salvando..." : "Provider usado pelos módulos de IA avançada"}
+          </FormHelperText>
+        </FormControl>
+      </Grid>
+
+      <Grid xs={12} sm={6} md={6} item>
+        <FormControl className={classes.selectContainer}>
+          <TextField
+            margin="dense"
+            label="Modelo padrão"
+            variant="outlined"
+            value={aiModel}
+            placeholder={aiProvider === "openai" ? "gpt-4o-mini" : aiProvider === "anthropic" ? "claude-3-5-sonnet-20241022" : aiProvider === "gemini" ? "gemini-2.0-flash" : "manus-default"}
+            onChange={(e) => setAiModel(e.target.value)}
+            onBlur={async () => {
+              setLoadingAiModel(true);
+              await update({ key: "aiModel", value: aiModel });
+              setLoadingAiModel(false);
+            }}
+          />
+          <FormHelperText>
+            {loadingAiModel ? "Salvando..." : "Nome do modelo (ex: gpt-4o-mini, claude-3-5-sonnet-20241022)"}
+          </FormHelperText>
+        </FormControl>
+      </Grid>
+
+      {/* OpenAI API Key */}
+      <Grid xs={12} sm={6} md={6} item>
+        <FormControl className={classes.selectContainer}>
+          <TextField
+            margin="dense"
+            label="OpenAI API Key"
+            variant="outlined"
+            type="password"
+            value={openaiApiKey}
+            onChange={(e) => setOpenaiApiKey(e.target.value)}
+            onBlur={async () => {
+              setLoadingOpenaiApiKey(true);
+              await update({ key: "openaiApiKey", value: openaiApiKey });
+              setLoadingOpenaiApiKey(false);
+            }}
+          />
+          <FormHelperText>{loadingOpenaiApiKey ? "Salvando..." : "Chave da API OpenAI (sk-...)"}</FormHelperText>
+        </FormControl>
+      </Grid>
+
+      {/* Anthropic API Key */}
+      <Grid xs={12} sm={6} md={6} item>
+        <FormControl className={classes.selectContainer}>
+          <TextField
+            margin="dense"
+            label="Anthropic (Claude) API Key"
+            variant="outlined"
+            type="password"
+            value={anthropicApiKey}
+            onChange={(e) => setAnthropicApiKey(e.target.value)}
+            onBlur={async () => {
+              setLoadingAnthropicApiKey(true);
+              await update({ key: "anthropicApiKey", value: anthropicApiKey });
+              setLoadingAnthropicApiKey(false);
+            }}
+          />
+          <FormHelperText>{loadingAnthropicApiKey ? "Salvando..." : "Chave da API Anthropic (sk-ant-...)"}</FormHelperText>
+        </FormControl>
+      </Grid>
+
+      {/* Google Gemini API Key */}
+      <Grid xs={12} sm={6} md={6} item>
+        <FormControl className={classes.selectContainer}>
+          <TextField
+            margin="dense"
+            label="Google Gemini API Key"
+            variant="outlined"
+            type="password"
+            value={geminiApiKey}
+            onChange={(e) => setGeminiApiKey(e.target.value)}
+            onBlur={async () => {
+              setLoadingGeminiApiKey(true);
+              await update({ key: "geminiApiKey", value: geminiApiKey });
+              setLoadingGeminiApiKey(false);
+            }}
+          />
+          <FormHelperText>{loadingGeminiApiKey ? "Salvando..." : "Chave da API Google AI Studio (AIza...)"}</FormHelperText>
+        </FormControl>
+      </Grid>
+
+      {/* Manus API Key + Base URL */}
+      <Grid xs={12} sm={6} md={6} item>
+        <FormControl className={classes.selectContainer}>
+          <TextField
+            margin="dense"
+            label="Manus IA API Key"
+            variant="outlined"
+            type="password"
+            value={manusApiKey}
+            onChange={(e) => setManusApiKey(e.target.value)}
+            onBlur={async () => {
+              setLoadingManusApiKey(true);
+              await update({ key: "manusApiKey", value: manusApiKey });
+              setLoadingManusApiKey(false);
+            }}
+          />
+          <FormHelperText>{loadingManusApiKey ? "Salvando..." : "Chave da API Manus IA"}</FormHelperText>
+        </FormControl>
+      </Grid>
+
+      <Grid xs={12} sm={6} md={6} item>
+        <FormControl className={classes.selectContainer}>
+          <TextField
+            margin="dense"
+            label="Manus IA Base URL"
+            variant="outlined"
+            value={manusBaseUrl}
+            placeholder="https://api.manus.ai/v1"
+            onChange={(e) => setManusBaseUrl(e.target.value)}
+            onBlur={async () => {
+              setLoadingManusBaseUrl(true);
+              await update({ key: "manusBaseUrl", value: manusBaseUrl });
+              setLoadingManusBaseUrl(false);
+            }}
+          />
+          <FormHelperText>{loadingManusBaseUrl ? "Salvando..." : "Endpoint compatível com OpenAI (deixe vazio para padrão)"}</FormHelperText>
+        </FormControl>
+      </Grid>
+
     </>
   );
 }

@@ -16,6 +16,8 @@ interface PromptData {
     maxMessages?: number;
     companyId: string | number;
     model: string;
+    provider?: string;
+    baseUrl?: string;
 }
 
 const CreatePromptService = async (promptData: PromptData): Promise<Prompt> => {

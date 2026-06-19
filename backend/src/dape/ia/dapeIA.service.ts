@@ -1,10 +1,10 @@
 import { QueryTypes } from "sequelize";
-import { Configuration, OpenAIApi } from "openai";
 import sequelize from "../../database";
 import { SUMMARY_PROMPT, SUGGEST_REPLY_PROMPT, NEXT_ACTION_PROMPT } from "./dapeIA.prompts";
+import { callAIProvider, AIProvider, AIMessage } from "../../services/AIProviderService/AIProviderRouter";
 
 const MAX_CALLS_PER_MINUTE = 10;
-const MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "gpt-4o-mini";
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
 
@@ -27,39 +27,57 @@ async function checkRateLimit(companyId: number): Promise<void> {
   }
 }
 
-// ── OpenAI client ────────────────────────────────────────────────────────────
+// ── AI client (multi-provider) ───────────────────────────────────────────────
 
-async function getOpenAIKey(companyId: number): Promise<string> {
-  // 1. Try Settings table (key = 'openaiApiKey' or 'OPENAI_API_KEY')
-  const setting = await sequelize.query<{ value: string }>(
-    `SELECT value FROM "Settings"
-     WHERE "companyId" = :companyId AND key IN ('openaiApiKey','OPENAI_API_KEY','openai_api_key')
-     LIMIT 1`,
-    { replacements: { companyId }, type: QueryTypes.SELECT }
-  );
-  if (setting[0]?.value) return setting[0].value;
-
-  // 2. Fallback to environment variable
-  const envKey = process.env.OPENAI_API_KEY;
-  if (envKey) return envKey;
-
-  throw new Error("OPENAI_KEY_NOT_CONFIGURED");
+interface AISettings {
+  provider: AIProvider;
+  apiKey: string;
+  model: string;
+  baseUrl?: string;
 }
 
-async function callOpenAI(companyId: number, prompt: string): Promise<{ content: string; tokens: number }> {
-  const apiKey = await getOpenAIKey(companyId);
-  const configuration = new Configuration({ apiKey });
-  const openai = new OpenAIApi(configuration);
+async function getCompanyAISettings(companyId: number): Promise<AISettings> {
+  const rows = await sequelize.query<{ key: string; value: string }>(
+    `SELECT key, value FROM "Settings" WHERE "companyId" = :companyId`,
+    { replacements: { companyId }, type: QueryTypes.SELECT }
+  );
+  const get = (key: string) => rows.find(r => r.key === key)?.value;
 
-  const response = await openai.createChatCompletion({
-    model: MODEL,
+  const provider = (get("aiProvider") || "openai") as AIProvider;
+  const model = get("aiModel") || DEFAULT_MODEL;
+
+  let apiKey: string;
+  switch (provider) {
+    case "anthropic": apiKey = get("anthropicApiKey") || process.env.ANTHROPIC_API_KEY || ""; break;
+    case "gemini":    apiKey = get("geminiApiKey")    || process.env.GEMINI_API_KEY    || ""; break;
+    case "manus":     apiKey = get("manusApiKey")     || process.env.MANUS_API_KEY     || ""; break;
+    default:
+      apiKey = get("openaiApiKey") || get("OPENAI_API_KEY") || get("openai_api_key")
+               || process.env.OPENAI_API_KEY || "";
+  }
+
+  const baseUrl = provider === "manus" ? (get("manusBaseUrl") || undefined) : undefined;
+
+  if (!apiKey) throw new Error(`API_KEY_NOT_CONFIGURED:${provider}`);
+
+  return { provider, model, apiKey, baseUrl };
+}
+
+async function callAI(companyId: number, prompt: string): Promise<{ content: string; tokens: number }> {
+  const settings = await getCompanyAISettings(companyId);
+
+  const content = await callAIProvider({
+    provider: settings.provider,
+    apiKey: settings.apiKey,
+    model: settings.model,
     messages: [{ role: "user", content: prompt }],
+    maxTokens: 600,
     temperature: 0.7,
-    max_tokens: 600,
+    baseUrl: settings.baseUrl,
   });
 
-  const content = response.data.choices[0]?.message?.content || "";
-  const tokens = response.data.usage?.total_tokens || 0;
+  // Token counting is only precise for OpenAI; for other providers we estimate
+  const tokens = Math.ceil(content.length / 4);
   return { content, tokens };
 }
 
@@ -109,7 +127,7 @@ export async function summarizeTicket(ticketId: number, companyId: number) {
   const conversation = await getTicketMessages(ticketId, companyId);
   const prompt = SUMMARY_PROMPT(conversation);
 
-  const { content, tokens } = await callOpenAI(companyId, prompt);
+  const { content, tokens } = await callAI(companyId, prompt);
   const parsed = parseJSON(content);
 
   if (!parsed) throw new Error("IA_PARSE_ERROR");
@@ -129,7 +147,7 @@ export async function summarizeTicket(ticketId: number, companyId: number) {
         intent: parsed.intencao || null,
         urgency: parsed.urgencia || null,
         estimatedValue: parsed.valor_estimado || null,
-        model: MODEL,
+        model: DEFAULT_MODEL,
         tokens,
       },
       type: QueryTypes.SELECT,
@@ -178,7 +196,7 @@ export async function suggestReply(ticketId: number, companyId: number) {
   const summaryContext = latestSummary?.summary_text || "Conversa em andamento.";
 
   const prompt = SUGGEST_REPLY_PROMPT(summaryContext, lastMessage);
-  const { content, tokens } = await callOpenAI(companyId, prompt);
+  const { content, tokens } = await callAI(companyId, prompt);
   const parsed = parseJSON(content);
   if (!parsed?.opcoes) throw new Error("IA_PARSE_ERROR");
 
@@ -207,7 +225,7 @@ export async function suggestNextAction(ticketId: number, companyId: number) {
   const summaryContext = latestSummary?.summary_text || "Lead em acompanhamento.";
 
   const prompt = NEXT_ACTION_PROMPT(summaryContext, conversation.split("\n").slice(-10).join("\n"));
-  const { content, tokens } = await callOpenAI(companyId, prompt);
+  const { content, tokens } = await callAI(companyId, prompt);
   const parsed = parseJSON(content);
   if (!parsed) throw new Error("IA_PARSE_ERROR");
 
