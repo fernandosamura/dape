@@ -2450,6 +2450,24 @@ const handleMessage = async (
       await verifyMessage(msg, ticket, contact);
     }
 
+    // Non-blocking SDR qualification for first message from a contact
+    if (!msg.key.fromMe && unreadMessages === 1) {
+      try {
+        const { SDRAgent } = await import('../../dape/agents/SDRAgent');
+        const sdrAgent = new SDRAgent(companyId);
+        const msgBody = getBodyMessage(msg) || '';
+        sdrAgent.qualifyLead(contact.id, msgBody).then(result => {
+          if (result) {
+            console.log(`[wbotMessageListener] SDR qualification for contact ${contact.id}:`, result);
+          }
+        }).catch(err => {
+          console.error('[wbotMessageListener] SDR qualification error (non-blocking):', err);
+        });
+      } catch (err) {
+        // completely non-blocking — never throw
+      }
+    }
+
     const currentSchedule = await VerifyCurrentSchedule(companyId);
     const scheduleType = await Setting.findOne({
       where: {
