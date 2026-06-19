@@ -36,11 +36,25 @@ export function useDapeModules() {
 
   const hasModule = (moduleKey) => enabledModules.includes(moduleKey);
 
+  // Returns the operation_mode for a given module key, defaulting to 'assisted'
+  const getModuleMode = (moduleKey) => {
+    const mod = modules.find(m => m.module_key === moduleKey);
+    return mod?.operation_mode || 'assisted';
+  };
+
+  // Map of moduleKey → operation_mode for convenient access
+  const modulesModes = modules.reduce((acc, m) => {
+    acc[m.module_key] = m.operation_mode || 'assisted';
+    return acc;
+  }, {});
+
   return {
     enabledModules,
     modules,
+    modulesModes,
     planFeatures,
     hasModule,
+    getModuleMode,
     isLoading,
     isMaster: hasModule("dape_pipeline") && hasModule("dape_radar"), // master has all
     hasPipeline:     hasModule("dape_pipeline"),

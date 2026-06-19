@@ -131,12 +131,14 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
 
     // 3. Module associations
     if (modules && typeof modules === "object") {
-      for (const [moduleKey, isEnabled] of Object.entries(modules)) {
+      for (const [moduleKey, val] of Object.entries(modules)) {
+        const isEnabled = typeof val === "object" && val !== null ? (val as any).is_enabled : val;
+        const operationMode = typeof val === "object" && val !== null ? ((val as any).operation_mode || 'assisted') : 'assisted';
         await sequelize.query(
-          `INSERT INTO dape_plan_modules (plan_id, module_key, is_enabled, created_at)
-           VALUES (:planId, :moduleKey, :isEnabled, NOW())
-           ON CONFLICT (plan_id, module_key) DO UPDATE SET is_enabled = :isEnabled`,
-          { replacements: { planId: dapePlanId, moduleKey, isEnabled }, type: QueryTypes.INSERT }
+          `INSERT INTO dape_plan_modules (plan_id, module_key, is_enabled, operation_mode, created_at)
+           VALUES (:planId, :moduleKey, :isEnabled, :operationMode, NOW())
+           ON CONFLICT (plan_id, module_key) DO UPDATE SET is_enabled = :isEnabled, operation_mode = :operationMode`,
+          { replacements: { planId: dapePlanId, moduleKey, isEnabled, operationMode }, type: QueryTypes.INSERT }
         );
       }
     }
@@ -220,12 +222,14 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
     }
 
     if (modules && typeof modules === "object") {
-      for (const [moduleKey, isEnabled] of Object.entries(modules)) {
+      for (const [moduleKey, val] of Object.entries(modules)) {
+        const isEnabled = typeof val === "object" && val !== null ? (val as any).is_enabled : val;
+        const operationMode = typeof val === "object" && val !== null ? ((val as any).operation_mode || 'assisted') : 'assisted';
         await sequelize.query(
-          `INSERT INTO dape_plan_modules (plan_id, module_key, is_enabled, created_at)
-           VALUES (:planId, :moduleKey, :isEnabled, NOW())
-           ON CONFLICT (plan_id, module_key) DO UPDATE SET is_enabled = :isEnabled`,
-          { replacements: { planId: id, moduleKey, isEnabled }, type: QueryTypes.INSERT }
+          `INSERT INTO dape_plan_modules (plan_id, module_key, is_enabled, operation_mode, created_at)
+           VALUES (:planId, :moduleKey, :isEnabled, :operationMode, NOW())
+           ON CONFLICT (plan_id, module_key) DO UPDATE SET is_enabled = :isEnabled, operation_mode = :operationMode`,
+          { replacements: { planId: id, moduleKey, isEnabled, operationMode }, type: QueryTypes.INSERT }
         );
       }
     }
@@ -448,14 +452,15 @@ export const removeCompany = async (req: Request, res: Response) => {
 // ─── MODULE OVERRIDE ─────────────────────────────────────────────────────────
 export const setModuleOverride = async (req: Request, res: Response) => {
   try {
-    const { companyId, moduleKey, isEnabled } = req.body;
+    const { companyId, moduleKey, isEnabled, operationMode } = req.body;
     if (!companyId || !moduleKey) return res.status(400).json({ error: "companyId e moduleKey obrigatórios" });
 
+    const mode = operationMode || 'assisted';
     await sequelize.query(
-      `INSERT INTO dape_tenant_module_overrides (company_id, module_key, is_enabled, created_at, updated_at)
-       VALUES (:cid, :key, :enabled, NOW(), NOW())
-       ON CONFLICT (company_id, module_key) DO UPDATE SET is_enabled = :enabled, updated_at = NOW()`,
-      { replacements: { cid: companyId, key: moduleKey, enabled: isEnabled }, type: QueryTypes.INSERT }
+      `INSERT INTO dape_tenant_module_overrides (company_id, module_key, is_enabled, operation_mode, created_at, updated_at)
+       VALUES (:cid, :key, :enabled, :mode, NOW(), NOW())
+       ON CONFLICT (company_id, module_key) DO UPDATE SET is_enabled = :enabled, operation_mode = :mode, updated_at = NOW()`,
+      { replacements: { cid: companyId, key: moduleKey, enabled: isEnabled, mode }, type: QueryTypes.INSERT }
     );
     moduleAccessService.invalidateCache(parseInt(companyId));
     return res.json({ success: true });

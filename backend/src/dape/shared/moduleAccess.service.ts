@@ -108,42 +108,45 @@ export const moduleAccessService = {
     return enabled;
   },
 
-  async getAllModulesStatus(companyId: number): Promise<Array<{ module_key: string; module_name: string; is_enabled: boolean; from_override: boolean }>> {
+  async getAllModulesStatus(companyId: number): Promise<Array<{ module_key: string; module_name: string; is_enabled: boolean; from_override: boolean; operation_mode: 'disabled' | 'assisted' | 'automatic' }>> {
     if (await isMasterCompany(companyId)) {
       return ALL_DAPE_MODULES.map(key => ({
         module_key: key,
         module_name: MODULE_NAMES[key] || key,
         is_enabled: true,
         from_override: false,
+        operation_mode: 'automatic' as const,
       }));
     }
 
-    const overrides = await sequelize.query<{ module_key: string; is_enabled: boolean }>(
-      `SELECT module_key, is_enabled FROM dape_tenant_module_overrides WHERE company_id = :companyId`,
+    const overrides = await sequelize.query<{ module_key: string; is_enabled: boolean; operation_mode: string }>(
+      `SELECT module_key, is_enabled, operation_mode FROM dape_tenant_module_overrides WHERE company_id = :companyId`,
       { replacements: { companyId }, type: QueryTypes.SELECT }
     );
-    const overrideMap = new Map(overrides.map(r => [r.module_key, r.is_enabled]));
+    const overrideMap = new Map(overrides.map(r => [r.module_key, r]));
 
-    const planModules = await sequelize.query<{ module_key: string; is_enabled: boolean }>(
-      `SELECT pm.module_key, pm.is_enabled
+    const planModules = await sequelize.query<{ module_key: string; is_enabled: boolean; operation_mode: string }>(
+      `SELECT pm.module_key, pm.is_enabled, pm.operation_mode
        FROM dape_tenant_plans tp
        JOIN dape_plan_modules pm ON pm.plan_id = tp.plan_id
        WHERE tp.company_id = :companyId AND tp.is_active = TRUE
          AND (tp.plan_ends_at IS NULL OR tp.plan_ends_at >= CURRENT_DATE)`,
       { replacements: { companyId }, type: QueryTypes.SELECT }
     );
-    const planMap = new Map(planModules.map(r => [r.module_key, r.is_enabled]));
+    const planMap = new Map(planModules.map(r => [r.module_key, r]));
 
     return ALL_DAPE_MODULES.map(key => {
-      const fromOverride = overrideMap.has(key);
-      const isEnabled = fromOverride
-        ? overrideMap.get(key) === true
-        : planMap.get(key) === true;
+      const ov = overrideMap.get(key);
+      const pm = planMap.get(key);
+      const fromOverride = !!ov;
+      const isEnabled = fromOverride ? ov!.is_enabled === true : pm?.is_enabled === true;
+      const operationMode = (ov?.operation_mode || pm?.operation_mode || 'assisted') as 'disabled' | 'assisted' | 'automatic';
       return {
         module_key: key,
         module_name: MODULE_NAMES[key] || key,
         is_enabled: isEnabled,
         from_override: fromOverride,
+        operation_mode: operationMode,
       };
     });
   },

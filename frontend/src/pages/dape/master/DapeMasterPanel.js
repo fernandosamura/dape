@@ -49,8 +49,18 @@ const EMPTY_PLAN = {
   modules: {
     dape_pipeline: false, dape_analytics: false, dape_ia: false,
     dape_growth: false, dape_intelligence: false, dape_radar: false
+  },
+  modulesModes: {
+    dape_pipeline: "assisted", dape_analytics: "assisted", dape_ia: "assisted",
+    dape_growth: "assisted", dape_intelligence: "assisted", dape_radar: "assisted"
   }
 };
+
+const OPERATION_MODE_OPTIONS = [
+  { value: "disabled", label: "Desativado" },
+  { value: "assisted", label: "Assistido" },
+  { value: "automatic", label: "Automático" },
+];
 
 const EMPTY_COMPANY = {
   name: "", email: "", phone: "", status: "active", dueDate: "",
@@ -64,6 +74,21 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
 
   useEffect(() => {
     if (plan) {
+      // Extract modulesModes from plan.modules if it carries the new object format
+      const rawMods = plan.modules || EMPTY_PLAN.modules;
+      const parsedMods = typeof rawMods === "string" ? JSON.parse(rawMods || "{}") : rawMods;
+      const modulesEnabled = {};
+      const modulesModes = { ...EMPTY_PLAN.modulesModes };
+      MODULE_KEYS.forEach(({ key }) => {
+        const v = parsedMods[key];
+        if (typeof v === "object" && v !== null) {
+          modulesEnabled[key] = !!v.is_enabled;
+          modulesModes[key] = v.operation_mode || "assisted";
+        } else {
+          modulesEnabled[key] = !!v;
+          modulesModes[key] = modulesModes[key] || "assisted";
+        }
+      });
       setForm({
         name: plan.name || "",
         description: plan.description || "",
@@ -81,7 +106,8 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
         use_integrations: plan.use_integrations || false,
         use_ia_audio_reply: plan.use_ia_audio_reply || false,
         allowed_ia_models: Array.isArray(plan.allowed_ia_models) ? plan.allowed_ia_models.join(", ") : (plan.allowed_ia_models || ""),
-        modules: plan.modules || EMPTY_PLAN.modules
+        modules: modulesEnabled,
+        modulesModes,
       });
     } else {
       setForm(EMPTY_PLAN);
@@ -90,6 +116,7 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
 
   const set = (field, val) => setForm(p => ({ ...p, [field]: val }));
   const setModule = (key, val) => setForm(p => ({ ...p, modules: { ...p.modules, [key]: val } }));
+  const setModuleMode = (key, val) => setForm(p => ({ ...p, modulesModes: { ...p.modulesModes, [key]: val } }));
 
   const handleSave = async () => {
     if (!form.name) return toast.error("Nome obrigatório");
@@ -98,7 +125,12 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
       const allowedIaModelsArray = typeof form.allowed_ia_models === "string"
         ? form.allowed_ia_models.split(",").map(s => s.trim()).filter(s => s.length > 0)
         : [];
-      const payload = { ...form, allowed_ia_models: allowedIaModelsArray };
+      // Build modules as objects carrying both is_enabled and operation_mode
+      const modulesPayload = {};
+      MODULE_KEYS.forEach(({ key }) => {
+        modulesPayload[key] = { is_enabled: !!form.modules[key], operation_mode: form.modulesModes[key] || "assisted" };
+      });
+      const payload = { ...form, allowed_ia_models: allowedIaModelsArray, modules: modulesPayload };
       if (plan?.id) {
         await api.put(`/dape/master/plans/${plan.id}`, payload);
         toast.success("Plano atualizado!");
@@ -152,11 +184,23 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
 
           <Grid item xs={12}><Divider /><Typography variant="subtitle2" style={{ fontWeight: 600, marginTop: 8 }}>Módulos DAPLE</Typography></Grid>
           {MODULE_KEYS.map(m => (
-            <Grid item xs={6} md={4} key={m.key}>
-              <FormControlLabel
-                control={<Switch checked={!!form.modules[m.key]} onChange={e => setModule(m.key, e.target.checked)} color="primary" size="small" />}
-                label={m.label}
-              />
+            <Grid item xs={12} md={6} key={m.key}>
+              <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+                <FormControlLabel
+                  style={{ marginRight: 0, minWidth: 130 }}
+                  control={<Switch checked={!!form.modules[m.key]} onChange={e => setModule(m.key, e.target.checked)} color="primary" size="small" />}
+                  label={m.label}
+                />
+                <TextField
+                  select size="small" variant="outlined"
+                  value={form.modulesModes[m.key] || "assisted"}
+                  onChange={e => setModuleMode(m.key, e.target.value)}
+                  SelectProps={{ native: true }}
+                  style={{ minWidth: 130 }}
+                >
+                  {OPERATION_MODE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </TextField>
+              </Box>
             </Grid>
           ))}
         </Grid>
@@ -264,6 +308,7 @@ function CompanyDialog({ open, onClose, company, plans, onSaved }) {
 // ─── MODULE OVERRIDE DIALOG ──────────────────────────────────────────────────
 function ModuleOverrideDialog({ open, onClose, company, onSaved }) {
   const [overrides, setOverrides] = useState({});
+  const [overrideModes, setOverrideModes] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -272,9 +317,16 @@ function ModuleOverrideDialog({ open, onClose, company, onSaved }) {
       setLoading(true);
       api.get(`/dape/modules/my-access?companyId=${company.id}`)
         .then(r => {
-          const m = {};
-          MODULE_KEYS.forEach(k => { m[k.key] = r.data?.modules?.includes(k.key) || false; });
-          setOverrides(m);
+          const enabled = {};
+          const modes = {};
+          const modsList = r.data?.modules || [];
+          MODULE_KEYS.forEach(k => {
+            const mod = modsList.find(mod => mod.module_key === k.key);
+            enabled[k.key] = mod ? mod.is_enabled : false;
+            modes[k.key] = mod?.operation_mode || "assisted";
+          });
+          setOverrides(enabled);
+          setOverrideModes(modes);
         })
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -285,7 +337,8 @@ function ModuleOverrideDialog({ open, onClose, company, onSaved }) {
     setSaving(true);
     try {
       for (const [moduleKey, isEnabled] of Object.entries(overrides)) {
-        await api.post("/dape/master/module-override", { companyId: company.id, moduleKey, isEnabled });
+        const operationMode = overrideModes[moduleKey] || "assisted";
+        await api.post("/dape/master/module-override", { companyId: company.id, moduleKey, isEnabled, operationMode });
       }
       toast.success("Módulos atualizados!");
       await onSaved();
@@ -298,15 +351,26 @@ function ModuleOverrideDialog({ open, onClose, company, onSaved }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Módulos — {company?.name}</DialogTitle>
       <DialogContent>
         {loading ? <CircularProgress size={24} /> : MODULE_KEYS.map(m => (
-          <FormControlLabel key={m.key}
-            style={{ display: "block" }}
-            control={<Switch checked={!!overrides[m.key]} onChange={e => setOverrides(p => ({ ...p, [m.key]: e.target.checked }))} color="primary" />}
-            label={m.label}
-          />
+          <Box key={m.key} display="flex" alignItems="center" style={{ gap: 8, marginBottom: 8 }}>
+            <FormControlLabel
+              style={{ marginRight: 0, minWidth: 150 }}
+              control={<Switch checked={!!overrides[m.key]} onChange={e => setOverrides(p => ({ ...p, [m.key]: e.target.checked }))} color="primary" />}
+              label={m.label}
+            />
+            <TextField
+              select size="small" variant="outlined"
+              value={overrideModes[m.key] || "assisted"}
+              onChange={e => setOverrideModes(p => ({ ...p, [m.key]: e.target.value }))}
+              SelectProps={{ native: true }}
+              style={{ minWidth: 140 }}
+            >
+              {OPERATION_MODE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </TextField>
+          </Box>
         ))}
       </DialogContent>
       <DialogActions>

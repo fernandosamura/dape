@@ -7,9 +7,13 @@ const router = Router();
 router.use(isAuth);
 
 // GET /api/dape/modules/my-access — returns enabled modules for current tenant
+// Master users may pass ?companyId=X to query another company's module status
 router.get('/my-access', async (req: Request, res: Response) => {
   try {
-    const companyId = (req as any).user?.companyId;
+    const user = (req as any).user;
+    const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string, 10) : null;
+    // Allow companyId override only for master company users
+    const companyId = (requestedCompanyId && user?.isMaster) ? requestedCompanyId : user?.companyId;
     const enabledModules = await moduleAccessService.getEnabledModules(companyId);
     const allStatus = await moduleAccessService.getAllModulesStatus(companyId);
     const planFeatures = await moduleAccessService.getPlanFeatures(companyId);
