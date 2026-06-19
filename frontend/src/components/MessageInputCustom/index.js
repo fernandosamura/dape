@@ -56,6 +56,11 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     padding: "7px",
     alignItems: "center",
+    flexWrap: "nowrap",
+    "@media (max-width: 600px)": {
+      padding: "4px 8px",
+      gap: 4,
+    },
   },
 
   messageInputWrapper: {
@@ -65,6 +70,7 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     borderRadius: 20,
     flex: 1,
+    minWidth: 0,
   },
 
   messageInput: {
@@ -170,6 +176,11 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     color: "#6bcbef",
     fontWeight: 500,
+  },
+  hideMobile: {
+    "@media (max-width: 600px)": {
+      display: "none !important",
+    },
   },
 }));
 
@@ -755,12 +766,14 @@ const MessageInputCustom = (props) => {
       <Paper square elevation={0} className={classes.mainWrapper}>
         {replyingMessage && renderReplyingMessage(replyingMessage)}
         <div className={classes.newMessageBox}>
-          <EmojiOptions
-            disabled={disableOption()}
-            handleAddEmoji={handleAddEmoji}
-            showEmoji={showEmoji}
-            setShowEmoji={setShowEmoji}
-          />
+          <span className={classes.hideMobile} style={{ display: "flex" }}>
+            <EmojiOptions
+              disabled={disableOption()}
+              handleAddEmoji={handleAddEmoji}
+              showEmoji={showEmoji}
+              setShowEmoji={setShowEmoji}
+            />
+          </span>
 
           <FileInput
             disableOption={disableOption}

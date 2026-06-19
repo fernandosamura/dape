@@ -80,6 +80,49 @@ const App = () => {
 				mediainput: mode === "light" ? "#ededed" : "#1c1c1c",
             },
             mode,
+            overrides: {
+                MuiButton: {
+                    root: {
+                        "@media (max-width: 600px)": {
+                            padding: "8px 16px",
+                            fontSize: "0.875rem",
+                            minHeight: 44,
+                        },
+                    },
+                },
+                MuiIconButton: {
+                    root: {
+                        "@media (max-width: 600px)": {
+                            padding: 10,
+                        },
+                    },
+                },
+                MuiTableCell: {
+                    root: {
+                        "@media (max-width: 600px)": {
+                            padding: "8px 12px",
+                            fontSize: "0.8125rem",
+                        },
+                    },
+                },
+                MuiTypography: {
+                    h4: {
+                        "@media (max-width: 600px)": {
+                            fontSize: "1.5rem",
+                        },
+                    },
+                    h5: {
+                        "@media (max-width: 600px)": {
+                            fontSize: "1.25rem",
+                        },
+                    },
+                    h6: {
+                        "@media (max-width: 600px)": {
+                            fontSize: "1rem",
+                        },
+                    },
+                },
+            },
         },
         locale
     );
