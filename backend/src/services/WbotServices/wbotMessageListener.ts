@@ -2488,12 +2488,12 @@ const handleMessage = async (
               { where: { id: result.dealId, companyId, status: 'open' } }
             );
             console.log(
-              
+              `[PipelineAgent] Auto-advanced deal ${result.dealId} from "${result.currentStage}" to "${result.suggestedStage}" — ${result.reasoning}`
             );
           } else if (result && result.shouldAdvance && result.confidence === 'medium') {
             // Log suggestion for human review (don't auto-update)
             console.log(
-              
+              `[PipelineAgent] Stage suggestion (medium confidence) for deal ${result.dealId}: "${result.currentStage}" → "${result.suggestedStage}" — ${result.reasoning} [human review needed]`
             );
           }
         } catch (err) {
