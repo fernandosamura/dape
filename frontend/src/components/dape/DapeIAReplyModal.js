@@ -14,20 +14,23 @@ const s = {
   optionNum: { fontSize: 10, fontWeight: "bold", color: "#8B5CF6", marginBottom: 4, textTransform: "uppercase" },
   optionText: { fontSize: 13, color: "#374151", lineHeight: 1.5 },
   lastMsg: { background: "#F9FAFB", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#6B7280", marginBottom: 16, borderLeft: "3px solid #E5E7EB" },
-  buttons: { display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" },
+  buttons: { display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end", flexWrap: "wrap" },
   btnCancel: { padding: "8px 16px", borderRadius: 6, border: "1px solid #D1D5DB", background: "#fff", cursor: "pointer", fontSize: 13 },
   btnUse: (disabled) => ({ padding: "8px 16px", borderRadius: 6, border: "none", background: disabled ? "#C4B5FD" : "#8B5CF6", color: "#fff", cursor: disabled ? "not-allowed" : "pointer", fontSize: 13, fontWeight: "bold" }),
+  btnAudio: (disabled) => ({ padding: "8px 16px", borderRadius: 6, border: "none", background: disabled ? "#A7F3D0" : "#10B981", color: "#fff", cursor: disabled ? "not-allowed" : "pointer", fontSize: 13, fontWeight: "bold" }),
   loading: { textAlign: "center", padding: "24px 0", color: "#9CA3AF", fontSize: 13 },
   error: { background: "#FEE2E2", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#991B1B", marginBottom: 12 },
 };
 
-export default function DapeIAReplyModal({ open, onClose, ticketId, onUseReply }) {
+export default function DapeIAReplyModal({ open, onClose, ticketId, onUseReply, audioReplyEnabled, onSendAudio }) {
   const [suggestions, setSuggestions] = useState([]);
   const [lastMessage, setLastMessage] = useState("");
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState(null);
 
   async function loadSuggestions() {
     if (loaded) return;
@@ -63,6 +66,25 @@ export default function DapeIAReplyModal({ open, onClose, ticketId, onUseReply }
     setLoaded(false);
   }
 
+  async function handleSendAsAudio() {
+    if (selected === null) return;
+    const text = suggestions[selected];
+    setAudioLoading(true);
+    setAudioError(null);
+    try {
+      const { data } = await api.post(`/dape/ia/generate-audio-reply/${ticketId}`, { text });
+      if (onSendAudio) onSendAudio(data.url);
+      onClose();
+      setSelected(null);
+      setSuggestions([]);
+      setLoaded(false);
+    } catch (err) {
+      setAudioError(err?.response?.data?.error || "Erro ao gerar áudio");
+    } finally {
+      setAudioLoading(false);
+    }
+  }
+
   if (!open) return null;
 
   return (
@@ -77,6 +99,7 @@ export default function DapeIAReplyModal({ open, onClose, ticketId, onUseReply }
 
         {loading && <div style={s.loading}>Gerando sugestões com IA...</div>}
         {error && <div style={s.error}>{error}</div>}
+        {audioError && <div style={s.error}>{audioError}</div>}
 
         {!loading && suggestions.map((text, i) => (
           <div key={i} style={s.optionWrap(selected === i)} onClick={() => setSelected(i)}>
@@ -94,6 +117,15 @@ export default function DapeIAReplyModal({ open, onClose, ticketId, onUseReply }
           {suggestions.length > 0 && !loading && (
             <button style={s.btnUse(selected === null)} onClick={handleUse} disabled={selected === null}>
               Usar esta resposta
+            </button>
+          )}
+          {suggestions.length > 0 && !loading && audioReplyEnabled && (
+            <button
+              style={s.btnAudio(selected === null || audioLoading)}
+              onClick={handleSendAsAudio}
+              disabled={selected === null || audioLoading}
+            >
+              {audioLoading ? "Gerando áudio..." : "🔊 Enviar como Áudio"}
             </button>
           )}
           {loaded && (

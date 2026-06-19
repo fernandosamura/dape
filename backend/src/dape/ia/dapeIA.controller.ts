@@ -19,6 +19,10 @@ function handleError(res: Response, err: any, context: string): void {
     res.status(503).json({ error: "Chave OpenAI não configurada. Configure em Configurações > Integrações.", code: "OPENAI_KEY_NOT_CONFIGURED" });
     return;
   }
+  if (err?.message?.startsWith("API_KEY_NOT_CONFIGURED")) {
+    res.status(503).json({ error: "Chave OpenAI não configurada. Configure em Configurações > Integrações.", code: "OPENAI_KEY_NOT_CONFIGURED" });
+    return;
+  }
   if (err?.message === "IA_PARSE_ERROR") {
     res.status(502).json({ error: "Resposta da IA inválida. Tente novamente." });
     return;
@@ -84,5 +88,22 @@ export async function markUsed(req: Request, res: Response): Promise<void> {
     res.json({ ok: true });
   } catch (err) {
     handleError(res, err, "markUsed");
+  }
+}
+
+export async function generateAudioReply(req: Request, res: Response): Promise<void> {
+  try {
+    const companyId = getCompanyId(req);
+    const ticketId = parseInt(req.params.ticketId, 10);
+    if (isNaN(ticketId)) { res.status(400).json({ error: "ticketId inválido" }); return; }
+    const { text } = req.body;
+    if (!text || typeof text !== "string" || text.trim() === "") {
+      res.status(400).json({ error: "Campo 'text' é obrigatório" });
+      return;
+    }
+    const url = await IAService.generateAudioReply(companyId, ticketId, text.trim());
+    res.json({ url });
+  } catch (err) {
+    handleError(res, err, "generateAudioReply");
   }
 }

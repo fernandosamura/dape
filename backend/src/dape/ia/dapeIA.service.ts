@@ -2,6 +2,9 @@ import { QueryTypes } from "sequelize";
 import sequelize from "../../database";
 import { SUMMARY_PROMPT, SUGGEST_REPLY_PROMPT, NEXT_ACTION_PROMPT } from "./dapeIA.prompts";
 import { callAIProvider, AIProvider, AIMessage } from "../../services/AIProviderService/AIProviderRouter";
+import nodeFs from "fs";
+import fsPath from "path";
+import axios from "axios";
 
 const MAX_CALLS_PER_MINUTE = 10;
 const DEFAULT_MODEL = "gpt-4o-mini";
@@ -254,4 +257,45 @@ export async function markSuggestionUsed(suggestionId: number, companyId: number
      WHERE id = :suggestionId AND company_id = :companyId`,
     { replacements: { suggestionId, companyId }, type: QueryTypes.UPDATE }
   );
+}
+
+
+// ── TTS Audio Generation ─────────────────────────────────────────────────────
+
+export async function generateAudioReply(companyId: number, ticketId: number, text: string): Promise<string> {
+  // Get OpenAI API key (TTS only works with OpenAI)
+  const rows = await sequelize.query<{ key: string; value: string }>(
+    `SELECT key, value FROM "Settings" WHERE "companyId" = :companyId`,
+    { replacements: { companyId }, type: QueryTypes.SELECT }
+  );
+  const get = (key: string) => rows.find(r => r.key === key)?.value;
+  const apiKey = get("openaiApiKey") || get("OPENAI_API_KEY") || get("openai_api_key") || process.env.OPENAI_API_KEY || "";
+
+  if (!apiKey) throw new Error("OPENAI_KEY_NOT_CONFIGURED");
+
+  // Ensure audio directory exists
+  const publicFolder = fsPath.resolve(__dirname, "..", "..", "..", "public");
+  const audioFolder = fsPath.join(publicFolder, "audio");
+  if (!nodeFs.existsSync(audioFolder)) {
+    nodeFs.mkdirSync(audioFolder, { recursive: true });
+  }
+
+  const filename = `audio_${companyId}_${Date.now()}.mp3`;
+  const filePath = fsPath.join(audioFolder, filename);
+
+  // Call OpenAI TTS API directly via axios (openai v3.3.0 doesn't have audio.speech)
+  const response = await axios.post(
+    "https://api.openai.com/v1/audio/speech",
+    { model: "tts-1", voice: "alloy", input: text },
+    {
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      responseType: "arraybuffer",
+    }
+  );
+
+  nodeFs.writeFileSync(filePath, Buffer.from(response.data));
+
+  // Return public URL: served at /public/audio/<filename>
+  const backendUrl = process.env.API_URL || "http://2.25.196.154:3000";
+  return `${backendUrl}/public/audio/${filename}`;
 }

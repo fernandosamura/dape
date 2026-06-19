@@ -23,4 +23,7 @@ router.post("/next-action/:ticketId", IAController.suggestNextAction);
 // PUT  /api/dape/ia/suggestion/:suggestionId/used — marca sugestão como usada
 router.put("/suggestion/:suggestionId/used", IAController.markUsed);
 
+// POST /api/dape/ia/generate-audio-reply/:ticketId — gera áudio TTS da resposta
+router.post("/generate-audio-reply/:ticketId", IAController.generateAudioReply);
+
 export default router;

@@ -37,6 +37,7 @@ import toastError from "../../errors/toastError";
 import useQuickMessages from "../../hooks/useQuickMessages";
 import DapeIAReplyModal from "../dape/DapeIAReplyModal";
 import { useDapeModules } from "../../hooks/useDapeModules";
+import useSettings from "../../hooks/useSettings";
 
 const Mp3Recorder = new MicRecorder({ bitRate: 128 });
 
@@ -482,6 +483,16 @@ const MessageInputCustom = (props) => {
   const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
   const [showIAModal, setShowIAModal] = useState(false);
   const { hasIA } = useDapeModules();
+  const [iaAudioReplyEnabled, setIaAudioReplyEnabled] = React.useState(false);
+  const { getAll: getAllSettings } = useSettings();
+
+  React.useEffect(() => {
+    if (!hasIA) return;
+    getAllSettings().then((settings) => {
+      const s = settings.find((x) => x.key === 'iaAudioReplyEnabled');
+      setIaAudioReplyEnabled(s?.value === 'true');
+    }).catch(() => {});
+  }, [hasIA]);
 
   useEffect(() => {
     inputRef.current.focus();
@@ -621,6 +632,23 @@ const MessageInputCustom = (props) => {
       toastError(err);
       setLoading(false);
     }
+  };
+
+  const handleSendAudio = async (audioUrl) => {
+    setLoading(true);
+    try {
+      const response = await axios.get(audioUrl, { responseType: 'blob' });
+      const blob = response.data;
+      const filename = audioUrl.split('/').pop() || 'audio-ia.mp3';
+      const formData = new FormData();
+      formData.append('medias', blob, filename);
+      formData.append('body', filename);
+      formData.append('fromMe', true);
+      await api.post(`/messages/${ticketId}`, formData);
+    } catch (err) {
+      toastError(err);
+    }
+    setLoading(false);
   };
 
   const handleUploadAudio = async () => {
@@ -776,6 +804,11 @@ const MessageInputCustom = (props) => {
             onUseReply={(text) => {
               setInputMessage(text);
               setTimeout(() => inputRef.current && inputRef.current.focus(), 100);
+            }}
+            audioReplyEnabled={iaAudioReplyEnabled}
+            onSendAudio={(audioUrl) => {
+              setShowIAModal(false);
+              handleSendAudio(audioUrl);
             }}
           />
           <ActionButtons
