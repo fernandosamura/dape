@@ -4,6 +4,7 @@ import { useHistory } from "react-router-dom";
 import { makeStyles, createTheme, ThemeProvider } from "@material-ui/core/styles";
 import { IconButton } from "@material-ui/core";
 import { MoreVert, Replay } from "@material-ui/icons";
+import BusinessCenterIcon from "@material-ui/icons/BusinessCenter";
 
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
@@ -16,6 +17,8 @@ import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import UndoRoundedIcon from '@material-ui/icons/UndoRounded';
 import Tooltip from '@material-ui/core/Tooltip';
 import { green } from '@material-ui/core/colors';
+import DealModal from "../dape/DealModal";
+import useDeals from "../../hooks/useDeals";
 
 
 const useStyles = makeStyles(theme => ({
@@ -35,9 +38,11 @@ const TicketActionButtonsCustom = ({ ticket }) => {
 	const history = useHistory();
 	const [anchorEl, setAnchorEl] = useState(null);
 	const [loading, setLoading] = useState(false);
+	const [dealModalOpen, setDealModalOpen] = useState(false);
 	const ticketOptionsMenuOpen = Boolean(anchorEl);
 	const { user } = useContext(AuthContext);
 	const { setCurrentTicket } = useContext(TicketsContext);
+	const { createDeal } = useDeals();
 
 	const customTheme = createTheme({
 		palette: {
@@ -77,8 +82,27 @@ const TicketActionButtonsCustom = ({ ticket }) => {
 		}
 	};
 
+	const handleCreateDeal = async (data) => {
+		try {
+			const contactId = ticket.contact?.id || ticket.contactId;
+			await createDeal({ ...data, contactId });
+			setDealModalOpen(false);
+		} catch (err) {
+			console.error("[TicketActionButtons] createDeal error:", err);
+		}
+	};
+
 	return (
 		<div className={classes.actionButtons}>
+			<Tooltip title="Criar Negócio (Deal)">
+				<IconButton
+					size="small"
+					onClick={() => setDealModalOpen(true)}
+					style={{ color: "#22C55E" }}
+				>
+					<BusinessCenterIcon />
+				</IconButton>
+			</Tooltip>
 			{ticket.status === "closed" && (
 				<ButtonWithSpinner
 					loading={loading}
@@ -142,6 +166,12 @@ const TicketActionButtonsCustom = ({ ticket }) => {
 					{i18n.t("messagesList.header.buttons.accept")}
 				</ButtonWithSpinner>
 			)}
+			<DealModal
+				open={dealModalOpen}
+				onClose={() => setDealModalOpen(false)}
+				onSave={handleCreateDeal}
+				deal={null}
+			/>
 		</div>
 	);
 };
