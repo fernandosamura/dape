@@ -8,6 +8,7 @@ import UpdatePromptService from "../services/PromptServices/UpdatePromptService"
 import Whatsapp from "../models/Whatsapp";
 import { verify } from "jsonwebtoken";
 import authConfig from "../config/auth";
+import { moduleAccessService } from "../dape/shared/moduleAccess.service";
 
 interface TokenPayload {
   id: string;
@@ -40,6 +41,12 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   const decoded = verify(token, authConfig.secret);
   const { companyId } = decoded as TokenPayload;
   const { name, apiKey, prompt, maxTokens, temperature, promptTokens, completionTokens, totalTokens, queueId, maxMessages, model, provider, baseUrl, voice, voiceKey, voiceRegion, ttsProvider} = req.body;
+
+  const { allowedIaModels } = await moduleAccessService.getPlanFeatures(companyId);
+  if (allowedIaModels.length > 0 && model && !allowedIaModels.includes(model)) {
+    return res.status(403).json({ error: "Modelo de IA não permitido para o seu plano" });
+  }
+
   const promptTable = await CreatePromptService({ name, apiKey, prompt, maxTokens, temperature, promptTokens, completionTokens, totalTokens, queueId, maxMessages, companyId, model, provider, baseUrl, voice, voiceKey, voiceRegion, ttsProvider });
 
   const io = getIO();
@@ -72,6 +79,11 @@ export const update = async (
   const [, token] = authHeader.split(" ");
   const decoded = verify(token, authConfig.secret);
   const { companyId } = decoded as TokenPayload;
+
+  const { allowedIaModels } = await moduleAccessService.getPlanFeatures(companyId);
+  if (allowedIaModels.length > 0 && promptData.model && !allowedIaModels.includes(promptData.model)) {
+    return res.status(403).json({ error: "Modelo de IA não permitido para o seu plano" });
+  }
 
   const prompt = await UpdatePromptService({ promptData, promptId: promptId, companyId });
 

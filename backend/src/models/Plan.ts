@@ -7,7 +7,8 @@ import {
   PrimaryKey,
   AutoIncrement,
   AllowNull,
-  Unique
+  Unique,
+  DataType
 } from "sequelize-typescript";
 
 @Table
@@ -66,6 +67,9 @@ class Plan extends Model<Plan> {
 
   @Column
   useInstagram: boolean;
+
+  @Column(DataType.JSONB)
+  allowedIaModels: string[];
 }
 
 export default Plan;

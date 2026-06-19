@@ -44,6 +44,7 @@ const EMPTY_PLAN = {
   max_connections: 3, max_queues: 3,
   use_campaigns: false, use_schedules: false, use_internal_chat: false,
   use_external_api: false, use_kanban: false, use_openai: false, use_integrations: false,
+  allowed_ia_models: "",
   modules: {
     dape_pipeline: false, dape_analytics: false, dape_ia: false,
     dape_growth: false, dape_intelligence: false, dape_radar: false
@@ -77,6 +78,7 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
         use_kanban: plan.use_kanban || false,
         use_openai: plan.use_openai || false,
         use_integrations: plan.use_integrations || false,
+        allowed_ia_models: Array.isArray(plan.allowed_ia_models) ? plan.allowed_ia_models.join(", ") : (plan.allowed_ia_models || ""),
         modules: plan.modules || EMPTY_PLAN.modules
       });
     } else {
@@ -91,11 +93,15 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
     if (!form.name) return toast.error("Nome obrigatório");
     setSaving(true);
     try {
+      const allowedIaModelsArray = typeof form.allowed_ia_models === "string"
+        ? form.allowed_ia_models.split(",").map(s => s.trim()).filter(s => s.length > 0)
+        : [];
+      const payload = { ...form, allowed_ia_models: allowedIaModelsArray };
       if (plan?.id) {
-        await api.put(`/dape/master/plans/${plan.id}`, form);
+        await api.put(`/dape/master/plans/${plan.id}`, payload);
         toast.success("Plano atualizado!");
       } else {
-        await api.post("/dape/master/plans", form);
+        await api.post("/dape/master/plans", payload);
         toast.success("Plano criado!");
       }
       await onSaved();
@@ -120,6 +126,9 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
           </Grid>
           <Grid item xs={12}>
             <TextField fullWidth label="Descrição" value={form.description} onChange={e => set("description", e.target.value)} variant="outlined" size="small" multiline rows={2} />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField fullWidth label="Modelos de IA Permitidos (separados por vírgula)" value={form.allowed_ia_models} onChange={e => set("allowed_ia_models", e.target.value)} variant="outlined" size="small" placeholder="Ex: gpt-4,gpt-3.5-turbo,claude-3 (vazio = sem restrição)" helperText="Deixe vazio para permitir todos os modelos" />
           </Grid>
 
           <Grid item xs={12}><Typography variant="subtitle2" style={{ fontWeight: 600 }}>Limites do Sistema</Typography></Grid>

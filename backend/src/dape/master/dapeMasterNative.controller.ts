@@ -29,6 +29,7 @@ export const listUnifiedPlans = async (req: Request, res: Response) => {
         dp.use_integrations,
         dp.use_facebook,
         dp.use_instagram,
+        dp.allowed_ia_models,
         dp.is_master,
         dp.created_at,
         dp.updated_at,
@@ -54,11 +55,12 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
   try {
     const {
       name, description, price,
-      max_users, max_contacts, 
+      max_users, max_contacts,
       max_connections, max_queues,
       use_campaigns, use_schedules, use_internal_chat,
       use_external_api, use_kanban, use_openai, use_integrations,
       use_facebook, use_instagram,
+      allowed_ia_models,
       modules
     } = req.body;
 
@@ -99,15 +101,15 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
     const nativePlanId = (nativePlan as any).id;
 
     // 2. Create dape_plans record
+    const iaModels = Array.isArray(allowed_ia_models) ? allowed_ia_models : [];
     const [dapePlan] = await sequelize.query(
-      `INSERT INTO dape_plans (name, slug, description, price_monthly, max_users, max_contacts, max_connections, max_queues, use_campaigns, use_schedules, use_internal_chat, use_external_api, use_kanban, use_openai, use_integrations, use_facebook, use_instagram, native_plan_id, created_at, updated_at)
-       VALUES (:name, :slug, :description, :price, :max_users, :max_contacts, :max_connections, :max_queues, :use_campaigns, :use_schedules, :use_internal_chat, :use_external_api, :use_kanban, :use_openai, :use_integrations, :use_facebook, :use_instagram, :native_plan_id, NOW(), NOW())
+      `INSERT INTO dape_plans (name, slug, description, price_monthly, max_users, max_contacts, max_connections, max_queues, use_campaigns, use_schedules, use_internal_chat, use_external_api, use_kanban, use_openai, use_integrations, use_facebook, use_instagram, allowed_ia_models, native_plan_id, created_at, updated_at)
+       VALUES (:name, :slug, :description, :price, :max_users, :max_contacts, :max_connections, :max_queues, :use_campaigns, :use_schedules, :use_internal_chat, :use_external_api, :use_kanban, :use_openai, :use_integrations, :use_facebook, :use_instagram, :allowed_ia_models, :native_plan_id, NOW(), NOW())
        RETURNING id`,
       {
         replacements: {
           name, slug: uniqueSlug, description: description || null, price: price || 0,
           max_users: max_users || 5, max_contacts: max_contacts || 1000,
-          
           max_connections: max_connections || 3, max_queues: max_queues || 3,
           use_campaigns: use_campaigns || false, use_schedules: use_schedules || false,
           use_internal_chat: use_internal_chat || false, use_external_api: use_external_api || false,
@@ -115,6 +117,7 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
           use_integrations: use_integrations || false,
           use_facebook: use_facebook !== undefined ? use_facebook : true,
           use_instagram: use_instagram !== undefined ? use_instagram : true,
+          allowed_ia_models: JSON.stringify(iaModels),
           native_plan_id: nativePlanId
         },
         type: QueryTypes.SELECT
@@ -147,11 +150,12 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
     const { id } = req.params;
     const {
       name, description, price,
-      max_users, max_contacts, 
+      max_users, max_contacts,
       max_connections, max_queues,
       use_campaigns, use_schedules, use_internal_chat,
       use_external_api, use_kanban, use_openai, use_integrations,
       use_facebook, use_instagram,
+      allowed_ia_models,
       modules
     } = req.body;
 
@@ -160,26 +164,28 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
       { replacements: { id }, type: QueryTypes.SELECT }
     ) as any[];
 
+    const iaModels = Array.isArray(allowed_ia_models) ? allowed_ia_models : [];
     await sequelize.query(
       `UPDATE dape_plans SET name=:name, description=:description, price_monthly=:price,
        max_users=:max_users, max_contacts=:max_contacts,
        max_connections=:max_connections, max_queues=:max_queues,
        use_campaigns=:use_campaigns, use_schedules=:use_schedules, use_internal_chat=:use_internal_chat,
        use_external_api=:use_external_api, use_kanban=:use_kanban, use_openai=:use_openai,
-       use_integrations=:use_integrations, use_facebook=:use_facebook, use_instagram=:use_instagram, updated_at=NOW()
+       use_integrations=:use_integrations, use_facebook=:use_facebook, use_instagram=:use_instagram,
+       allowed_ia_models=:allowed_ia_models, updated_at=NOW()
        WHERE id=:id`,
       {
         replacements: {
           id, name, description: description || null, price: price || 0,
           max_users: max_users || 5, max_contacts: max_contacts || 1000,
-          
           max_connections: max_connections || 3, max_queues: max_queues || 3,
           use_campaigns: use_campaigns || false, use_schedules: use_schedules || false,
           use_internal_chat: use_internal_chat || false, use_external_api: use_external_api || false,
           use_kanban: use_kanban || false, use_openai: use_openai || false,
           use_integrations: use_integrations || false,
           use_facebook: use_facebook !== undefined ? use_facebook : true,
-          use_instagram: use_instagram !== undefined ? use_instagram : true
+          use_instagram: use_instagram !== undefined ? use_instagram : true,
+          allowed_ia_models: JSON.stringify(iaModels)
         },
         type: QueryTypes.UPDATE
       }
