@@ -6,6 +6,7 @@ import path from "path";
 import AppError from "../../errors/AppError";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
 import Ticket from "../../models/Ticket";
+import Message from "../../models/Message";
 import { lookup } from "mime-types";
 import formatBody from "../../helpers/Mustache";
 
@@ -18,10 +19,10 @@ interface Request {
 const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
 
 const processAudio = async (audio: string): Promise<string> => {
-  const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
+  const outputAudio = `${publicFolder}/${new Date().getTime()}.ogg`;
   return new Promise((resolve, reject) => {
     exec(
-      `ffmpeg -i ${audio} -vn -ab 128k -ar 44100 -f ipod ${outputAudio} -y`,
+      `ffmpeg -i ${audio} -c:a libopus -b:a 32k -vbr on -compression_level 10 ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
         fs.unlinkSync(audio);
@@ -32,10 +33,10 @@ const processAudio = async (audio: string): Promise<string> => {
 };
 
 const processAudioFile = async (audio: string): Promise<string> => {
-  const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
+  const outputAudio = `${publicFolder}/${new Date().getTime()}.ogg`;
   return new Promise((resolve, reject) => {
     exec(
-      `ffmpeg -i ${audio} -vn -ar 44100 -ac 2 -b:a 192k ${outputAudio}`,
+      `ffmpeg -i ${audio} -c:a libopus -b:a 32k -vbr on -compression_level 10 ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
         fs.unlinkSync(audio);
@@ -64,26 +65,15 @@ export const getMessageOptions = async (
         video: fs.readFileSync(pathMedia),
         caption: body ? body : "",
         fileName: fileName
-        // gifPlayback: true
       };
     } else if (typeMessage === "audio") {
-      const typeAudio = true; //fileName.includes("audio-record-site");
       const convert = await processAudio(pathMedia);
-      if (typeAudio) {
-        options = {
-          audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : mimeType,
-          caption: body ? body : null,
-          ptt: true
-        };
-      } else {
-        options = {
-          audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : mimeType,
-          caption: body ? body : null,
-          ptt: true
-        };
-      }
+      options = {
+        audio: fs.readFileSync(convert),
+        mimetype: "audio/ogg; codecs=opus",
+        caption: body ? body : null,
+        ptt: true
+      };
     } else if (typeMessage === "document") {
       options = {
         document: fs.readFileSync(pathMedia),
@@ -121,6 +111,26 @@ const SendWhatsAppMedia = async ({
   try {
     const wbot = await GetTicketWbot(ticket);
 
+    // --- DETECÇÃO DE DOMÍNIO @lid ---
+    let jidDomain = ticket.isGroup ? "g.us" : "s.whatsapp.net";
+    if (!ticket.isGroup) {
+      const lastContactMsg = await Message.findOne({
+        where: { ticketId: ticket.id, fromMe: false },
+        order: [["createdAt", "DESC"]]
+      });
+      if (lastContactMsg?.dataJson) {
+        try {
+          const parsedMsg = JSON.parse(lastContactMsg.dataJson);
+          const remoteJid: string = parsedMsg?.key?.remoteJid || "";
+          if (remoteJid.includes("@lid")) {
+            jidDomain = "lid";
+          }
+        } catch (_) {}
+      }
+    }
+    const number = `${ticket.contact.number}@${jidDomain}`;
+    // --- FIM DETECÇÃO JID ---
+
     const pathMedia = media.path;
     const typeMessage = media.mimetype.split("/")[0];
     let options: AnyMessageContent;
@@ -131,7 +141,6 @@ const SendWhatsAppMedia = async ({
         video: fs.readFileSync(pathMedia),
         caption: bodyMessage,
         fileName: media.originalname
-        // gifPlayback: true
       };
     } else if (typeMessage === "audio") {
       const typeAudio = media.originalname.includes("audio-record-site");
@@ -139,14 +148,15 @@ const SendWhatsAppMedia = async ({
         const convert = await processAudio(media.path);
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : media.mimetype,
+          mimetype: "audio/ogg; codecs=opus",
           ptt: true
         };
       } else {
         const convert = await processAudioFile(media.path);
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : media.mimetype
+          mimetype: "audio/ogg; codecs=opus",
+          ptt: false
         };
       }
     } else if (typeMessage === "document" || typeMessage === "text") {
@@ -170,12 +180,7 @@ const SendWhatsAppMedia = async ({
       };
     }
 
-    const sentMessage = await wbot.sendMessage(
-      `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-      {
-        ...options
-      }
-    );
+    const sentMessage = await wbot.sendMessage(number, { ...options });
 
     await ticket.update({ lastMessage: bodyMessage });
 

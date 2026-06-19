@@ -26,10 +26,10 @@ interface RequestFlow {
 const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
 
 const processAudio = async (audio: string): Promise<string> => {
-  const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
+  const outputAudio = `${publicFolder}/${new Date().getTime()}.ogg`;
   return new Promise((resolve, reject) => {
     exec(
-      `ffmpeg -i ${audio} -vn -ab 128k -ar 44100 -f ipod ${outputAudio} -y`,
+      `ffmpeg -i ${audio} -c:a libopus -b:a 32k -vbr on -compression_level 10 ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
         //fs.unlinkSync(audio);
@@ -40,10 +40,10 @@ const processAudio = async (audio: string): Promise<string> => {
 };
 
 const processAudioFile = async (audio: string): Promise<string> => {
-  const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
+  const outputAudio = `${publicFolder}/${new Date().getTime()}.ogg`;
   return new Promise((resolve, reject) => {
     exec(
-      `ffmpeg -i ${audio} -vn -ar 44100 -ac 2 -b:a 192k ${outputAudio}`,
+      `ffmpeg -i ${audio} -c:a libopus -b:a 32k -vbr on -compression_level 10 ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
         //fs.unlinkSync(audio);
@@ -113,14 +113,14 @@ const SendWhatsAppMediaFlow = async ({
           const convert = await processAudio(pathMedia);
           options = {
             audio: fs.readFileSync(convert),
-            mimetype: typeMessage ? "audio/mp4" : mimetype,
+            mimetype: typeMessage ? "audio/ogg; codecs=opus" : mimetype,
             ptt: true
           };
         } else {
           const convert = await processAudioFile(pathMedia);
           options = {
             audio: fs.readFileSync(convert),
-            mimetype: typeMessage ? "audio/mp4" : mimetype,
+            mimetype: typeMessage ? "audio/ogg; codecs=opus" : mimetype,
             ptt: false
           };
         }
