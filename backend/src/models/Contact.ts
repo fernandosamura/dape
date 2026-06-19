@@ -18,6 +18,8 @@ import Ticket from "./Ticket";
 import Company from "./Company";
 import Schedule from "./Schedule";
 import Whatsapp from "./Whatsapp";
+import DapeLeadSource from "./DapeLeadSource";
+import DapeDeal from "./DapeDeal";
 
 @Table
 class Contact extends Model<Contact> {
@@ -87,6 +89,12 @@ class Contact extends Model<Contact> {
 
   @BelongsTo(() => Whatsapp)
   whatsapp: Whatsapp;
+
+  @HasMany(() => DapeLeadSource, { foreignKey: "contactId", as: "leadSources" })
+  leadSources: DapeLeadSource[];
+
+  @HasMany(() => DapeDeal, { foreignKey: "contactId", as: "deals" })
+  deals: DapeDeal[];
 }
 
 export default Contact;
