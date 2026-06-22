@@ -64,7 +64,7 @@ const CreateUserService = async ({
       .required()
       .test(
         "Check-email",
-        "An user with this email already exists.",
+        "ERR_EMAIL_ALREADY_EXISTS",
         async value => {
           if (!value) return false;
           const emailExists = await User.findOne({

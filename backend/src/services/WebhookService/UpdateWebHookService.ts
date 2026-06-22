@@ -28,7 +28,7 @@ const UpdateWebHookService = async ({
     }
 
     const webhook = await WebhookModel.update({ name }, {
-      where: {id: webhookId, user_id: userId}
+      where: {id: webhookId, company_id: companyId}
     });
 
     return 'ok';

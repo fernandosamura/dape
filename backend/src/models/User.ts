@@ -85,6 +85,9 @@ class User extends Model<User> {
   })
   quickMessages: QuickMessage[];
 
+  @Column({ allowNull: true })
+  companyUserNumber: number;
+
   @ForeignKey(() => Whatsapp)
   @Column
   whatsappId: number;
