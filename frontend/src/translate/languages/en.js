@@ -1592,7 +1592,12 @@ const messages = {
 				ERR_QUEUE_COLOR_ALREADY_EXISTS: "This color is already in use, choose another.",
 				ERR_WAPP_GREETING_REQUIRED: "Greeting message is required when there is more than one queue.",
 			},
-		}
+		},
+		allTicket: {
+			form: {
+				viewTags: "View Tags",
+			},
+		},
 	},
 };
 

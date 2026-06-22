@@ -1638,6 +1638,11 @@ const messages = {
         ERR_WAPP_GREETING_REQUIRED:
             "A mensagem de saudação é obrigatório quando há mais de uma fila.",
       },
+      allTicket: {
+        form: {
+          viewTags: "Ver Tags",
+        },
+      },
     },
   },
 };

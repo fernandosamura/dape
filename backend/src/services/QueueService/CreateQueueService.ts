@@ -3,6 +3,7 @@ import AppError from "../../errors/AppError";
 import Queue from "../../models/Queue";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
+import { UniqueConstraintError } from "sequelize";
 
 interface QueueData {
   name: string;
@@ -86,9 +87,15 @@ const CreateQueueService = async (queueData: QueueData): Promise<Queue> => {
     throw new AppError(err.message);
   }
 
-  const queue = await Queue.create(queueData);
-
-  return queue;
+  try {
+    const queue = await Queue.create(queueData);
+    return queue;
+  } catch (err: any) {
+    if (err instanceof UniqueConstraintError) {
+      throw new AppError("ERR_QUEUE_NAME_ALREADY_EXISTS");
+    }
+    throw err;
+  }
 };
 
 export default CreateQueueService;
