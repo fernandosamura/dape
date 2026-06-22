@@ -84,6 +84,9 @@ class Queue extends Model<Queue> {
   @Column
   orderQueue: number;
 
+  @Column({ allowNull: true })
+  companyQueueNumber: number;
+
   
   @ForeignKey(() => QueueIntegrations)
   @Column
