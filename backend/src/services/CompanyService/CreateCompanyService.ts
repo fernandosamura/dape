@@ -286,6 +286,18 @@ const CreateCompanyService = async (
     },
   });
 
+  await Setting.findOrCreate({
+    where: {
+      companyId: company.id,
+      key: 'userCampaigns'
+    },
+    defaults: {
+      companyId: company.id,
+      key: 'userCampaigns',
+      value: 'disabled'
+    },
+  });
+
   if (companyData.campaignsEnabled !== undefined) {
     const [setting, created] = await Setting.findOrCreate({
       where: {

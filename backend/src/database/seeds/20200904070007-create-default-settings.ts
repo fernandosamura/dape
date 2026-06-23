@@ -109,6 +109,13 @@ module.exports = {
                             createdAt: new Date(),
                             updatedAt: new Date()
                         },
+                        {
+                            key: "userCampaigns",
+                            value: "disabled",
+                            companyId: 1,
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        },
 
                     ],
                     { transaction: t }

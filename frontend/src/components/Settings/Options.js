@@ -137,6 +137,8 @@ export default function Options(props) {
   const [loadingSettingsTransfTicket, setLoadingSettingsTransfTicket] = useState(false);
   
   const [sendGreetingMessageOneQueues, setSendGreetingMessageOneQueues] = useState("disabled");
+  const [userCampaigns, setUserCampaigns] = useState("disabled");
+  const [loadingUserCampaigns, setLoadingUserCampaigns] = useState(false);
   const [loadingSendGreetingMessageOneQueues, setLoadingSendGreetingMessageOneQueues] = useState(false);
 
   const { update } = useSettings();
@@ -178,6 +180,11 @@ export default function Options(props) {
       const sendGreetingMessageOneQueues = settings.find((s) => s.key === "sendGreetingMessageOneQueues");
       if (sendGreetingMessageOneQueues) {
         setSendGreetingMessageOneQueues(sendGreetingMessageOneQueues.value)
+      }
+
+      const userCampaignsSetting = settings.find((s) => s.key === "userCampaigns");
+      if (userCampaignsSetting) {
+        setUserCampaigns(userCampaignsSetting.value);
       }	  
 	  
       const chatbotType = settings.find((s) => s.key === "chatBotType");
@@ -406,6 +413,17 @@ export default function Options(props) {
     setLoadingClientSecrectMkauthType(false);
   }*/}
 
+  async function handleUserCampaigns(value) {
+    setUserCampaigns(value);
+    setLoadingUserCampaigns(true);
+    await update({
+      key: "userCampaigns",
+      value,
+    });
+    toast.success(i18n.t("settings.options.toasts.success"));
+    setLoadingUserCampaigns(false);
+  }
+
   async function handleChangeAsaas(value) {
     setAsaasType(value);
     setLoadingAsaasType(true);
@@ -588,6 +606,29 @@ export default function Options(props) {
             </FormHelperText>
           </FormControl>
         </Grid>
+
+        {/* ACESSO A CAMPANHAS POR USUÁRIOS */}
+        <Grid xs={12} sm={6} md={4} item>
+          <FormControl className={classes.selectContainer}>
+            <InputLabel id="userCampaigns-label">
+              Acesso a Campanhas por Usuários
+            </InputLabel>
+            <Select
+              labelId="userCampaigns-label"
+              value={userCampaigns}
+              onChange={async (e) => {
+                handleUserCampaigns(e.target.value);
+              }}
+            >
+              <MenuItem value={"disabled"}>{i18n.t("settings.options.fields.disabled")}</MenuItem>
+              <MenuItem value={"enabled"}>{i18n.t("settings.options.fields.enabled")}</MenuItem>
+            </Select>
+            <FormHelperText>
+              {loadingUserCampaigns && i18n.t("settings.options.updating")}
+            </FormHelperText>
+          </FormControl>
+        </Grid>
+        {/* ACESSO A CAMPANHAS POR USUÁRIOS */}
 		
       </Grid>
       <Grid spacing={3} container>

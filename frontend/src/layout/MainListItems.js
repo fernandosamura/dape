@@ -177,6 +177,7 @@ const MainListItems = (props) => {
   const [showSchedules, setShowSchedules] = useState(false);
   const [showInternalChat, setShowInternalChat] = useState(false);
   const [showExternalApi, setShowExternalApi] = useState(false);
+  const [userCampaigns, setUserCampaigns] = useState("disabled");
 
 
   const [invisible, setInvisible] = useState(true);
@@ -213,6 +214,21 @@ const MainListItems = (props) => {
       setShowExternalApi(planConfigs.plan.useExternalApi);
     }
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const { data } = await api.get("/settings");
+        const s = Array.isArray(data) ? data : (data.value || []);
+        const uc = s.find((x) => x.key === "userCampaigns");
+        if (uc) setUserCampaigns(uc.value);
+      } catch (err) {
+        // ignore
+      }
+    }
+    fetchSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -380,32 +396,8 @@ const MainListItems = (props) => {
         icon={<HelpOutlineIcon />}
       />
 
-      <Can
-        role={user.profile}
-        perform="drawer-admin-items:view"
-        yes={() => (
-          <>
-            <Divider />
-            <ListSubheader
-              hidden={collapsed}
-              style={{
-                position: "relative",
-                fontSize: "11px",
-                textAlign: "left",
-                paddingLeft: 20,
-                color: "#F5C300",
-                fontWeight: 700,
-                letterSpacing: "1.5px",
-                textTransform: "uppercase",
-                opacity: 0.85
-              }}
-              inset
-              color="inherit">
-              {i18n.t("mainDrawer.listItems.administration")}
-            </ListSubheader>
-			
-            {showCampaigns && (
-              <>
+      {showCampaigns && (user.profile === "admin" || userCampaigns === "enabled") && (
+        <>
                 <ListItem
                   button
                   onClick={() => setOpenCampaignSubmenu((prev) => !prev)}
@@ -501,9 +493,33 @@ const MainListItems = (props) => {
                     </ListItem>
                   </List>
                 </Collapse>
-              </>
-            )}
+        </>
+      )}
 
+      <Can
+        role={user.profile}
+        perform="drawer-admin-items:view"
+        yes={() => (
+          <>
+            <Divider />
+            <ListSubheader
+              hidden={collapsed}
+              style={{
+                position: "relative",
+                fontSize: "11px",
+                textAlign: "left",
+                paddingLeft: 20,
+                color: "#F5C300",
+                fontWeight: 700,
+                letterSpacing: "1.5px",
+                textTransform: "uppercase",
+                opacity: 0.85
+              }}
+              inset
+              color="inherit">
+              {i18n.t("mainDrawer.listItems.administration")}
+            </ListSubheader>
+			
             {user.super && (
               <ListItemLink
                 to="/announcements"
