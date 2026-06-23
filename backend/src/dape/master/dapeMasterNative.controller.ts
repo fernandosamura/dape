@@ -35,7 +35,7 @@ export const listUnifiedPlans = async (req: Request, res: Response) => {
         dp.created_at,
         dp.updated_at,
         COALESCE(
-          json_object_agg(dpm.module_key, dpm.is_enabled)
+          json_object_agg(dpm.module_key, json_build_object('is_enabled', dpm.is_enabled, 'operation_mode', COALESCE(dpm.operation_mode, 'assisted')))
           FILTER (WHERE dpm.module_key IS NOT NULL),
           '{}'::json
         ) AS modules

@@ -27,6 +27,10 @@ services:
       - redis
     networks:
       - app-network
+    volumes:
+      - ./public:/app/public
+      - ./brands:/app/public/brands
+      - ./instances.json:/app/instances.json
     deploy:
       resources:
         limits:

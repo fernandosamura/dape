@@ -160,10 +160,14 @@ const Kanban = () => {
 
   const handleCardMove = async (cardId, sourceLaneId, targetLaneId) => {
     try {
-      await api.delete(`/ticket-tags/${targetLaneId}`);
+      await // Remove all kanban tags from ticket
+      api.delete(`/ticket-tags/${cardId}`);
       toast.success(i18n.t("kanban.toasts.removed"));
-      await api.put(`/ticket-tags/${targetLaneId}/${sourceLaneId}`);
-      toast.success(i18n.t("kanban.toasts.added"));
+      // If moving to a real tag lane (not the open/untagged lane), assign the new tag
+      if (targetLaneId !== "lane0") {
+        await api.put(`/ticket-tags/${cardId}/${targetLaneId}`);
+        toast.success(i18n.t("kanban.toasts.added"));
+      }
     } catch (err) {
       console.log(err);
     }

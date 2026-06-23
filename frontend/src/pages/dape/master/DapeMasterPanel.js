@@ -166,10 +166,10 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
           </Grid>
 
           <Grid item xs={12}><Typography variant="subtitle2" style={{ fontWeight: 600 }}>Limites do Sistema</Typography></Grid>
-          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Usuários" type="number" value={form.max_users} onChange={e => set("max_users", parseInt(e.target.value))} variant="outlined" size="small" /></Grid>
-          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Conexões" type="number" value={form.max_connections} onChange={e => set("max_connections", parseInt(e.target.value))} variant="outlined" size="small" /></Grid>
-          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Filas" type="number" value={form.max_queues} onChange={e => set("max_queues", parseInt(e.target.value))} variant="outlined" size="small" /></Grid>
-          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Contatos" type="number" value={form.max_contacts} onChange={e => set("max_contacts", parseInt(e.target.value))} variant="outlined" size="small" /></Grid>
+          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Usuários" type="number" value={form.max_users} onChange={e => set("max_users", parseInt(e.target.value) || 0)} variant="outlined" size="small" /></Grid>
+          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Conexões" type="number" value={form.max_connections} onChange={e => set("max_connections", parseInt(e.target.value) || 0)} variant="outlined" size="small" /></Grid>
+          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Filas" type="number" value={form.max_queues} onChange={e => set("max_queues", parseInt(e.target.value) || 0)} variant="outlined" size="small" /></Grid>
+          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Contatos" type="number" value={form.max_contacts} onChange={e => set("max_contacts", parseInt(e.target.value) || 0)} variant="outlined" size="small" /></Grid>
 
           <Grid item xs={12}><Typography variant="subtitle2" style={{ fontWeight: 600 }}>Funcionalidades do Sistema</Typography></Grid>
           {[
