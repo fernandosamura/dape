@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 
 import Grid from "@material-ui/core/Grid";
 import MenuItem from "@material-ui/core/MenuItem";
@@ -17,6 +17,7 @@ import { makeStyles } from "@material-ui/core/styles";
 import { grey, blue } from "@material-ui/core/colors";
 import { Tabs, Tab, Switch, FormControlLabel } from "@material-ui/core";
 import { i18n } from "../../translate/i18n";
+import { AuthContext } from "../../context/Auth/AuthContext";
 
 //import 'react-toastify/dist/ReactToastify.css';
  
@@ -82,6 +83,7 @@ const useStyles = makeStyles((theme) => ({
 export default function Options(props) {
   const { settings, scheduleTypeChanged } = props;
   const classes = useStyles();
+  const { user } = useContext(AuthContext);
   const [userRating, setUserRating] = useState("disabled");
   const [scheduleType, setScheduleType] = useState("disabled");
   const [callType, setCallType] = useState("enabled");
@@ -776,6 +778,7 @@ export default function Options(props) {
         </Grid>
       </Grid>*/}
       {/*-----------------ASAAS-----------------*/}
+      {user.super && (
       <Grid spacing={3} container
         style={{ marginBottom: 10 }}>
         <Tabs
@@ -808,6 +811,7 @@ export default function Options(props) {
           </FormControl>
         </Grid>
       </Grid>
+      )}
 
       {/* ════════════════════════════════════════════════════════
            CONFIGURAÇÕES DE IA — Multi-Provider
