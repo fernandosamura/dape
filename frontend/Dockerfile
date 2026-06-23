@@ -40,6 +40,7 @@ RUN chmod +x update_tab_name.sh && bash update_tab_name.sh
 COPY frontend/update_app_color.sh ./
 RUN chmod +x update_app_color.sh && bash update_app_color.sh
 
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 RUN yarn build
 
 EXPOSE 3001

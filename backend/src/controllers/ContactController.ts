@@ -102,12 +102,11 @@ export const storeUpload = async (req: Request, res: Response) : Promise<Respons
 
   const promises = contacts.map(async contact => {
 
-    const newContact : ContactData = {name: contact.Nome, number: contact.Telefone.replace(/\D/g, '')}
-
     try{
 
-      const contact = await createUploadedContact( newContact, companyId, schema )
-      contactAdded.push( {contactName: contact.name, contactId: contact.id} );
+      const newContact : ContactData = {name: contact.Nome, number: String(contact.Telefone).replace(/\D/g, '')}
+      const saved = await createUploadedContact( newContact, companyId, schema )
+      contactAdded.push( {contactName: saved.name, contactId: saved.id} );
 
     }catch(e){
       errorBag.push({contactName: contact.Nome, error: e || e.message});

@@ -430,6 +430,7 @@ const messages = {
           deleteTitle: "Deletar ",
           deleteAllTitle: "Deletar Todos",
           importTitle: "Importar contatos",
+          importTitlte: "Importar Contatos",
           deleteMessage:
               "Tem certeza que deseja deletar este contato? Todos os tickets relacionados serão perdidos.",
           deleteAllMessage:
