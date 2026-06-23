@@ -9,6 +9,7 @@ import { TransferTicketQueue } from "./wbotTransferTicketQueue";
 import cron from "node-cron";
 import { startAnalyticsCron } from "./dape/analytics/dapeAnalytics.cron";
 import { startDapeAutomation } from "./dape/dapeAutomation.cron";
+import { startBillingCrons } from "./dape/billing/billing.cron";
 
 const server = app.listen(process.env.PORT, async () => {
   const companies = await Company.findAll();
@@ -40,5 +41,6 @@ cron.schedule("* * * * *", async () => {
 
 startAnalyticsCron();
 startDapeAutomation();
+startBillingCrons();
 initIO(server);
 gracefulShutdown(server);

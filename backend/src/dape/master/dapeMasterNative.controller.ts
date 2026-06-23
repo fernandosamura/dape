@@ -32,6 +32,9 @@ export const listUnifiedPlans = async (req: Request, res: Response) => {
         dp.allowed_ia_models,
         dp.use_ia_audio_reply,
         dp.is_master,
+        dp.extra_user_price,
+        dp.trial_days,
+        dp.grace_days,
         dp.created_at,
         dp.updated_at,
         COALESCE(
@@ -63,7 +66,8 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
       use_facebook, use_instagram,
       allowed_ia_models,
       use_ia_audio_reply,
-      modules
+      modules,
+      extra_user_price, trial_days, grace_days
     } = req.body;
 
     if (!name) return res.status(400).json({ error: "name é obrigatório" });
@@ -105,8 +109,8 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
     // 2. Create dape_plans record
     const iaModels = Array.isArray(allowed_ia_models) ? allowed_ia_models : [];
     const [dapePlan] = await sequelize.query(
-      `INSERT INTO dape_plans (name, slug, description, price_monthly, max_users, max_contacts, max_connections, max_queues, use_campaigns, use_schedules, use_internal_chat, use_external_api, use_kanban, use_openai, use_integrations, use_facebook, use_instagram, allowed_ia_models, use_ia_audio_reply, native_plan_id, created_at, updated_at)
-       VALUES (:name, :slug, :description, :price, :max_users, :max_contacts, :max_connections, :max_queues, :use_campaigns, :use_schedules, :use_internal_chat, :use_external_api, :use_kanban, :use_openai, :use_integrations, :use_facebook, :use_instagram, :allowed_ia_models, :use_ia_audio_reply, :native_plan_id, NOW(), NOW())
+      `INSERT INTO dape_plans (name, slug, description, price_monthly, max_users, max_contacts, max_connections, max_queues, use_campaigns, use_schedules, use_internal_chat, use_external_api, use_kanban, use_openai, use_integrations, use_facebook, use_instagram, allowed_ia_models, use_ia_audio_reply, extra_user_price, trial_days, grace_days, native_plan_id, created_at, updated_at)
+       VALUES (:name, :slug, :description, :price, :max_users, :max_contacts, :max_connections, :max_queues, :use_campaigns, :use_schedules, :use_internal_chat, :use_external_api, :use_kanban, :use_openai, :use_integrations, :use_facebook, :use_instagram, :allowed_ia_models, :use_ia_audio_reply, :extra_user_price, :trial_days, :grace_days, :native_plan_id, NOW(), NOW())
        RETURNING id`,
       {
         replacements: {
@@ -121,6 +125,9 @@ export const createUnifiedPlan = async (req: Request, res: Response) => {
           use_instagram: use_instagram !== undefined ? use_instagram : true,
           allowed_ia_models: JSON.stringify(iaModels),
           use_ia_audio_reply: use_ia_audio_reply || false,
+          extra_user_price: parseFloat(extra_user_price) || 0,
+          trial_days: parseInt(trial_days) || 0,
+          grace_days: parseInt(grace_days) || 3,
           native_plan_id: nativePlanId
         },
         type: QueryTypes.SELECT
@@ -162,7 +169,8 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
       use_facebook, use_instagram,
       allowed_ia_models,
       use_ia_audio_reply,
-      modules
+      modules,
+      extra_user_price, trial_days, grace_days
     } = req.body;
 
     const [existing] = await sequelize.query(
@@ -178,7 +186,9 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
        use_campaigns=:use_campaigns, use_schedules=:use_schedules, use_internal_chat=:use_internal_chat,
        use_external_api=:use_external_api, use_kanban=:use_kanban, use_openai=:use_openai,
        use_integrations=:use_integrations, use_facebook=:use_facebook, use_instagram=:use_instagram,
-       allowed_ia_models=:allowed_ia_models, use_ia_audio_reply=:use_ia_audio_reply, updated_at=NOW()
+       allowed_ia_models=:allowed_ia_models, use_ia_audio_reply=:use_ia_audio_reply,
+       extra_user_price=:extra_user_price, trial_days=:trial_days, grace_days=:grace_days,
+       updated_at=NOW()
        WHERE id=:id`,
       {
         replacements: {
@@ -192,7 +202,10 @@ export const updateUnifiedPlan = async (req: Request, res: Response) => {
           use_facebook: use_facebook !== undefined ? use_facebook : true,
           use_instagram: use_instagram !== undefined ? use_instagram : true,
           allowed_ia_models: JSON.stringify(iaModels),
-          use_ia_audio_reply: use_ia_audio_reply || false
+          use_ia_audio_reply: use_ia_audio_reply || false,
+          extra_user_price: parseFloat(extra_user_price) || 0,
+          trial_days: parseInt(trial_days) || 0,
+          grace_days: parseInt(grace_days) || 3
         },
         type: QueryTypes.UPDATE
       }

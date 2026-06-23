@@ -29,6 +29,7 @@ import ListIcon from "@material-ui/icons/ListAlt";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
 import ForumIcon from "@material-ui/icons/Forum";
 import LocalAtmIcon from '@material-ui/icons/LocalAtm';
+import CreditCardIcon from '@material-ui/icons/CreditCard';
 import StarsIcon from "@material-ui/icons/Stars";
 import TrendingUpIcon from "@material-ui/icons/TrendingUp";
 import BarChartIcon from "@material-ui/icons/BarChart";
@@ -580,6 +581,13 @@ const MainListItems = (props) => {
               primary={i18n.t("mainDrawer.listItems.financeiro")}
               icon={<LocalAtmIcon />}
             />
+            {user.profile === "admin" && (
+              <ListItemLink
+                to="/dape/billing"
+                primary="💳 Assinatura"
+                icon={<CreditCardIcon />}
+              />
+            )}
 
             {hasPipeline && (
               <ListItemLink

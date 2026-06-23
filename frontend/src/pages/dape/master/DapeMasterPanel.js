@@ -42,6 +42,7 @@ const EMPTY_PLAN = {
   name: "", description: "", price: "",
   max_users: 5, max_contacts: 1000,
   max_connections: 3, max_queues: 3,
+  extra_user_price: 0, trial_days: 0, grace_days: 3,
   use_campaigns: false, use_schedules: false, use_internal_chat: false,
   use_external_api: false, use_kanban: false, use_openai: false, use_integrations: false,
   use_ia_audio_reply: false,
@@ -97,6 +98,9 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
         max_contacts: plan.max_contacts || 1000,
         max_connections: plan.max_connections || 3,
         max_queues: plan.max_queues || 3,
+        extra_user_price: plan.extra_user_price || 0,
+        trial_days: plan.trial_days || 0,
+        grace_days: plan.grace_days || 3,
         use_campaigns: plan.use_campaigns || false,
         use_schedules: plan.use_schedules || false,
         use_internal_chat: plan.use_internal_chat || false,
@@ -166,10 +170,33 @@ function PlanDialog({ open, onClose, plan, onSaved }) {
           </Grid>
 
           <Grid item xs={12}><Typography variant="subtitle2" style={{ fontWeight: 600 }}>Limites do Sistema</Typography></Grid>
-          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Usuários" type="number" value={form.max_users} onChange={e => set("max_users", parseInt(e.target.value) || 0)} variant="outlined" size="small" /></Grid>
+          <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Usuários Base" type="number" value={form.max_users} onChange={e => set("max_users", parseInt(e.target.value) || 0)} variant="outlined" size="small" helperText="Padrão: 5" /></Grid>
           <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Conexões" type="number" value={form.max_connections} onChange={e => set("max_connections", parseInt(e.target.value) || 0)} variant="outlined" size="small" /></Grid>
           <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Filas" type="number" value={form.max_queues} onChange={e => set("max_queues", parseInt(e.target.value) || 0)} variant="outlined" size="small" /></Grid>
           <Grid item xs={6} md={3}><TextField fullWidth label="Máx. Contatos" type="number" value={form.max_contacts} onChange={e => set("max_contacts", parseInt(e.target.value) || 0)} variant="outlined" size="small" /></Grid>
+
+          <Grid item xs={12}><Typography variant="subtitle2" style={{ fontWeight: 600 }}>Configurações de Cobrança</Typography></Grid>
+          <Grid item xs={6} md={4}>
+            <TextField fullWidth label="Preço Usuário Extra (R$/mês)" type="number" value={form.extra_user_price}
+              onChange={e => set("extra_user_price", parseFloat(e.target.value) || 0)}
+              variant="outlined" size="small"
+              helperText="Cobrado por cada usuário extra além do limite base"
+            />
+          </Grid>
+          <Grid item xs={6} md={4}>
+            <TextField fullWidth label="Dias de Trial Gratuito" type="number" value={form.trial_days}
+              onChange={e => set("trial_days", parseInt(e.target.value) || 0)}
+              variant="outlined" size="small"
+              helperText="0 = sem trial. Ex: 7, 14, 30"
+            />
+          </Grid>
+          <Grid item xs={6} md={4}>
+            <TextField fullWidth label="Dias de Tolerância (Grace)" type="number" value={form.grace_days}
+              onChange={e => set("grace_days", parseInt(e.target.value) || 3)}
+              variant="outlined" size="small"
+              helperText="Dias após vencimento antes de bloquear"
+            />
+          </Grid>
 
           <Grid item xs={12}><Typography variant="subtitle2" style={{ fontWeight: 600 }}>Funcionalidades do Sistema</Typography></Grid>
           {[
@@ -383,6 +410,146 @@ function ModuleOverrideDialog({ open, onClose, company, onSaved }) {
   );
 }
 
+// ─── MASTER BILLING TAB ─────────────────────────────────────────────────────
+function MasterBillingTab() {
+  const classes = useStyles();
+  const [loading, setLoading] = React.useState(true);
+  const [overview, setOverview] = React.useState({ summary: {}, companies: [] });
+
+  const loadOverview = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/dape/billing/master/overview");
+      setOverview(res.data);
+    } catch (err) {
+      toast.error("Erro ao carregar painel financeiro");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => { loadOverview(); }, [loadOverview]);
+
+  const fmt = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
+
+  const STATUS_COLOR = {
+    active: "#22c55e", trialing: "#3b82f6", past_due: "#f59e0b",
+    blocked: "#ef4444", canceled: "#6b7280", pending_first_payment: "#8b5cf6",
+  };
+
+  const s = overview.summary;
+
+  if (loading) return <Box display="flex" justifyContent="center" p={4}><CircularProgress /></Box>;
+
+  return (
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h6" style={{ fontWeight: 700 }}>Painel Financeiro</Typography>
+        <IconButton size="small" onClick={loadOverview}><RefreshIcon /></IconButton>
+      </Box>
+
+      {/* Cards de resumo */}
+      <Grid container spacing={2} style={{ marginBottom: 24 }}>
+        <Grid item xs={6} md={2}>
+          <Card variant="outlined">
+            <CardContent style={{ padding: "12px 16px" }}>
+              <Typography variant="caption" color="textSecondary">Ativos</Typography>
+              <Typography variant="h5" style={{ fontWeight: 700, color: "#22c55e" }}>{s.active_count || 0}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={2}>
+          <Card variant="outlined">
+            <CardContent style={{ padding: "12px 16px" }}>
+              <Typography variant="caption" color="textSecondary">Trial</Typography>
+              <Typography variant="h5" style={{ fontWeight: 700, color: "#3b82f6" }}>{s.trialing_count || 0}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={2}>
+          <Card variant="outlined">
+            <CardContent style={{ padding: "12px 16px" }}>
+              <Typography variant="caption" color="textSecondary">Pendente</Typography>
+              <Typography variant="h5" style={{ fontWeight: 700, color: "#f59e0b" }}>{s.past_due_count || 0}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={2}>
+          <Card variant="outlined">
+            <CardContent style={{ padding: "12px 16px" }}>
+              <Typography variant="caption" color="textSecondary">Bloqueados</Typography>
+              <Typography variant="h5" style={{ fontWeight: 700, color: "#ef4444" }}>{s.blocked_count || 0}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={2}>
+          <Card variant="outlined">
+            <CardContent style={{ padding: "12px 16px" }}>
+              <Typography variant="caption" color="textSecondary">Cancelados</Typography>
+              <Typography variant="h5" style={{ fontWeight: 700, color: "#6b7280" }}>{s.canceled_count || 0}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={2}>
+          <Card variant="outlined" style={{ borderColor: "#1565c0" }}>
+            <CardContent style={{ padding: "12px 16px" }}>
+              <Typography variant="caption" color="textSecondary">MRR Estimado</Typography>
+              <Typography variant="h6" style={{ fontWeight: 700, color: "#1565c0" }}>{fmt(s.mrr_estimated)}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Tabela de empresas */}
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Empresa</TableCell>
+              <TableCell>Plano</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Extras</TableCell>
+              <TableCell>Valor/mês</TableCell>
+              <TableCell>Vencimento</TableCell>
+              <TableCell>Último Pgto</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {overview.companies.map((c) => (
+              <TableRow key={c.id} hover>
+                <TableCell>
+                  <Typography variant="body2" style={{ fontWeight: 600 }}>{c.name}</Typography>
+                  <Typography variant="caption" color="textSecondary">{c.email}</Typography>
+                </TableCell>
+                <TableCell>{c.plan_name}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={c.billing_status || "sem assinatura"}
+                    size="small"
+                    style={{ background: STATUS_COLOR[c.billing_status] || "#e5e7eb", color: "#fff", fontWeight: 600 }}
+                  />
+                </TableCell>
+                <TableCell>{c.extra_users_count || 0}</TableCell>
+                <TableCell>{fmt(c.monthly_amount)}</TableCell>
+                <TableCell>{fmtDate(c.next_due_date)}</TableCell>
+                <TableCell>{fmtDate(c.last_payment_at)}</TableCell>
+              </TableRow>
+            ))}
+            {overview.companies.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  <Typography variant="body2" color="textSecondary">Nenhuma empresa com assinatura registrada</Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
+}
+
 // ─── MAIN PANEL ──────────────────────────────────────────────────────────────
 export default function DapeMasterPanel() {
   const classes = useStyles();
@@ -475,6 +642,7 @@ export default function DapeMasterPanel() {
         <Tab label="🏢 Empresas" />
         <Tab label="📋 Planos" />
         <Tab label="📊 Monitoramento" />
+        <Tab label="💰 Financeiro" />
       </Tabs>
 
       {/* ─── TAB 0: EMPRESAS ─── */}
@@ -673,6 +841,9 @@ export default function DapeMasterPanel() {
           </Box>
         </Box>
       )}
+
+      {/* ─── TAB 3: FINANCEIRO / BILLING ─── */}
+      {tab === 3 && <MasterBillingTab />}
 
       {/* ─── DIALOGS ─── */}
       <PlanDialog

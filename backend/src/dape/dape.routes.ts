@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import dapeModulesRoutes from './shared/dapeModules.routes';
+import dapeBillingRoutes from './billing/billing.routes';
 import dapeMasterRoutes from './master/dapeMaster.routes';
 import dapePipelineRoutes from './pipeline/dapePipeline.routes';
 import dapeAnalyticsRoutes from './analytics/dapeAnalytics.routes';
@@ -18,5 +19,6 @@ router.use('/ia', dapeIARoutes);
 router.use('/growth', dapeGrowthRoutes);
 router.use('/intelligence', dapeIntelligenceRoutes);
 router.use('/radar', dapeRadarRoutes);
+router.use('/billing', dapeBillingRoutes);
 
 export default router;

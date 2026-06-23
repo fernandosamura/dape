@@ -36,6 +36,7 @@ import flowBuilder from "./flowBuilderRoutes";
 import flowCampaignRoutes from "./flowCampaignRoutes";
 import webHookRoutes from "./webHookRoutes";
 import dapeRoutes from "../dape/dape.routes";
+import { handleAsaasWebhook } from "../dape/billing/billingWebhook.controller";
 
 const routes = Router();
 
@@ -74,6 +75,8 @@ routes.use(flowDefaultRoutes);
 routes.use(flowBuilder);
 routes.use(flowCampaignRoutes);
 routes.use("/webhook", webHookRoutes);
+// Webhook público do Asaas — sem autenticação (deve ficar antes do isAuth)
+routes.post("/webhooks/asaas", handleAsaasWebhook);
 
 routes.use("/dape", dapeRoutes);
 export default routes;
