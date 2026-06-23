@@ -2,7 +2,7 @@ import { QueryInterface, DataTypes } from "sequelize";
 
 module.exports = {
   up: async (queryInterface: QueryInterface) => {
-    const tableDesc = await queryInterface.describeTable("Users");
+    const tableDesc = await queryInterface.describeTable("Users") as Record<string, unknown>;
     if (!tableDesc.companyUserNumber) {
       await queryInterface.addColumn("Users", "companyUserNumber", {
         type: DataTypes.INTEGER,

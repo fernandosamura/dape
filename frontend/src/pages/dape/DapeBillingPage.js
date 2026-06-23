@@ -3,9 +3,10 @@ import {
   Box, Typography, Grid, Paper, Button, Divider, Chip,
   CircularProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, Select, MenuItem, FormControl,
-  InputLabel, Alert, Snackbar, IconButton, Tooltip, Table,
+  InputLabel, Snackbar, IconButton, Tooltip, Table,
   TableBody, TableCell, TableHead, TableRow
 } from "@material-ui/core";
+import { Alert } from "@material-ui/lab";
 import { makeStyles } from "@material-ui/core/styles";
 import AddIcon from "@material-ui/icons/Add";
 import RemoveIcon from "@material-ui/icons/Remove";
