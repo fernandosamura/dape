@@ -240,6 +240,30 @@ function timeout(ms) {
 export async function sleep(time) {
   await timeout(time);
 }
+
+/**
+ * Envia mensagem de texto com digitando... humanizado.
+ * Delay = clamp(words * 60ms + rand(0,400), 800, 4000) ms
+ */
+async function sendWithTypingDelay(
+  wbot: Session,
+  jid: string,
+  text: string,
+  ticket: Ticket,
+  contact: Contact
+): Promise<void> {
+  const words = text.trim().split(/\s+/).length;
+  const base = Math.min(words * 60, 3600);
+  const jitter = Math.floor(Math.random() * 400);
+  const delayMs = Math.max(800, Math.min(base + jitter, 4000));
+
+  await wbot.sendPresenceUpdate("composing", jid);
+  await timeout(delayMs);
+  await wbot.sendPresenceUpdate("paused", jid);
+
+  const sent = await wbot.sendMessage(jid, { text });
+  await verifyMessage(sent!, ticket, contact);
+}
 export const sendMessageImage = async (
   wbot: Session,
   contact,
@@ -795,11 +819,8 @@ const handleOpenAi = async (
     }
 
     if (!prompt.voice || prompt.voice === "texto") {
-      // Resposta em texto
-      const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: response!
-      });
-      await verifyMessage(sentMessage!, ticket, contact);
+      // Resposta em texto com delay humanizado (typing indicator)
+      await sendWithTypingDelay(wbot, msg.key.remoteJid!, response!, ticket, contact);
     } else {
       // Resposta em áudio OGG/Opus (compatível com WhatsApp Web/Baileys)
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
@@ -831,21 +852,46 @@ const handleOpenAi = async (
     }
 
   } else if (msg.message?.audioMessage) {
-    // Transcrição de áudio via Whisper (apenas OpenAI e Manus)
-    if (aiProvider !== "openai" && aiProvider !== "manus") {
+    // Transcrição de áudio: Whisper (OpenAI/Manus) ou Gemini Multimodal
+    const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
+    const audioFilePath = `${publicFolder}/${mediaUrl}`;
+    let transcribedText = "";
+
+    if (aiProvider === "gemini") {
+      // Gemini: transcrição via API Multimodal (base64 inline)
+      try {
+        const { GoogleGenerativeAI } = require("@google/generative-ai");
+        const audioBuffer = fs.readFileSync(audioFilePath);
+        const audioBase64 = audioBuffer.toString("base64");
+        const mimeType = mediaSent!.mediaType === "audioMessage" ? "audio/ogg" : "audio/mpeg";
+
+        const genAI = new GoogleGenerativeAI(prompt.apiKey);
+        const geminiModel = genAI.getGenerativeModel({ model: aiModel });
+        const result = await geminiModel.generateContent([
+          { text: "Transcreva o áudio a seguir. Retorne apenas o texto transcrito, sem explicações adicionais." },
+          { inlineData: { mimeType, data: audioBase64 } }
+        ]);
+        transcribedText = result.response.text().trim();
+        logger.info(`[AI] Gemini transcreveu áudio: "${transcribedText.slice(0, 80)}..."`);
+      } catch (err) {
+        logger.error(`[AI] Erro na transcrição Gemini: ${err}`);
+        return;
+      }
+    } else if (aiProvider === "openai" || aiProvider === "manus") {
+      // OpenAI / Manus: transcrição via Whisper
+      const file = fs.createReadStream(audioFilePath) as any;
+      const whisperConfig = new Configuration({
+        apiKey: prompt.apiKey,
+        ...(aiProvider === "manus" && prompt.baseUrl ? { basePath: prompt.baseUrl } : {})
+      });
+      const openaiWhisper = new OpenAIApi(whisperConfig);
+      const transcription = await openaiWhisper.createTranscription(file, "whisper-1");
+      transcribedText = transcription.data.text;
+    } else {
+      // Anthropic não suporta transcrição de áudio nativa
       logger.info(`[AI] Transcrição de áudio não suportada para provider: ${aiProvider}`);
       return;
     }
-
-    const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
-    const file = fs.createReadStream(`${publicFolder}/${mediaUrl}`) as any;
-
-    const whisperConfig = new Configuration({
-      apiKey: prompt.apiKey,
-      ...(aiProvider === "manus" && prompt.baseUrl ? { basePath: prompt.baseUrl } : {})
-    });
-    const openaiWhisper = new OpenAIApi(whisperConfig);
-    const transcription = await openaiWhisper.createTranscription(file, "whisper-1");
 
     messagesAI = [];
     messagesAI.push({ role: "system", content: promptSystem });
@@ -862,7 +908,7 @@ const handleOpenAi = async (
         }
       }
     }
-    messagesAI.push({ role: "user", content: transcription.data.text });
+    messagesAI.push({ role: "user", content: transcribedText });
 
     let response = await callAIProvider({
       provider: aiProvider,
@@ -882,10 +928,8 @@ const handleOpenAi = async (
     }
 
     if (!prompt.voice || prompt.voice === "texto") {
-      const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: response!
-      });
-      await verifyMessage(sentMessage!, ticket, contact);
+      // Resposta em texto com delay humanizado (typing indicator)
+      await sendWithTypingDelay(wbot, msg.key.remoteJid!, response!, ticket, contact);
     } else {
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
       try {
@@ -923,7 +967,7 @@ export const transferQueue = async (
   contact: Contact
 ): Promise<void> => {
   await UpdateTicketService({
-    ticketData: { queueId: queueId },
+    ticketData: { queueId: queueId, status: "pending", userId: null, chatbot: false },
     ticketId: ticket.id,
     companyId: ticket.companyId
   });
