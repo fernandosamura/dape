@@ -68,7 +68,8 @@
     "yup": "^0.32.11",
     "@anthropic-ai/sdk": "^0.105.0",
     "@google/generative-ai": "^0.24.1",
-    "@google-cloud/text-to-speech": "^6.4.1"
+    "@google-cloud/text-to-speech": "^6.4.1",
+    "express-rate-limit": "^7.0.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.2",
