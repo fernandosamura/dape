@@ -14,7 +14,7 @@ import {
 import Company from "./Company";
 import Contact from "./Contact";
 
-@Table({ tableName: "dape_deals" })
+@Table({ tableName: "dape_deals", underscored: true })
 class DapeDeal extends Model<DapeDeal> {
   @PrimaryKey
   @AutoIncrement

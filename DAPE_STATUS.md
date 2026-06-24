@@ -1,6 +1,6 @@
 # DAPE — Status de Desenvolvimento
 
-Última atualização: 2026-06-18
+Última atualização: 2026-06-24
 
 ## Módulos
 
@@ -15,10 +15,56 @@
 | DAPE Radar       | OK      | OK       | OK        | Completo       |
 | DAPE Automation  | OK      | --       | OK        | Completo       |
 | Channels por Plano | OK   | OK       | OK        | Completo       |
+| DAPE Billing     | OK      | OK       | OK        | Completo       |
 
 ## Ultimo backup realizado
-Local: /home/backup/dape_20260618_204530_parecer_tecnico
-Data: 2026-06-18 20:45:30
+Local: /home/backup/dape_20260624_183300_dapedeal_ia_fix
+Data: 2026-06-24 18:33:00
+
+## Correcoes aplicadas (2026-06-24) — DapeDeal + IA Rate Limit
+
+### Blockers resolvidos
+
+#### 1. DapeDeal / PipelineAgent — column does not exist
+- **Erro:** `column DapeDeal.contactId does not exist` e `column "companyId" does not exist`
+- **Causa raiz:** Tabela `dape_deals` criada com snake_case (`company_id`, `contact_id`) mas
+  o modelo `DapeDeal.ts` sem `underscored: true` gerava SQL com camelCase
+- **Correção:** `@Table({ tableName: "dape_deals", underscored: true })` em `DapeDeal.ts`
+- **Arquivo:** `backend/src/models/DapeDeal.ts`
+
+#### 2. Rate Limit IA muito restritivo
+- **Problema:** `MAX_CALLS_PER_MINUTE = 10` bloqueava o chatbot prematuramente
+- **Correção:** Aumentado para `50` em `backend/src/dape/ia/dapeIA.service.ts`
+
+#### 3. Migrations criadas (idempotentes)
+- `20260624000001-create-dape-ia-tables.ts` — tabelas `dape_ia_rate_limits`,
+  `dape_ia_summaries`, `dape_ia_suggestions` (já existiam, migration documenta a estrutura)
+- `20260624000002-add-provider-to-prompts.ts` — colunas `provider`, `baseUrl`, `voice`,
+  `voiceKey`, `voiceRegion`, `ttsProvider` na tabela `Prompts` (já existiam)
+- Migrations anteriores (`20260622*`, `20260623*`) registradas no `SequelizeMeta`
+
+#### 4. Container backend — fix nodemon
+- **Problema:** Após restart, `yarn start` falhava com `/bin/sh: nodemon: not found`
+- **Causa:** Yarn executa scripts via `sh -c`, sem `node_modules/.bin` no PATH do Alpine sh
+- **Correção:** `package.json` start: `"nodemon dist/server.js"` → `"node dist/server.js"`
+- Imagem corrigida salva como `dape-backend:fixed`
+
+### Resultado
+- Logs limpos: zero erros de DapeDeal/PipelineAgent após o fix
+- Backend rodando estável na porta 3000
+- Todos os providers de IA (Gemini, Claude, GPT) operacionais
+
+## Correcoes aplicadas (2026-06-23) — Billing / Asaas
+
+- Tabelas `dape_billing_invoices`, `dape_billing_events`, `dape_extra_user_requests`
+- Colunas de billing em `dape_tenant_plans` e `dape_plans`
+- Migration: `20260623000001-add-billing-tables.ts`
+
+## Correcoes aplicadas (2026-06-22) — Constraints por empresa
+
+- Unique constraints por company em Queues, Whatsapps, QueueIntegrations, Settings
+- Coluna `companyId` em Webhooks
+- Migrations: `20260622000001` a `20260622000007`
 
 ## Correcoes aplicadas (2026-06-18) — Parecer Tecnico Manus AI
 
@@ -35,14 +81,8 @@ Data: 2026-06-18 20:45:30
 - 3.2 Migrations renomeadas: 20222016014720 e 20222016014721 corrigidos para 20220220
 - 3.1 database.ts — fallback de dialeto corrigido de mysql para postgres
 
-### Nao aplicaveis (falsos alarmes)
-- 2.2 Tabelas dape_analytics/growth/ia/intelligence sao module keys, nao tabelas SQL
-- 2.3 Colunas de dape_plans ja existiam no banco
-- 2.6 Funcao dape_run_maintenance() ja existe no banco
-- 3.3 docker-entrypoint.sh ja tinha exec yarn start
-
 ## Issues conhecidos
 - Nenhum no momento
 
 ## Proxima tarefa
-- Monitorar logs do cron de analytics as 23:59 para confirmar snapshots
+- Monitorar comportamento do PipelineAgent com deals reais para confirmar fix completo

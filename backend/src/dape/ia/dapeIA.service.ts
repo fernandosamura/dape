@@ -6,7 +6,7 @@ import nodeFs from "fs";
 import fsPath from "path";
 import axios from "axios";
 
-const MAX_CALLS_PER_MINUTE = 10;
+const MAX_CALLS_PER_MINUTE = 50;
 const DEFAULT_MODEL = "gpt-4o-mini";
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
