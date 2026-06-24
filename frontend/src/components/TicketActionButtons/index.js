@@ -1,9 +1,9 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { useHistory } from "react-router-dom";
 
 import { makeStyles } from "@material-ui/core/styles";
-import { IconButton } from "@material-ui/core";
-import { MoreVert, Replay } from "@material-ui/icons";
+import { IconButton, Tooltip } from "@material-ui/core";
+import { MoreVert, Replay, Group, ExitToApp } from "@material-ui/icons";
 
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
@@ -30,8 +30,45 @@ const TicketActionButtons = ({ ticket }) => {
 	const history = useHistory();
 	const [anchorEl, setAnchorEl] = useState(null);
 	const [loading, setLoading] = useState(false);
+	const [groupLoading, setGroupLoading] = useState(false);
+	const [isInGroup, setIsInGroup] = useState(false);
 	const ticketOptionsMenuOpen = Boolean(anchorEl);
 	const { user } = useContext(AuthContext);
+
+	// Verifica se o usuário logado já está no grupo
+	useEffect(() => {
+		if (!ticket?.isGroup) return;
+		api.get(`/tickets/${ticket.id}/users`)
+			.then(({ data }) => {
+				setIsInGroup(data.some(u => u.id === user?.id));
+			})
+			.catch(() => {});
+	}, [ticket?.id, ticket?.isGroup, user?.id]);
+
+	const handleJoinGroup = async () => {
+		setGroupLoading(true);
+		try {
+			await api.post(`/tickets/${ticket.id}/join`);
+			setIsInGroup(true);
+			history.push(`/tickets/${ticket.id}`);
+		} catch (err) {
+			toastError(err);
+		} finally {
+			setGroupLoading(false);
+		}
+	};
+
+	const handleLeaveGroup = async () => {
+		setGroupLoading(true);
+		try {
+			await api.post(`/tickets/${ticket.id}/leave`);
+			setIsInGroup(false);
+		} catch (err) {
+			toastError(err);
+		} finally {
+			setGroupLoading(false);
+		}
+	};
 
 	const handleOpenTicketOptionsMenu = e => {
 		setAnchorEl(e.currentTarget);
@@ -104,15 +141,45 @@ const TicketActionButtons = ({ ticket }) => {
 				</>
 			)}
 			{ticket.status === "pending" && (
-				<ButtonWithSpinner
-					loading={loading}
-					size="small"
-					variant="contained"
-					color="primary"
-					onClick={e => handleUpdateTicketStatus(e, "open", user?.id)}
-				>
-					{i18n.t("messagesList.header.buttons.accept")}
-				</ButtonWithSpinner>
+				ticket.isGroup ? (
+					isInGroup ? (
+						<Tooltip title="Sair do Grupo">
+							<ButtonWithSpinner
+								loading={groupLoading}
+								size="small"
+								variant="outlined"
+								color="secondary"
+								startIcon={<ExitToApp />}
+								onClick={handleLeaveGroup}
+							>
+								Sair do Grupo
+							</ButtonWithSpinner>
+						</Tooltip>
+					) : (
+						<Tooltip title="Entrar no Grupo">
+							<ButtonWithSpinner
+								loading={groupLoading}
+								size="small"
+								variant="contained"
+								color="primary"
+								startIcon={<Group />}
+								onClick={handleJoinGroup}
+							>
+								Entrar no Grupo
+							</ButtonWithSpinner>
+						</Tooltip>
+					)
+				) : (
+					<ButtonWithSpinner
+						loading={loading}
+						size="small"
+						variant="contained"
+						color="primary"
+						onClick={e => handleUpdateTicketStatus(e, "open", user?.id)}
+					>
+						{i18n.t("messagesList.header.buttons.accept")}
+					</ButtonWithSpinner>
+				)
 			)}
 		</div>
 	);

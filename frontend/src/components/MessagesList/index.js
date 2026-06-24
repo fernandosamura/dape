@@ -759,6 +759,10 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
             </React.Fragment>
           );
         } else {
+          // Extrai nome do prefixo [Nome] para exibição em grupos
+          const groupSenderMatch = isGroup && message.body && message.body.match(/^\[([^\]]+)\]/);
+          const groupSenderName = groupSenderMatch ? groupSenderMatch[1] : null;
+
           return (
             <React.Fragment key={message.id}>
               {renderDailyTimestamps(message, index)}
@@ -775,6 +779,11 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
                 >
                   <ExpandMore />
                 </IconButton>
+                {groupSenderName && (
+                  <span className={classes.messageContactName} style={{ color: "#1976d2" }}>
+                    {groupSenderName}
+                  </span>
+                )}
                 {(message.mediaUrl || message.mediaType === "locationMessage" || message.mediaType === "vcard"
                   //|| message.mediaType === "multi_vcard" 
                 ) && checkMessageMedia(message)}
