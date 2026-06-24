@@ -1,6 +1,6 @@
 # DAPE — Status de Desenvolvimento
 
-Última atualização: 2026-06-24
+Última atualização: 2026-06-24 (sessão 2)
 
 ## Módulos
 
@@ -86,3 +86,27 @@ Data: 2026-06-24 18:33:00
 
 ## Proxima tarefa
 - Monitorar comportamento do PipelineAgent com deals reais para confirmar fix completo
+
+## Correcoes aplicadas (2026-06-24 sessão 2) — handleOpenAi 4 melhorias
+
+### 1. Roteamento para Fila corrigido
+-  agora define , , 
+- Ticket aparece corretamente na aba Aguardando após atendimento da IA
+- Arquivo: 
+
+### 2. Delay Humanizado (Sammy Digitando)
+- Nova função :  + delay randômico
+- Delay = clamp(palavras × 60ms + jitter(0-400ms), 800ms, 4000ms)
+- Usado nos 2 pontos de envio de texto em 
+
+### 3. Novos Modelos Gemini (família 2.5 e 3.1)
+- Adicionados: gemini-1.5-flash-8b, gemini-2.0-flash-lite, gemini-2.0-flash-thinking-exp
+- Gemini 2.5: flash, flash-lite, flash-preview-tts, pro, pro-preview
+- Gemini 3.1: flash-lite, flash, flash-tts, pro, pro-preview
+- Gemini Live: gemini-2.0-flash-live, gemini-3.1-flash-live
+- Arquivo: 
+
+### 4. Transcrição de Áudio com Gemini Multimodal
+- Áudio enviado em base64 via  direto no payload do Gemini
+- Fluxo: gemini → multimodal nativo | openai/manus → Whisper | anthropic → não suportado
+- Sem necessidade de API externa para Gemini
