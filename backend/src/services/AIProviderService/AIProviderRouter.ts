@@ -139,7 +139,7 @@ async function callGemini(opts: {
 /** Modelos disponíveis por provider */
 export const PROVIDER_MODELS: Record<AIProvider, string[]> = {
   openai:    ["gpt-3.5-turbo", "gpt-3.5-turbo-1106", "gpt-4o-mini", "gpt-4o", "gpt-4-turbo"],
-  anthropic: ["claude-3-haiku-20240307", "claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-opus-4-5", "claude-sonnet-4-5"],
-  gemini:    ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-exp"],
+  anthropic: ["claude-3-haiku-20240307", "claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-8"],
+  gemini:    ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-exp", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"],
   manus:     ["manus-default"]
 };

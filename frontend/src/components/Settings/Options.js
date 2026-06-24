@@ -858,7 +858,7 @@ export default function Options(props) {
             label="Modelo padrão"
             variant="outlined"
             value={aiModel}
-            placeholder={aiProvider === "openai" ? "gpt-4o-mini" : aiProvider === "anthropic" ? "claude-3-5-sonnet-20241022" : aiProvider === "gemini" ? "gemini-2.0-flash" : "manus-default"}
+            placeholder={aiProvider === "openai" ? "gpt-4o-mini" : aiProvider === "anthropic" ? "claude-sonnet-4-6" : aiProvider === "gemini" ? "gemini-3.1-flash-lite" : "manus-default"}
             onChange={(e) => setAiModel(e.target.value)}
             onBlur={async () => {
               setLoadingAiModel(true);
@@ -867,7 +867,7 @@ export default function Options(props) {
             }}
           />
           <FormHelperText>
-            {loadingAiModel ? "Salvando..." : "Nome do modelo (ex: gpt-4o-mini, claude-3-5-sonnet-20241022)"}
+            {loadingAiModel ? "Salvando..." : "Nome do modelo (ex: gpt-4o-mini, claude-sonnet-4-6, gemini-3.1-flash-lite)"}
           </FormHelperText>
         </FormControl>
       </Grid>
