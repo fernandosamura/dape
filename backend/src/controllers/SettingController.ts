@@ -15,7 +15,15 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 
   const settings = await ListSettingsService({ companyId });
 
-  return res.status(200).json(settings);
+  // Mascarar token asaas para usuários não-super
+  const maskedSettings = settings.map((s: any) => {
+    if (s.key === "asaas" && !req.user.super) {
+      return { ...s.dataValues, value: s.value ? "***" : "" };
+    }
+    return s;
+  });
+
+  return res.status(200).json(maskedSettings);
 };
 
 export const update = async (
@@ -28,6 +36,11 @@ export const update = async (
   const { settingKey: key } = req.params;
   const { value } = req.body;
   const { companyId } = req.user;
+
+  // Apenas super pode alterar o token Asaas
+  if (key === "asaas" && !req.user.super) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
 
   const setting = await UpdateSettingService({
     key,

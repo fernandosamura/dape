@@ -177,12 +177,25 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
                 });
                 removeWbot(id, false);
               } else {
-                // Outros erros (515 restartRequired, 503, 428, etc.) — reconecta automaticamente
-                removeWbot(id, false);
-                setTimeout(
-                  () => StartWhatsAppSession(whatsapp, whatsapp.companyId),
-                  2000
-                );
+                // Outros erros (515 restartRequired, 503, 428, etc.) — reconecta com backoff exponencial
+                const retries = retriesQrCodeMap.get(id) || 0;
+                const delay = Math.min(2000 * Math.pow(2, retries), 60000); // 2s, 4s, 8s, ... max 60s
+                if (retries >= 5) {
+                  // Circuit breaker: após 5 tentativas consecutivas, para de reconectar
+                  logger.warn(`Circuit breaker ativado para ${name} após ${retries} tentativas — marcando DISCONNECTED`);
+                  await whatsapp.update({ status: "DISCONNECTED", qrcode: "" });
+                  io.to(`company-${whatsapp.companyId}-mainchannel`).emit(`company-${whatsapp.companyId}-whatsappSession`, {
+                    action: "update",
+                    session: whatsapp
+                  });
+                  removeWbot(id, false);
+                  retriesQrCodeMap.delete(id);
+                } else {
+                  retriesQrCodeMap.set(id, retries + 1);
+                  logger.info(`Reconectando ${name} em ${delay / 1000}s (tentativa ${retries + 1}/5)`);
+                  removeWbot(id, false);
+                  setTimeout(() => StartWhatsAppSession(whatsapp, whatsapp.companyId), delay);
+                }
               }
             }
 

@@ -69,15 +69,26 @@ async function getCompanyAISettings(companyId: number): Promise<AISettings> {
 async function callAI(companyId: number, prompt: string): Promise<{ content: string; tokens: number }> {
   const settings = await getCompanyAISettings(companyId);
 
-  const content = await callAIProvider({
-    provider: settings.provider,
-    apiKey: settings.apiKey,
-    model: settings.model,
-    messages: [{ role: "user", content: prompt }],
-    maxTokens: 600,
-    temperature: 0.7,
-    baseUrl: settings.baseUrl,
-  });
+  let content: string;
+  try {
+    content = await callAIProvider({
+      provider: settings.provider,
+      apiKey: settings.apiKey,
+      model: settings.model,
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 600,
+      temperature: 0.7,
+      baseUrl: settings.baseUrl,
+    });
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    // Re-throw rate limit and config errors so callers can handle them
+    if (msg.includes('RATE_LIMIT') || msg.includes('API_KEY') || msg.includes('429')) {
+      throw err;
+    }
+    // For transient provider errors (5xx, timeout, etc.) throw a typed error
+    throw new Error('IA_PROVIDER_ERROR:' + settings.provider + '::' + msg.slice(0, 120));
+  }
 
   // Token counting is only precise for OpenAI; for other providers we estimate
   const tokens = Math.ceil(content.length / 4);
@@ -130,10 +141,20 @@ export async function summarizeTicket(ticketId: number, companyId: number) {
   const conversation = await getTicketMessages(ticketId, companyId);
   const prompt = SUMMARY_PROMPT(conversation);
 
-  const { content, tokens } = await callAI(companyId, prompt);
+  let content: string;
+  let tokens: number;
+  try {
+    ({ content, tokens } = await callAI(companyId, prompt));
+  } catch (err: any) {
+    const msg = err?.message || "";
+    if (msg.startsWith('IA_PROVIDER_ERROR')) {
+      throw new Error('IA_PROVIDER_UNAVAILABLE');
+    }
+    throw err;
+  }
   const parsed = parseJSON(content);
 
-  if (!parsed) throw new Error("IA_PARSE_ERROR");
+  if (!parsed) throw new Error('IA_PARSE_ERROR');
 
   // Save to DB
   const saved = await sequelize.query<{ id: number }>(
