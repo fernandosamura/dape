@@ -257,6 +257,7 @@ async function sendWithTypingDelay(
   const jitter = Math.floor(Math.random() * 400);
   const delayMs = Math.max(800, Math.min(base + jitter, 4000));
 
+  await wbot.presenceSubscribe(jid);
   await wbot.sendPresenceUpdate("composing", jid);
   await timeout(delayMs);
   await wbot.sendPresenceUpdate("paused", jid);

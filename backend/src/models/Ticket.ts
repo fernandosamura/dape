@@ -25,6 +25,7 @@ import Company from "./Company";
 import QueueOption from "./QueueOption";
 import Tag from "./Tag";
 import TicketTag from "./TicketTag";
+import TicketUser from "./TicketUser";
 import QueueIntegrations from "./QueueIntegrations";
 import Prompt from "./Prompt";
 
@@ -164,6 +165,9 @@ class Ticket extends Model<Ticket> {
 
   @Column(DataType.JSON)
   dataWebhook: {} | null;
+
+  @BelongsToMany(() => User, () => TicketUser)
+  chatUsers: User[];
 }
 
 export default Ticket;

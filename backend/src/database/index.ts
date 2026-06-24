@@ -44,6 +44,7 @@ import { FlowCampaignModel } from "../models/FlowCampaign";
 import { FlowImgModel } from "../models/FlowImg";
 import DapeLeadSource from "../models/DapeLeadSource";
 import DapeDeal from "../models/DapeDeal";
+import TicketUser from "../models/TicketUser";
 
 // eslint-disable-next-line
 const dbConfig = require("../config/database");
@@ -97,6 +98,7 @@ const models = [
   FlowImgModel,
   DapeLeadSource,
   DapeDeal,
+  TicketUser,
 ];
 
 sequelize.addModels(models);

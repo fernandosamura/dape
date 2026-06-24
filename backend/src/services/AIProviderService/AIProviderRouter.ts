@@ -154,6 +154,8 @@ export const PROVIDER_MODELS: Record<AIProvider, string[]> = {
     "gemini-3.1-pro", "gemini-3.1-pro-preview",
     // Gemini Live (streaming multimodal)
     "gemini-2.0-flash-live", "gemini-3.1-flash-live",
+    // Gemini 3.x adicionais
+    "gemini-3-flash-preview", "gemini-3.5-flash",
   ],
   manus:     ["manus-default"]
 };

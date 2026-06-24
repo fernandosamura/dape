@@ -5,6 +5,7 @@ import AppError from "../../errors/AppError";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
+import User from "../../models/User";
 
 import formatBody from "../../helpers/Mustache";
 
@@ -12,12 +13,15 @@ interface Request {
   body: string;
   ticket: Ticket;
   quotedMsg?: Message;
+  /** userId do atendente que envia — usado para prefixo em grupos */
+  userId?: number;
 }
 
 const SendWhatsAppMessage = async ({
   body,
   ticket,
-  quotedMsg
+  quotedMsg,
+  userId
 }: Request): Promise<WAMessage> => {
   let options = {};
   const wbot = await GetTicketWbot(ticket);
@@ -64,16 +68,27 @@ const SendWhatsAppMessage = async ({
     
   }
 
+  // Para grupos, prefixar com o nome do atendente: "[Nome] mensagem"
+  let finalBody = formatBody(body, ticket.contact);
+  if (ticket.isGroup && userId) {
+    try {
+      const attendant = await User.findByPk(userId, { attributes: ["name"] });
+      if (attendant?.name) {
+        finalBody = `[${attendant.name}] ${finalBody}`;
+      }
+    } catch (_) {}
+  }
+
   try {
     const sentMessage = await wbot.sendMessage(number,{
-        text: formatBody(body, ticket.contact)
+        text: finalBody
       },
       {
         ...options
       }
     );
 
-    await ticket.update({ lastMessage: formatBody(body, ticket.contact) });
+    await ticket.update({ lastMessage: finalBody });
     return sentMessage;
   } catch (err) {
     Sentry.captureException(err);

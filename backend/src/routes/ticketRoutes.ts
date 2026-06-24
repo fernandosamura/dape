@@ -19,4 +19,10 @@ ticketRoutes.put("/tickets/:ticketId", isAuth, TicketController.update);
 
 ticketRoutes.delete("/tickets/:ticketId", isAuth, TicketController.remove);
 
+// Grupos: entrada/saida de atendentes
+import * as TicketGroupController from "../controllers/TicketGroupController";
+ticketRoutes.post("/tickets/:ticketId/join",  isAuth, TicketGroupController.join);
+ticketRoutes.post("/tickets/:ticketId/leave", isAuth, TicketGroupController.leave);
+ticketRoutes.get("/tickets/:ticketId/users",  isAuth, TicketGroupController.users);
+
 export default ticketRoutes;
