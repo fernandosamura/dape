@@ -161,7 +161,7 @@ const TicketsManagerTabs = () => {
   const [selectedUsers, setSelectedUsers] = useState([]);
 
   useEffect(() => {
-    if (user.profile.toUpperCase() === "ADMIN") {
+    if (user.profile.toUpperCase() === "ADMIN" || user.allTicket === "enabled") {
       setShowAllTickets(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -281,27 +281,23 @@ const TicketsManagerTabs = () => {
             >
               {i18n.t("ticketsManager.buttons.newTicket")}
             </Button>
-            <Can
-              role={user.profile}
-              perform="tickets-manager:showall"
-              yes={() => (
-                <FormControlLabel
-                  label={i18n.t("tickets.buttons.showAll")}
-                  labelPlacement="start"
-                  control={
-                    <Switch
-                      size="small"
-                      checked={showAllTickets}
-                      onChange={() =>
-                        setShowAllTickets((prevState) => !prevState)
-                      }
-                      name="showAllTickets"
-                      color="primary"
-                    />
-                  }
-                />
-              )}
-            />
+            {(user.profile.toUpperCase() === "ADMIN" || user.allTicket === "enabled") && (
+              <FormControlLabel
+                label={i18n.t("tickets.buttons.showAll")}
+                labelPlacement="start"
+                control={
+                  <Switch
+                    size="small"
+                    checked={showAllTickets}
+                    onChange={() =>
+                      setShowAllTickets((prevState) => !prevState)
+                    }
+                    name="showAllTickets"
+                    color="primary"
+                  />
+                }
+              />
+            )}
           </>
         )}
         <TicketsQueueSelect

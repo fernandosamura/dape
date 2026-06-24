@@ -193,7 +193,8 @@ const TicketsListCustom = (props) => {
       (t) => queueIds.indexOf(t.queueId) > -1
     );
 
-    if (profile === "user") {
+    const allTicketEnabled = user.allTicket === "enabled";
+    if (profile === "user" && !allTicketEnabled) {
       dispatch({ type: "LOAD_TICKETS", payload: filteredTickets });
     } else {
       dispatch({ type: "LOAD_TICKETS", payload: tickets });

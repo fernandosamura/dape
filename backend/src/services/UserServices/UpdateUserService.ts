@@ -60,14 +60,9 @@ const UpdateUserService = async ({
     throw new AppError(err.message);
   }
 
-  await user.update({
-    email,
-    password,
-    profile,
-    name,
-    whatsappId: whatsappId || null,
-	allTicket
-  });
+  const updateData: any = { email, profile, name, whatsappId: whatsappId || null, allTicket };
+  if (password) updateData.password = password;
+  await user.update(updateData);
 
   await user.$set("queues", queueIds);
 

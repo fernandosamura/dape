@@ -153,7 +153,22 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
             );
 
             if (connection === "close") {
-              if ((lastDisconnect?.error as Boom)?.output?.statusCode === 403) {
+              const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+
+              logger.info(`Socket ${name} close - statusCode: ${statusCode}`);
+
+              if (statusCode === DisconnectReason.loggedOut) {
+                // 401: loggedOut / device_removed — limpa sessão, NÃO reconecta automaticamente
+                // O usuário deve remover o dispositivo vinculado no celular e escanear novamente
+                await whatsapp.update({ status: "DISCONNECTED", session: "" });
+                await DeleteBaileysService(whatsapp.id);
+                io.to(`company-${whatsapp.companyId}-mainchannel`).emit(`company-${whatsapp.companyId}-whatsappSession`, {
+                  action: "update",
+                  session: whatsapp
+                });
+                removeWbot(id, false);
+              } else if (statusCode === DisconnectReason.forbidden) {
+                // 403: forbidden — limpa sessão, não reconecta
                 await whatsapp.update({ status: "PENDING", session: "" });
                 await DeleteBaileysService(whatsapp.id);
                 io.to(`company-${whatsapp.companyId}-mainchannel`).emit(`company-${whatsapp.companyId}-whatsappSession`, {
@@ -161,23 +176,8 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
                   session: whatsapp
                 });
                 removeWbot(id, false);
-              }
-              if (
-                (lastDisconnect?.error as Boom)?.output?.statusCode !==
-                DisconnectReason.loggedOut
-              ) {
-                removeWbot(id, false);
-                setTimeout(
-                  () => StartWhatsAppSession(whatsapp, whatsapp.companyId),
-                  2000
-                );
               } else {
-                await whatsapp.update({ status: "PENDING", session: "" });
-                await DeleteBaileysService(whatsapp.id);
-                io.to(`company-${whatsapp.companyId}-mainchannel`).emit(`company-${whatsapp.companyId}-whatsappSession`, {
-                  action: "update",
-                  session: whatsapp
-                });
+                // Outros erros (515 restartRequired, 503, 428, etc.) — reconecta automaticamente
                 removeWbot(id, false);
                 setTimeout(
                   () => StartWhatsAppSession(whatsapp, whatsapp.companyId),
