@@ -528,6 +528,13 @@ const MainListItems = (props) => {
                 icon={<AnnouncementIcon />}
               />
             )}
+            {user.profile === "admin" && (
+              <ListItemLink
+                to="/dape/billing"
+                primary="Assinatura"
+                icon={<CreditCardIcon />}
+              />
+            )}
             {showOpenAi && (
               <ListItemLink
                 to="/prompts"
@@ -581,60 +588,53 @@ const MainListItems = (props) => {
               primary={i18n.t("mainDrawer.listItems.financeiro")}
               icon={<LocalAtmIcon />}
             />
-            {user.profile === "admin" && (
-              <ListItemLink
-                to="/dape/billing"
-                primary="💳 Assinatura"
-                icon={<CreditCardIcon />}
-              />
-            )}
 
             {hasPipeline && (
               <ListItemLink
                 to="/dape/pipeline"
-                primary="📊 Pipeline"
+                primary="Pipeline"
                 icon={<TrendingUpIcon />}
               />
             )}
             {hasPipeline && (
               <ListItemLink
                 to="/dape/kanban"
-                primary="🏆 Kanban"
+                primary="Kanban DAPE"
                 icon={<TrendingUpIcon />}
               />
             )}
             {hasAnalytics && (
               <ListItemLink
                 to="/dape/analytics"
-                primary="📈 Analytics"
+                primary="Analytics"
                 icon={<BarChartIcon />}
               />
             )}
             {hasGrowth && (
               <ListItemLink
                 to="/dape/growth"
-                primary="🚀 Growth"
+                primary="Growth"
                 icon={<TrackChangesIcon />}
               />
             )}
             {hasIntelligence && (
               <ListItemLink
                 to="/dape/intelligence"
-                primary="🏢 Intelligence"
+                primary="Intelligence"
                 icon={<BusinessIcon />}
               />
             )}
             {hasRadar && (
               <ListItemLink
                 to="/dape/radar"
-                primary="📡 Radar"
+                primary="Radar"
                 icon={<TrackChangesOutlinedIcon />}
               />
             )}
             {user.super && (
               <ListItemLink
                 to="/dape/master"
-                primary="⚡ DAPLE Master"
+                primary="DAPLE Master"
                 icon={<StarsIcon />}
               />
             )}

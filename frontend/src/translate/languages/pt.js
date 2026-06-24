@@ -857,7 +857,7 @@ const messages = {
           chats: "Chat Interno",
           financeiro: "Financeiro",
           files: "Lista de arquivos",
-          prompts: "Open.Ai",
+          prompts: "Daple AI",
           queueIntegration: "Integrações",
         },
         appBar: {
