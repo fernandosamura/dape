@@ -41,6 +41,14 @@ const useStyles = makeStyles((theme) => ({
   },
   listItem: {
     cursor: "pointer",
+    borderRadius: 8,
+    margin: "4px 8px",
+    padding: "8px 12px",
+    transition: "background 0.2s, box-shadow 0.2s",
+    "&:hover": {
+      backgroundColor: "rgba(0, 45, 110, 0.06)",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+    },
   },
 }));
 
@@ -110,8 +118,10 @@ export default function ChatList({
 
   const getItemStyle = (chat) => {
     return {
-      borderLeft: chat.uuid === id ? "6px solid #002d6e" : null,
-      backgroundColor: chat.uuid === id ? "theme.palette.chatlist" : null,
+      borderLeft: chat.uuid === id ? "4px solid #1976d2" : "4px solid transparent",
+      backgroundColor: chat.uuid === id ? "rgba(25, 118, 210, 0.08)" : undefined,
+      borderRadius: 8,
+      boxShadow: chat.uuid === id ? "0 2px 8px rgba(25,118,210,0.12)" : undefined,
     };
   };
 
