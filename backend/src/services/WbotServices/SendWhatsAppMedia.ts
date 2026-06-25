@@ -9,6 +9,7 @@ import Ticket from "../../models/Ticket";
 import Message from "../../models/Message";
 import { lookup } from "mime-types";
 import formatBody from "../../helpers/Mustache";
+import { downloadFromR2 } from "../StorageServices/R2Service";
 
 interface Request {
   media: Express.Multer.File;
@@ -17,6 +18,37 @@ interface Request {
 }
 
 const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
+const tempFolder = path.resolve(publicFolder, "temp");
+
+const ensureTempFolder = () => {
+  if (!fs.existsSync(tempFolder)) {
+    fs.mkdirSync(tempFolder, { recursive: true });
+  }
+};
+
+/**
+ * Se R2 está ativo e o arquivo não existe localmente,
+ * faz o download para public/temp e retorna o caminho temporário.
+ * Retorna null se o arquivo existe localmente ou R2 não está ativo.
+ */
+const resolveLocalPath = async (
+  mediaPath: string,
+  mediaFilename: string
+): Promise<{ localPath: string; isTempDownload: boolean }> => {
+  if (
+    process.env.CLOUDFLARE_R2_ENABLED === "true" &&
+    !fs.existsSync(mediaPath)
+  ) {
+    ensureTempFolder();
+    const tempPath = path.join(
+      tempFolder,
+      `r2_${Date.now()}_${path.basename(mediaFilename)}`
+    );
+    await downloadFromR2(mediaFilename, tempPath);
+    return { localPath: tempPath, isTempDownload: true };
+  }
+  return { localPath: mediaPath, isTempDownload: false };
+};
 
 const processAudio = async (audio: string): Promise<string> => {
   const outputAudio = `${publicFolder}/${new Date().getTime()}.ogg`;
@@ -25,7 +57,7 @@ const processAudio = async (audio: string): Promise<string> => {
       `ffmpeg -i ${audio} -c:a libopus -b:a 32k -vbr on -compression_level 10 ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
-        fs.unlinkSync(audio);
+        if (fs.existsSync(audio)) fs.unlinkSync(audio);
         resolve(outputAudio);
       }
     );
@@ -39,7 +71,7 @@ const processAudioFile = async (audio: string): Promise<string> => {
       `ffmpeg -i ${audio} -c:a libopus -b:a 32k -vbr on -compression_level 10 ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
-        fs.unlinkSync(audio);
+        if (fs.existsSync(audio)) fs.unlinkSync(audio);
         resolve(outputAudio);
       }
     );
@@ -51,7 +83,13 @@ export const getMessageOptions = async (
   pathMedia: string,
   body?: string
 ): Promise<any> => {
-  const mimeType = lookup(pathMedia) || "";
+  // Se R2 ativo e arquivo não existe localmente, baixa do R2
+  let { localPath, isTempDownload } = await resolveLocalPath(
+    pathMedia,
+    path.basename(pathMedia)
+  );
+
+  const mimeType = lookup(localPath) || "";
   const typeMessage = mimeType.split("/")[0];
 
   try {
@@ -62,12 +100,14 @@ export const getMessageOptions = async (
 
     if (typeMessage === "video") {
       options = {
-        video: fs.readFileSync(pathMedia),
+        video: fs.readFileSync(localPath),
         caption: body ? body : "",
         fileName: fileName
       };
     } else if (typeMessage === "audio") {
-      const convert = await processAudio(pathMedia);
+      // processAudio deleta o input automaticamente (isTempDownload já é tratado)
+      const convert = await processAudio(localPath);
+      isTempDownload = false; // já deletado pelo processAudio
       options = {
         audio: fs.readFileSync(convert),
         mimetype: "audio/ogg; codecs=opus",
@@ -76,21 +116,21 @@ export const getMessageOptions = async (
       };
     } else if (typeMessage === "document") {
       options = {
-        document: fs.readFileSync(pathMedia),
+        document: fs.readFileSync(localPath),
         caption: body ? body : null,
         fileName: fileName,
         mimetype: mimeType
       };
     } else if (typeMessage === "application") {
       options = {
-        document: fs.readFileSync(pathMedia),
+        document: fs.readFileSync(localPath),
         caption: body ? body : null,
         fileName: fileName,
         mimetype: mimeType
       };
     } else {
       options = {
-        image: fs.readFileSync(pathMedia),
+        image: fs.readFileSync(localPath),
         caption: body ? body : null
       };
     }
@@ -100,6 +140,10 @@ export const getMessageOptions = async (
     Sentry.captureException(e);
     console.log(e);
     return null;
+  } finally {
+    if (isTempDownload && fs.existsSync(localPath)) {
+      fs.unlinkSync(localPath);
+    }
   }
 };
 
@@ -108,6 +152,8 @@ const SendWhatsAppMedia = async ({
   ticket,
   body
 }: Request): Promise<WAMessage> => {
+  let tempR2File: string | null = null;
+
   try {
     const wbot = await GetTicketWbot(ticket);
 
@@ -131,7 +177,13 @@ const SendWhatsAppMedia = async ({
     const number = `${ticket.contact.number}@${jidDomain}`;
     // --- FIM DETECÇÃO JID ---
 
-    const pathMedia = media.path;
+    // Resolve o caminho local (baixa do R2 se necessário)
+    const resolved = await resolveLocalPath(media.path, media.filename);
+    const pathMedia = resolved.localPath;
+    if (resolved.isTempDownload) {
+      tempR2File = pathMedia;
+    }
+
     const typeMessage = media.mimetype.split("/")[0];
     let options: AnyMessageContent;
     const bodyMessage = formatBody(body, ticket.contact);
@@ -145,14 +197,16 @@ const SendWhatsAppMedia = async ({
     } else if (typeMessage === "audio") {
       const typeAudio = media.originalname.includes("audio-record-site");
       if (typeAudio) {
-        const convert = await processAudio(media.path);
+        const convert = await processAudio(pathMedia);
+        tempR2File = null; // processAudio já deletou
         options = {
           audio: fs.readFileSync(convert),
           mimetype: "audio/ogg; codecs=opus",
           ptt: true
         };
       } else {
-        const convert = await processAudioFile(media.path);
+        const convert = await processAudioFile(pathMedia);
+        tempR2File = null; // processAudioFile já deletou
         options = {
           audio: fs.readFileSync(convert),
           mimetype: "audio/ogg; codecs=opus",
@@ -189,6 +243,11 @@ const SendWhatsAppMedia = async ({
     Sentry.captureException(err);
     console.log(err);
     throw new AppError("ERR_SENDING_WAPP_MSG");
+  } finally {
+    // Garante limpeza do arquivo temporário baixado do R2
+    if (tempR2File && fs.existsSync(tempR2File)) {
+      fs.unlinkSync(tempR2File);
+    }
   }
 };
 

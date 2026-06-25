@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import fs from "fs";
 import AppError from "../errors/AppError";
 
 import SetTicketMessagesAsRead from "../helpers/SetTicketMessagesAsRead";
@@ -22,6 +23,8 @@ import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
 import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
+import { uploadToR2 } from "../services/StorageServices/R2Service";
+
 type IndexQuery = {
   pageNumber: string;
 };
@@ -66,7 +69,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   const { ticketId } = req.params;
   const { body, quotedMsg }: MessageData = req.body;
   const medias = req.files as Express.Multer.File[];
-  const { companyId } = req.user; const userId = Number(req.user.id);
+  const { companyId } = req.user;
+  const userId = Number(req.user.id);
 
   const ticket = await ShowTicketService(ticketId, companyId);
 
@@ -75,7 +79,26 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   if (medias) {
     await Promise.all(
       medias.map(async (media: Express.Multer.File, index) => {
-        await SendWhatsAppMedia({ media, ticket, body: Array.isArray(body) ? body[index] : body });
+        // Envia pelo WhatsApp primeiro (arquivo ainda existe localmente)
+        await SendWhatsAppMedia({
+          media,
+          ticket,
+          body: Array.isArray(body) ? body[index] : body
+        });
+
+        // Se R2 está ativo, faz upload e remove o arquivo local
+        if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+          try {
+            await uploadToR2(
+              media.path,
+              media.filename,
+              media.mimetype || "application/octet-stream"
+            );
+            if (fs.existsSync(media.path)) fs.unlinkSync(media.path);
+          } catch (err) {
+            console.error("[R2] Erro ao fazer upload após envio:", err);
+          }
+        }
       })
     );
   } else {
@@ -133,10 +156,7 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
 
     const CheckValidNumber = await CheckContactNumber(numberToTest, companyId);
     const number = CheckValidNumber.jid.replace(/\D/g, "");
-    const profilePicUrl = await GetProfilePicUrl(
-      number,
-      companyId
-    );
+    const profilePicUrl = await GetProfilePicUrl(number, companyId);
     const contactData = {
       name: `${number}`,
       number,
@@ -147,11 +167,33 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
 
     const contact = await CreateOrUpdateContactService(contactData);
 
-    const ticket = await FindOrCreateTicketService(contact, whatsapp.id!, 0, companyId);
+    const ticket = await FindOrCreateTicketService(
+      contact,
+      whatsapp.id!,
+      0,
+      companyId
+    );
 
     if (medias) {
       await Promise.all(
         medias.map(async (media: Express.Multer.File) => {
+          // Determina o mediaPath: se R2 ativo, faz upload e usa a chave R2
+          let mediaPath = media.path;
+
+          if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+            try {
+              await uploadToR2(
+                media.path,
+                media.filename,
+                media.mimetype || "application/octet-stream"
+              );
+              if (fs.existsSync(media.path)) fs.unlinkSync(media.path);
+              mediaPath = media.filename; // chave R2
+            } catch (err) {
+              console.error("[R2] Erro ao fazer upload para fila:", err);
+            }
+          }
+
           await req.app.get("queues").messageQueue.add(
             "SendMessage",
             {
@@ -159,7 +201,7 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
               data: {
                 number,
                 body: body ? formatBody(body, contact) : media.originalname,
-                mediaPath: media.path,
+                mediaPath,
                 fileName: media.originalname
               }
             },
@@ -169,12 +211,13 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
       );
     } else {
       const sendUserId = req.user?.id ? Number(req.user.id) : undefined;
-      await SendWhatsAppMessage({ body: formatBody(body, contact), ticket, userId: sendUserId });
-
-      await ticket.update({
-        lastMessage: body,
+      await SendWhatsAppMessage({
+        body: formatBody(body, contact),
+        ticket,
+        userId: sendUserId
       });
 
+      await ticket.update({ lastMessage: body });
     }
 
     if (messageData.closeTicket) {
@@ -223,7 +266,6 @@ export const sendMessageFlow = async (
 
     const numberToTest = messageData.number;
     const body = messageData.body;
-
     const companyId = messageData.companyId;
 
     const CheckValidNumber = await CheckContactNumber(numberToTest, companyId);
@@ -232,6 +274,22 @@ export const sendMessageFlow = async (
     if (medias) {
       await Promise.all(
         medias.map(async (media: Express.Multer.File) => {
+          let mediaPath = media.path;
+
+          if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+            try {
+              await uploadToR2(
+                media.path,
+                media.filename,
+                media.mimetype || "application/octet-stream"
+              );
+              if (fs.existsSync(media.path)) fs.unlinkSync(media.path);
+              mediaPath = media.filename;
+            } catch (err) {
+              console.error("[R2] Erro ao fazer upload para fila (flow):", err);
+            }
+          }
+
           await req.app.get("queues").messageQueue.add(
             "SendMessage",
             {
@@ -239,24 +297,17 @@ export const sendMessageFlow = async (
               data: {
                 number,
                 body: media.originalname,
-                mediaPath: media.path
+                mediaPath
               }
             },
-            { removeOnComplete: true, attempts: 3 }
+            { removeOnComplete: false, attempts: 3 }
           );
         })
       );
     } else {
       req.app.get("queues").messageQueue.add(
         "SendMessage",
-        {
-          whatsappId,
-          data: {
-            number,
-            body
-          }
-        },
-
+        { whatsappId, data: { number, body } },
         { removeOnComplete: false, attempts: 3 }
       );
     }

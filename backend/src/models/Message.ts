@@ -48,9 +48,13 @@ class Message extends Model<Message> {
   @Column(DataType.STRING)
   get mediaUrl(): string | null {
     if (this.getDataValue("mediaUrl")) {
-      return `${process.env.BACKEND_URL}/public/${this.getDataValue(
-        "mediaUrl"
-      )}`;
+      if (
+        process.env.CLOUDFLARE_R2_ENABLED === "true" &&
+        process.env.CLOUDFLARE_R2_PUBLIC_URL
+      ) {
+        return `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${this.getDataValue("mediaUrl")}`;
+      }
+      return `${process.env.BACKEND_URL}/public/${this.getDataValue("mediaUrl")}`;
     }
     return null;
   }
@@ -104,7 +108,7 @@ class Message extends Model<Message> {
 
   @BelongsTo(() => Queue)
   queue: Queue;
-  
+
   @Default(false)
   @Column
   isEdited: boolean;

@@ -1,3 +1,4 @@
+import { uploadToR2 } from "../StorageServices/R2Service";
 import path, { join } from "path";
 import { promisify } from "util";
 import { readFile, writeFile } from "fs";
@@ -997,10 +998,19 @@ export const verifyMediaMessage = async (
   }
 
   try {
-    await writeFileAsync(
-      join(__dirname, "..", "..", "..", "public", media.filename),
-      Buffer.from(media.data, 'base64')
-    );
+    const fileBuffer = Buffer.from(media.data, 'base64');
+    if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+      const fs = require("fs");
+      const tempPath = join(__dirname, "..", "..", "..", "public", "temp", media.filename);
+      await writeFileAsync(tempPath, fileBuffer);
+      await uploadToR2(tempPath, media.filename, media.mimetype);
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    } else {
+      await writeFileAsync(
+        join(__dirname, "..", "..", "..", "public", media.filename),
+        fileBuffer
+      );
+    }
   } catch (err) {
     Sentry.captureException(err);
     logger.error(err);

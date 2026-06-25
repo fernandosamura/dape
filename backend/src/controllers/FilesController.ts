@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { getIO } from "../libs/socket";
+import fs from "fs";
 
 import AppError from "../errors/AppError";
 import { head } from "lodash";
@@ -12,6 +13,7 @@ import DeleteService from "../services/FileServices/DeleteService";
 import SimpleListService from "../services/FileServices/SimpleListService";
 import DeleteAllService from "../services/FileServices/DeleteAllService";
 import FilesOptions from "../models/FilesOptions";
+import { uploadToR2 } from "../services/StorageServices/R2Service";
 
 type IndexQuery = {
   searchParam?: string;
@@ -60,31 +62,41 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   return res.status(200).json(file);
 };
 
-export const uploadMedias = async (req: Request, res: Response): Promise<Response> => {
+export const uploadMedias = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   const { fileId, id, mediaType } = req.body;
   const files = req.files as Express.Multer.File[];
-  const file = head(files);
 
   try {
-    
-    let fileOpt
     if (files.length > 0) {
-
       for (const [index, file] of files.entries()) {
-        fileOpt = await FilesOptions.findOne({
+        let storedPath = file.filename.replace("/", "-");
+
+        // Se R2 está ativo, faz upload e remove o arquivo local
+        if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+          const mimeType =
+            file.mimetype || "application/octet-stream";
+          await uploadToR2(file.path, file.filename, mimeType);
+          fs.unlinkSync(file.path);
+          storedPath = file.filename;
+        }
+
+        const fileOpt = await FilesOptions.findOne({
           where: {
             fileId,
-            id: Array.isArray(id)? id[index] : id
+            id: Array.isArray(id) ? id[index] : id
           }
         });
 
-        fileOpt.update({
-          path: file.filename.replace('/','-'),
-          mediaType: Array.isArray(mediaType)? mediaType[index] : mediaType
-        }) ;
+        await fileOpt.update({
+          path: storedPath,
+          mediaType: Array.isArray(mediaType) ? mediaType[index] : mediaType
+        });
       }
     }
-    
+
     return res.send({ mensagem: "Arquivos atualizados" });
   } catch (err: any) {
     throw new AppError(err.message);
@@ -113,7 +125,6 @@ export const update = async (
 
   return res.status(200).json(fileList);
 };
-    
 
 export const remove = async (
   req: Request,
