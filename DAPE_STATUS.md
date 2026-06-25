@@ -127,3 +127,59 @@ Conteudo: public/ (midias .oga), brands/, instances.json, .env, backend/.env, du
 ## Proxima tarefa
 - Reconectar conexoes WhatsApp (Pop e Pub Plus Brasil) via QR Code
 - Monitorar logs em producao na nova VPS
+
+---
+
+## Sessao 2026-06-25 (tarde) — Migracao de Armazenamento para Cloudflare R2
+
+### Contexto
+- Objetivo: migrar arquivos de midia de /public na VPS para Cloudflare R2 (S3-compativel)
+- Motivacao: economia de disco na VPS e escalabilidade
+
+### 1. Variaveis de ambiente configuradas (.env do backend)
+- CLOUDFLARE_R2_ENABLED=true
+- CLOUDFLARE_R2_BUCKET_NAME=daplemidias
+- CLOUDFLARE_R2_ACCESS_KEY_ID / CLOUDFLARE_R2_SECRET_ACCESS_KEY
+- CLOUDFLARE_R2_ENDPOINT (endpoint R2 da conta)
+- CLOUDFLARE_R2_PUBLIC_URL (URL publica do bucket)
+
+### 2. R2Service.ts (novo — src/services/StorageServices/R2Service.ts)
+- S3Client configurado: endpoint R2, region auto, credenciais do .env
+- uploadToR2(filePath, fileName, mimeType) — stream local -> PutObjectCommand
+- deleteFromR2(fileName) — DeleteObjectCommand
+- downloadFromR2(fileName, destPath) — GetObjectCommand + pipeline de stream
+
+### 3. upload.ts refatorado
+- Quando CLOUDFLARE_R2_ENABLED=true, destino forcado para public/temp (staging)
+- Sem R2: comportamento original (subpastas por typeArch)
+
+### 4. FilesController.ts (uploadMedias)
+- Apos salvar no disco: uploadToR2 + unlinkSync do arquivo local
+
+### 5. MessageController.ts (store e send)
+- store: SendWhatsAppMedia primeiro (arquivo ainda existe) -> uploadToR2 -> unlinkSync
+- send (fila): uploadToR2 antes de enfileirar, passa chave R2 como mediaPath
+
+### 6. verifyMediaMessage (wbotMessageListener.ts)
+- Midia recebida do WhatsApp: salva em public/temp -> uploadToR2 -> unlinkSync temp
+- Sem R2: comportamento original (salva direto em public/)
+
+### 7. SendWhatsAppMedia.ts refatorado
+- resolveLocalPath(): se R2 ativo e arquivo nao existe localmente, baixa do R2 para temp
+- Bloco finally garante limpeza do arquivo temporario baixado
+- getMessageOptions() aplica mesma logica de resolucao
+
+### 8. Message.ts — getter mediaUrl
+- R2 ativo + CLOUDFLARE_R2_PUBLIC_URL definido: retorna URL do R2
+- Fallback automatico para disco local se variaveis nao configuradas
+
+### 9. Correcao de bugs criticos no modulo de IA
+- Bug 1: TTS (2 blocos) — uploadToR2 do .ogg antes de deleteFileSync
+  (sem isso, mediaUrl no banco apontava para arquivo ja deletado)
+- Bug 2: Transcricao de audio — downloadFromR2 antes de ler o arquivo,
+  deleteFileSync do temp apos transcricao (Gemini e Whisper)
+- Bug 3: .env.example atualizado com todas as variaveis CLOUDFLARE_R2_*
+
+### Commits desta sessao
+- a33cb53 feat: migra armazenamento de arquivos para Cloudflare R2
+- a8f18a1 fix: corrige 3 bugs criticos na integracao R2 com modulo de IA
