@@ -1,4 +1,4 @@
-import { uploadToR2 } from "../StorageServices/R2Service";
+import { uploadToR2, downloadFromR2 } from "../StorageServices/R2Service";
 import path, { join } from "path";
 import { promisify } from "util";
 import { readFile, writeFile } from "fs";
@@ -841,6 +841,13 @@ const handleOpenAi = async (
           ptt: true
         });
         await verifyMediaMessage(sendMessage!, ticket, contact, ticketTraking, false, false, wbot);
+        if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+          await uploadToR2(
+            `${publicFolder}/${fileNameWithOutExtension}.ogg`,
+            `${fileNameWithOutExtension}.ogg`,
+            "audio/ogg"
+          );
+        }
         deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.ogg`);
         deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
       } catch (error) {
@@ -858,6 +865,18 @@ const handleOpenAi = async (
     const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
     const audioFilePath = `${publicFolder}/${mediaUrl}`;
     let transcribedText = "";
+    let r2AudioDownloaded = false;
+
+    // Se R2 ativo, o arquivo foi deletado do disco — baixa temporariamente
+    if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+      try {
+        await downloadFromR2(mediaUrl, audioFilePath);
+        r2AudioDownloaded = true;
+      } catch (err) {
+        logger.error(`[R2] Erro ao baixar áudio para transcrição: ${err}`);
+        return;
+      }
+    }
 
     if (aiProvider === "gemini") {
       // Gemini: transcrição via API Multimodal (base64 inline)
@@ -912,6 +931,11 @@ const handleOpenAi = async (
     }
     messagesAI.push({ role: "user", content: transcribedText });
 
+    // Remove o arquivo baixado do R2 após leitura
+    if (r2AudioDownloaded) {
+      deleteFileSync(audioFilePath);
+    }
+
     let response = await callAIProvider({
       provider: aiProvider,
       apiKey: prompt.apiKey,
@@ -949,6 +973,13 @@ const handleOpenAi = async (
           ptt: true
         });
         await verifyMediaMessage(sendMessage!, ticket, contact, ticketTraking, false, false, wbot);
+        if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+          await uploadToR2(
+            `${publicFolder}/${fileNameWithOutExtension}.ogg`,
+            `${fileNameWithOutExtension}.ogg`,
+            "audio/ogg"
+          );
+        }
         deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.ogg`);
         deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
       } catch (error) {
