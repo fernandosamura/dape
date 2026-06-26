@@ -788,11 +788,14 @@ const handleOpenAi = async (
     limit: maxMessages
   });
 
+  const queues = await Queue.findAll({ where: { companyId: ticket.companyId } });
+  const queuesInfo = queues.map(q => `${q.id}=${q.name}`).join(", ");
+
   const promptSystem = `Nas respostas utilize o nome ${sanitizeName(
     contact.name || "Amigo(a)"
   )} para identificar o cliente.\nSua resposta deve usar no máximo ${
     prompt.maxTokens
-  } tokens e cuide para não truncar o final.\nSempre que possível, mencione o nome dele para ser mais personalizado o atendimento e mais educado. Quando a resposta requer uma transferência para o setor de atendimento, comece sua resposta com 'Ação: Transferir para o setor de atendimento'.\n
+  } tokens e cuide para não truncar o final.\nSempre que possível, mencione o nome dele para ser mais personalizado o atendimento e mais educado. Filas disponíveis: ${queuesInfo}. Quando precisar transferir o cliente, inicie sua resposta com 'Ação: Transferir para [ID]' onde [ID] é o número da fila correta para o assunto.\n
   ${prompt.prompt}\n`;
 
   let messagesAI: AIMessage[] = [];
@@ -826,11 +829,12 @@ const handleOpenAi = async (
     });
 
     let transferToQueue1 = false;
-    if (response?.includes("Ação: Transferir para o setor de atendimento")) {
+    let targetQueueId1: number | null = null;
+    const transferMatch1 = response?.match(/Ação: Transferir para (\d+)/);
+    if (transferMatch1) {
       transferToQueue1 = true;
-      response = response
-        .replace("Ação: Transferir para o setor de atendimento", "")
-        .trim();
+      targetQueueId1 = parseInt(transferMatch1[1]);
+      response = response.replace(/Ação: Transferir para \d+/, "").trim();
     }
 
     if (!prompt.voice || prompt.voice === "texto") {
@@ -873,13 +877,9 @@ const handleOpenAi = async (
       }
     }
 
-    if (transferToQueue1) {
+    if (transferToQueue1 && targetQueueId1) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      if (whatsapp?.transferQueueId) {
-        await transferQueue(whatsapp.transferQueueId, ticket, contact);
-      } else if (prompt.queueId) {
-        await transferQueue(prompt.queueId, ticket, contact);
-      }
+      await transferQueue(targetQueueId1, ticket, contact);
     }
 
   } else if (msg.message?.audioMessage) {
@@ -969,11 +969,12 @@ const handleOpenAi = async (
     });
 
     let transferToQueue2 = false;
-    if (response?.includes("Ação: Transferir para o setor de atendimento")) {
+    let targetQueueId2: number | null = null;
+    const transferMatch2 = response?.match(/Ação: Transferir para (\d+)/);
+    if (transferMatch2) {
       transferToQueue2 = true;
-      response = response
-        .replace("Ação: Transferir para o setor de atendimento", "")
-        .trim();
+      targetQueueId2 = parseInt(transferMatch2[1]);
+      response = response.replace(/Ação: Transferir para \d+/, "").trim();
     }
 
     if (!prompt.voice || prompt.voice === "texto") {
@@ -1014,13 +1015,9 @@ const handleOpenAi = async (
       }
     }
 
-    if (transferToQueue2) {
+    if (transferToQueue2 && targetQueueId2) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      if (whatsapp?.transferQueueId) {
-        await transferQueue(whatsapp.transferQueueId, ticket, contact);
-      } else if (prompt.queueId) {
-        await transferQueue(prompt.queueId, ticket, contact);
-      }
+      await transferQueue(targetQueueId2, ticket, contact);
     }
   }
   messagesAI = [];
