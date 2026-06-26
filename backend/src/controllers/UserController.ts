@@ -115,7 +115,10 @@ export const update = async (
   // Usuário comum editando a si mesmo: permite apenas name, email e password
   if (!isAdmin && isSelf) {
     const { name, email, password } = userData;
-    userData = { name, email, password };
+    // Busca as filas atuais do usuário para não apagá-las
+    const currentUser = await User.findByPk(+req.params.userId, { include: ["queues"] });
+    const currentQueueIds = currentUser?.queues?.map((q: any) => q.id) ?? [];
+    userData = { name, email, password, queueIds: currentQueueIds };
   }
 
   const user = await UpdateUserService({
