@@ -356,7 +356,7 @@ const Login = () => {
             </div>
             <Grid container justifyContent="center">
               <Grid item>
-                <Link component={RouterLink} to="/landing" style={{ color: '#F5C300', fontSize: '13px', textDecoration: 'none' }}>
+                <Link component={RouterLink} to="/daple" style={{ color: '#F5C300', fontSize: '13px', textDecoration: 'none' }}>
                   Ver nossos planos →
                 </Link>
               </Grid>
