@@ -31,6 +31,7 @@ services:
       - ./public:/app/public
       - ./brands:/app/public/brands
       - ./instances.json:/app/instances.json
+      - ./backend/logs:/usr/src/app/logs
     deploy:
       resources:
         limits:

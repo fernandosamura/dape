@@ -1,4 +1,6 @@
 import "./bootstrap";
+import fs from "fs";
+import path from "path";
 import "reflect-metadata";
 import "express-async-errors";
 import express, { Request, Response, NextFunction } from "express";
@@ -57,6 +59,21 @@ app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
     logger.warn(err);
     return res.status(err.statusCode).json({ error: err.message });
   }
+
+  const logEntry = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    message: err.message,
+    stack: err.stack,
+    method: req.method,
+    url: req.url,
+    user: req.user ? req.user.id : "unauthenticated"
+  }) + "\n";
+
+  try {
+    const logsDir = path.join(__dirname, "..", "logs");
+    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+    fs.appendFileSync(path.join(logsDir, "error.log"), logEntry);
+  } catch (_logErr) {}
 
   logger.error(err);
   return res.status(500).json({ error: "ERR_INTERNAL_SERVER_ERROR" });
