@@ -1,4 +1,5 @@
 import * as Yup from "yup";
+import { hash } from "bcryptjs";
 
 import AppError from "../../errors/AppError";
 import ShowUserService from "./ShowUserService";
@@ -61,7 +62,9 @@ const UpdateUserService = async ({
   }
 
   const updateData: any = { email, profile, name, whatsappId: whatsappId || null, allTicket };
-  if (password) updateData.password = password;
+  if (password) {
+    updateData.passwordHash = await hash(password, 8);
+  }
   await user.update(updateData);
 
   await user.$set("queues", queueIds);
