@@ -813,8 +813,9 @@ const handleOpenAi = async (
       baseUrl: prompt.baseUrl
     });
 
+    let transferToQueue1 = false;
     if (response?.includes("Ação: Transferir para o setor de atendimento")) {
-      await transferQueue(prompt.queueId, ticket, contact);
+      transferToQueue1 = true;
       response = response
         .replace("Ação: Transferir para o setor de atendimento", "")
         .trim();
@@ -858,6 +859,11 @@ const handleOpenAi = async (
         });
         await verifyMessage(sentMessage!, ticket, contact);
       }
+    }
+
+    if (transferToQueue1 && prompt.queueId) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await transferQueue(prompt.queueId, ticket, contact);
     }
 
   } else if (msg.message?.audioMessage) {
@@ -946,8 +952,9 @@ const handleOpenAi = async (
       baseUrl: prompt.baseUrl
     });
 
+    let transferToQueue2 = false;
     if (response?.includes("Ação: Transferir para o setor de atendimento")) {
-      await transferQueue(prompt.queueId, ticket, contact);
+      transferToQueue2 = true;
       response = response
         .replace("Ação: Transferir para o setor de atendimento", "")
         .trim();
@@ -989,6 +996,11 @@ const handleOpenAi = async (
         });
         await verifyMessage(sentMessage!, ticket, contact);
       }
+    }
+
+    if (transferToQueue2 && prompt.queueId) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await transferQueue(prompt.queueId, ticket, contact);
     }
   }
   messagesAI = [];

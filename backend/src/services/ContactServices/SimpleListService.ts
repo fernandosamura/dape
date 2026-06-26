@@ -24,7 +24,7 @@ const SimpleListService = async ({ name, companyId }: SearchContactParams): Prom
 
   options.where = {
     ...options.where,
-    companyId
+    companyId: companyId || -1 // Força ID inexistente se não fornecido
   }
 
   const contacts = await Contact.findAll(options);
