@@ -65,7 +65,7 @@ const Routes = () => {
       <AuthProvider>
         <TicketsContextProvider>
           <Switch>
-            <Route exact path="/landing" component={Landing} />
+            <Route exact path="/daple" component={Landing} />
             <Route exact path="/login" component={Login} />
             <Route exact path="/signup" component={Signup} />
             <Route exact path="/forgetpsw" component={ForgetPassword} />
