@@ -758,6 +758,8 @@ const handleOpenAi = async (
 
   if (msg.messageStubType) return;
 
+  const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
+
   const publicFolder: string = path.resolve(
     __dirname,
     "..",
@@ -861,9 +863,13 @@ const handleOpenAi = async (
       }
     }
 
-    if (transferToQueue1 && prompt.queueId) {
+    if (transferToQueue1) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      await transferQueue(prompt.queueId, ticket, contact);
+      if (whatsapp?.transferQueueId) {
+        await transferQueue(whatsapp.transferQueueId, ticket, contact);
+      } else if (prompt.queueId) {
+        await transferQueue(prompt.queueId, ticket, contact);
+      }
     }
 
   } else if (msg.message?.audioMessage) {
@@ -998,9 +1004,13 @@ const handleOpenAi = async (
       }
     }
 
-    if (transferToQueue2 && prompt.queueId) {
+    if (transferToQueue2) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      await transferQueue(prompt.queueId, ticket, contact);
+      if (whatsapp?.transferQueueId) {
+        await transferQueue(whatsapp.transferQueueId, ticket, contact);
+      } else if (prompt.queueId) {
+        await transferQueue(prompt.queueId, ticket, contact);
+      }
     }
   }
   messagesAI = [];
