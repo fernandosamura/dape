@@ -183,3 +183,55 @@ Conteudo: public/ (midias .oga), brands/, instances.json, .env, backend/.env, du
 ### Commits desta sessao
 - a33cb53 feat: migra armazenamento de arquivos para Cloudflare R2
 - a8f18a1 fix: corrige 3 bugs criticos na integracao R2 com modulo de IA
+
+---
+
+## Sessao 2026-06-26 — Landing Page Mobile + Bug Troca de Senha
+
+### 1. Landing Page — Layout Mobile dos Planos (grid inline style)
+- **Problema:** Cards de planos apareciam lado a lado no celular e saiam do layout
+- **Causa:** Container dos planos usava inline style com `grid-template-columns:repeat(4,1fr)` e class `rv` — nao tinha class `plans-grid`, entao o media query existente nao funcionava
+- **Fix:** Adicionada regra CSS com `!important` no media query `@media(max-width:900px)` para `.plans-section .inner>div[style]`
+- Commit: 9b8f170
+
+### 2. Landing Page — Layout Mobile dos Cards Intelligence + Radar Comercial
+- **Problema:** Cards "Intelligence — Score de Leads" e "Radar Comercial" apareciam lado a lado no celular
+- **Causa:** Container desses dois cards usava inline style `grid-template-columns:1fr 1fr` (secao separada do intel-grid principal)
+- **Fix:** Adicionada class `intel-sub-grid` ao container + regra CSS `.intel-sub-grid{grid-template-columns:1fr !important}` no media query mobile
+- Commit: 80630fc
+
+### 3. Bug Critico — Troca de Senha pelo Proprio Usuario (4 correcoes)
+
+#### Fix 1 — UserController.ts: permissao negada (403)
+- Qualquer usuario nao-admin recebia ERR_NO_PERMISSION ao tentar editar o proprio perfil
+- Corrigido: verificacao `isSelf` permite que usuario edite a si mesmo
+- Seguranca: campos `profile`, `queueIds`, `whatsappId` filtrados para nao-admins
+- Commit: 4c52ba6
+
+#### Fix 2 — UpdateUserService.ts: hash nao persistia no banco (campo VIRTUAL)
+- `password` e DataType.VIRTUAL no Sequelize v5 — o hook BeforeUpdate gera `passwordHash` mas nao entra no UPDATE SQL
+- Corrigido: `import { hash } from "bcryptjs"` + `updateData.passwordHash = await hash(password, 8)` antes do `user.update()`
+- Commit: cfed0ec
+
+#### Fix 3 — UpdateUserService.ts: erro 400 por companyId undefined
+- Apos Fix 1, o controller filtra o body para `{name, email, password}` — sem `companyId`
+- Verificacao `userData.companyId !== companyId` falhava com `undefined !== 2`
+- Corrigido: verificacao so executada se `userData.companyId !== undefined`
+- Commit: c637369
+
+#### Fix 4 — UserController.ts: filas apagadas apos salvar perfil
+- Com Fix 1, queueIds chegava como array vazio ao UpdateUserService, que executava `user.$set("queues", [])` apagando todas as filas
+- Corrigido: ao editar a si mesmo, busca as filas atuais do usuario no banco e as preserva no userData
+- Commit: 151954a
+
+## Commits desta sessao
+- 9b8f170 fix: corrige layout mobile dos planos (grid inline style override)
+- 80630fc fix: corrige mobile — cards Intelligence+Radar aparecem 1 por coluna
+- 4c52ba6 fix: permite que usuario comum edite o proprio perfil e senha
+- cfed0ec fix: corrige persistencia do hash de senha no UpdateUserService (campo VIRTUAL Sequelize v5)
+- c637369 fix: corrige verificacao de empresa no UpdateUserService para edicao de perfil proprio
+- 151954a fix: preserva filas do usuario ao editar o proprio perfil
+
+## Proxima tarefa
+- Testar fluxo completo de troca de senha pelo proprio usuario em producao
+- Monitorar logs do backend apos as correcoes
