@@ -25,6 +25,7 @@ import Message from "../../models/Message";
 import { getIO } from "../../libs/socket";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import { logger } from "../../utils/logger";
+import { moduleAccessService as moduleAccess } from "../../dape/shared/moduleAccess.service";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
@@ -738,6 +739,15 @@ const handleOpenAi = async (
 
   // REGRA PARA DESABILITAR O BOT PARA ALGUM CONTATO
   if (contact.disableBot) {
+    return;
+  }
+
+  // Verificação de acesso ao módulo de IA por plano
+  const hasIaAccess = await moduleAccess.checkAccess(ticket.companyId, 'dape_ia');
+  if (!hasIaAccess) {
+    logger.info(
+      `[handleOpenAi] Empresa ${ticket.companyId} sem módulo dape_ia ativo — chatbot bloqueado para ticket ${ticket.id}`
+    );
     return;
   }
 
