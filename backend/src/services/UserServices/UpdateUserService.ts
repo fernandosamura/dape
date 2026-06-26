@@ -41,7 +41,11 @@ const UpdateUserService = async ({
 
   const requestUser = await User.findByPk(requestUserId);
 
-  if (requestUser.super === false && userData.companyId !== companyId) {
+  if (
+    requestUser.super === false &&
+    userData.companyId !== undefined &&
+    userData.companyId !== companyId
+  ) {
     throw new AppError("O usuário não pertence à esta empresa");
   }
 
