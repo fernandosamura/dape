@@ -101,13 +101,22 @@ export const update = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  if (req.user.profile !== "admin") {
+  const isSelf = String(req.user.id) === String(req.params.userId);
+  const isAdmin = req.user.profile === "admin";
+
+  if (!isAdmin && !isSelf) {
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 
   const { id: requestUserId, companyId } = req.user;
   const { userId } = req.params;
-  const userData = req.body;
+  let userData = req.body;
+
+  // Usuário comum editando a si mesmo: permite apenas name, email e password
+  if (!isAdmin && isSelf) {
+    const { name, email, password } = userData;
+    userData = { name, email, password };
+  }
 
   const user = await UpdateUserService({
     userData,
