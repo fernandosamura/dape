@@ -126,9 +126,17 @@ export const findFilteredList = async (
 ): Promise<Response> => {
   try {
     const { contactId, ticketId } = req.query as QueryFilteredNotes;
+
+    const parsedContactId = parseInt(String(contactId), 10);
+    const parsedTicketId = parseInt(String(ticketId), 10);
+
+    if (isNaN(parsedContactId) || isNaN(parsedTicketId)) {
+      return res.status(200).json([]);
+    }
+
     const notes: TicketNote[] = await FindNotesByContactIdAndTicketId({
-      contactId,
-      ticketId
+      contactId: parsedContactId,
+      ticketId: parsedTicketId
     });
 
     return res.status(200).json(notes);

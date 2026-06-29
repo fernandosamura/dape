@@ -175,6 +175,11 @@ export const showFromUUID = async (
   const { uuid } = req.params;
   const { companyId } = req.user;
 
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuid || !UUID_REGEX.test(uuid)) {
+    return res.status(400).json({ error: "ERR_INVALID_TICKET_UUID" });
+  }
+
   const ticket: Ticket = await ShowTicketUUIDService(uuid, companyId);
 
   return res.status(200).json(ticket);
