@@ -6,12 +6,16 @@ import toastError from "../../../errors/toastError";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const RISK_CONFIG = {
-  low:    { label: "Baixo",  bg: "#D1FAE5", color: "#065F46" },
-  medium: { label: "Médio",  bg: "#FEF3C7", color: "#92400E" },
-  high:   { label: "Alto",   bg: "#FEE2E2", color: "#991B1B" },
+  low:      { label: "Baixo",    bg: "#D1FAE5", color: "#065F46" },
+  medium:   { label: "Médio",    bg: "#FEF3C7", color: "#92400E" },
+  high:     { label: "Alto",     bg: "#FEE2E2", color: "#991B1B" },
+  critical: { label: "Crítico",  bg: "#7F1D1D", color: "#FEF2F2" },
 };
 
-function getRiskLevel(quarantine, counters, config) {
+function getRiskLevel(quarantine, counters, config, apiRisk) {
+  // Prefer API-provided risk level if available
+  if (apiRisk?.level) return apiRisk.level.toLowerCase();
+  // fallback to existing logic
   if (quarantine) return "high";
   if (!config) return "low";
   const dayCounter = (counters || []).find(c => c.window_type === "day");
@@ -334,7 +338,7 @@ function ShieldDashboard() {
     const row = counters.find(c => c.window_type === type);
     return row ? Number(row.count) : 0;
   };
-  const riskLevel = getRiskLevel(status?.quarantine, counters, status?.config);
+  const riskLevel = getRiskLevel(status?.quarantine, counters, status?.config, status?.risk);
 
   const selectStyle = {
     padding: "8px 12px", border: "1px solid #D1D5DB", borderRadius: 8,
@@ -352,6 +356,16 @@ function ShieldDashboard() {
 
   return (
     <div style={{ padding: "12px 16px", fontFamily: "inherit", background: "#F9FAFB", minHeight: "100vh" }}>
+      {/* High risk alert banner */}
+      {status?.risk?.level === "HIGH" || status?.risk?.level === "CRITICAL" ? (
+        <div style={{
+          background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: 10,
+          padding: "12px 18px", marginBottom: 18, color: "#991B1B", fontWeight: 600,
+          fontSize: 14, display: "flex", alignItems: "center", gap: 10,
+        }}>
+          ⚠️ Uma ou mais conexões estão em nível de risco elevado. Verifique o Shield.
+        </div>
+      ) : null}
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
         <div>
@@ -428,6 +442,7 @@ function ShieldDashboard() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 12, color: "#6B7280" }}>Nível de risco:</span>
                   <RiskChip level={riskLevel} />
+                  <span style={{ fontSize: 12, color: "#6B7280" }}>Score: {status?.risk?.score ?? 0}/100</span>
                 </div>
               )}
             </div>

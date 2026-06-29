@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { QueryTypes } from "sequelize";
 import sequelize from "../../database";
+import { calculateConnectionRisk } from "./dapleShield.service";
 
 export const getShieldConfig = async (req: Request, res: Response): Promise<Response> => {
   const { companyId } = req.user;
@@ -111,10 +112,12 @@ export const getShieldStatus = async (req: Request, res: Response): Promise<Resp
       { replacements: { wid: whatsappId }, type: QueryTypes.SELECT }
     ),
   ]);
+  const risk = await calculateConnectionRisk(companyId, Number(whatsappId));
   return res.json({
     config: config[0] ?? null,
     counters: countersRaw,
     quarantine: quarantine[0] ?? null,
+    risk,
   });
 };
 
