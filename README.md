@@ -1,20 +1,17 @@
-# Atendechat
+# Daple
 
-O Atendechat é uma empresa distribuidora de White Label que possui uma solução de atendimentos via Whatsapp que aumenta a produtividade e organização das equipes
+O Daple é uma plataforma de atendimento via WhatsApp que aumenta a produtividade e organização das equipes.
 
 ## 🚀 Começando
 
-O repositório do Atendechat possui 3 pastas importantes:
+O repositório do Daple possui 3 pastas importantes:
 - backend
 - frontend
 - instalador
 
 O backend é feito em Express e possui toda a estrutura organizada dentro dessa pasta para que seja aplicado no ambiente do cliente. A pasta de frontend contém todo o framework do React.js que gerencia toda a interação com o usuário do sistema.
 
-A pasta de instalador dentro dessa repositório é uma cópia do instalador usado para que os clientes de sistemas possam fazer o clone dentro da pasta home de seus servidores e seguirem com a instalação automática de todas as dependências do projeto
-
-Link para o repositório do instalador atualizado:
-- [Instalador](https://github.com/atendechat-org/instalador)
+A pasta de instalador dentro desse repositório é uma cópia do instalador usado para que os clientes de sistemas possam fazer o clone dentro da pasta home de seus servidores e seguirem com a instalação automática de todas as dependências do projeto.
 
 Consulte **[Implantação](#-implanta%C3%A7%C3%A3o)** para saber como implantar o projeto.
 
@@ -161,7 +158,6 @@ pm2 save
 
 ## 🛠️ Construído com
 
-
 * [Express](https://expressjs.com/pt-br/) - O framework backend usado
 * [React](https://react.dev/) - Framework frontend usado
 * [NPM](https://www.npmjs.com/) - Gerenciador de dependências
@@ -176,8 +172,6 @@ Versão 1.0.0
 
 ## 📄 Licença
 
-Este projeto está sob a licença
+Este projeto está sob a licença MIT.
 
-⌨️ com ❤️ por [Atendechat](https://atendechat.com) 😊
-
-Todos os direitos reservados a https://atendechat.com
+⌨️ com ❤️ por Daple 😊

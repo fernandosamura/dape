@@ -256,7 +256,7 @@ export async function convertToContact(
   let contactId: number | null = null;
 
   try {
-    // Try to create a Contact in native AtendeChat (company = companyId)
+    // Try to create a Contact in native Daple (company = companyId)
     const existing = await sequelize.query<{ id: number }>(
       `SELECT id FROM "Contacts" WHERE number = :phone AND "companyId" = :companyId LIMIT 1`,
       { replacements: { phone: opp.phone || "", companyId }, type: QueryTypes.SELECT }

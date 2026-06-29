@@ -14,8 +14,8 @@
     "test": "NODE_ENV=test jest",
     "posttest": "NODE_ENV=test sequelize db:migrate:undo:all",
     "lint": "eslint src/**/*.ts",
-    "docker:push": "docker buildx build --platform linux/amd64,linux/arm64 -t rafaeldomenegueti/atendechat-backend:latest . --push",
-    "docker:push:hml": "docker buildx build --platform linux/amd64,linux/arm64 -t rafaeldomenegueti/atendechat-backend:hml . --push"
+    "docker:push": "docker buildx build --platform linux/amd64,linux/arm64 -t rafaeldomenegueti/daple-backend:latest . --push",
+    "docker:push:hml": "docker buildx build --platform linux/amd64,linux/arm64 -t rafaeldomenegueti/daple-backend:hml . --push"
   },
   "author": "",
   "license": "MIT",
