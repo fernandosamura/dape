@@ -49,6 +49,7 @@ import DapeIntelligencePage from "../pages/dape/DapeIntelligencePage";
 import DapeRadarPage from "../pages/dape/DapeRadarPage";
 import DapeKanbanPage from "../pages/dape/DapeKanbanPage";
 import DapeBillingPage from "../pages/dape/DapeBillingPage";
+import DapeShieldPage from "../pages/dape/DapeShieldPage";
 
 const Routes = () => {
   const [showCampaigns, setShowCampaigns] = useState(false);
@@ -152,6 +153,7 @@ const Routes = () => {
                 <Route exact path="/dape/kanban" component={DapeKanbanPage} isPrivate />
                 <Route exact path="/dape/master" component={DapeMasterPanel} isPrivate />
                 <Route exact path="/dape/billing" component={DapeBillingPage} isPrivate />
+                <Route exact path="/dape/shield" component={DapeShieldPage} isPrivate />
                 {showCampaigns && (
                   <>
                     <Route

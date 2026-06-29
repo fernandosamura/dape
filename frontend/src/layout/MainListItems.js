@@ -36,6 +36,7 @@ import BarChartIcon from "@material-ui/icons/BarChart";
 import TrackChangesIcon from "@material-ui/icons/TrackChanges";
 import BusinessIcon from "@material-ui/icons/Business";
 import TrackChangesOutlinedIcon from "@material-ui/icons/TrackChanges";
+import SecurityIcon from "@material-ui/icons/Security";
 import RotateRight from "@material-ui/icons/RotateRight";
 import { i18n } from "../translate/i18n";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
@@ -167,7 +168,7 @@ const MainListItems = (props) => {
   const classes = useStyles();
   const { drawerClose, collapsed } = props;
   const { whatsApps } = useContext(WhatsAppsContext);
-  const { hasPipeline, hasAnalytics, hasGrowth, hasIntelligence, hasRadar } = useDapeModules();
+  const { hasPipeline, hasAnalytics, hasGrowth, hasIntelligence, hasRadar, hasModule } = useDapeModules();
   const { user, handleLogout } = useContext(AuthContext);
   const [connectionWarning, setConnectionWarning] = useState(false);
   const [openCampaignSubmenu, setOpenCampaignSubmenu] = useState(false);
@@ -629,6 +630,13 @@ const MainListItems = (props) => {
                 to="/dape/radar"
                 primary="Radar"
                 icon={<TrackChangesOutlinedIcon />}
+              />
+            )}
+            {hasModule("dape_shield") && (
+              <ListItemLink
+                to="/dape/shield"
+                primary="DAPLE Shield"
+                icon={<SecurityIcon />}
               />
             )}
             {user.super && (
