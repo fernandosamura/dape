@@ -5,6 +5,8 @@ import { isNumeric, sleep, validaCpfCnpj, sendMessageImage } from "../WbotServic
 import formatBody from "../../helpers/Mustache";
 import axios from "axios";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
+import { logger } from "../../utils/logger";
 
 export interface IxcSettings {
   urlixc: string;
@@ -20,6 +22,19 @@ export const handleIxcBoleto = async (
 ): Promise<void> => {
   const { urlixc, ixckeybase64 } = settings;
   if (!urlixc || !ixckeybase64) return;
+
+  // DAPLE Shield — blocking check before any integration sends
+  const shieldResult = await dapleShield.evaluate({
+    companyId: ticket.companyId,
+    whatsappId: ticket.whatsappId,
+    source: "integration",
+    ticketId: ticket.id,
+    contactNumber: ticket.contact?.number
+  });
+  if (!shieldResult.allowed) {
+    logger.warn(`[DapleShield] Envio bloqueado (ixc boleto integration): ${shieldResult.reason}`);
+    return;
+  }
 
   let numberCPFCNPJ = cpfcnpj;
 
@@ -541,6 +556,19 @@ export const handleIxcReligue = async (
 ): Promise<void> => {
   const { urlixc, ixckeybase64 } = settings;
   if (!urlixc || !ixckeybase64) return;
+
+  // DAPLE Shield — blocking check before any integration sends
+  const shieldResultReligue = await dapleShield.evaluate({
+    companyId: ticket.companyId,
+    whatsappId: ticket.whatsappId,
+    source: "integration",
+    ticketId: ticket.id,
+    contactNumber: ticket.contact?.number
+  });
+  if (!shieldResultReligue.allowed) {
+    logger.warn(`[DapleShield] Envio bloqueado (ixc religue integration): ${shieldResultReligue.reason}`);
+    return;
+  }
 
   let numberCPFCNPJ = cpfcnpj;
 

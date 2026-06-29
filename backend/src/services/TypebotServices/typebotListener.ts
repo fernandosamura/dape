@@ -6,6 +6,7 @@ import { getBodyMessage } from "../WbotServices/wbotMessageListener";
 import { logger } from "../../utils/logger";
 import { isNil } from "lodash";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
 
 
 type Session = WASocket & {
@@ -28,6 +29,20 @@ const typebotListener = async ({
 }: Request): Promise<void> => {
 
     if (msg.key.remoteJid === 'status@broadcast') return;
+
+    // DAPLE Shield — blocking check before any typebot sends
+    if (wbot.id) {
+      const shieldResult = await dapleShield.evaluate({
+        companyId: ticket.companyId,
+        whatsappId: wbot.id,
+        source: "typebot",
+        ticketId: ticket.id
+      });
+      if (!shieldResult.allowed) {
+        logger.warn(`[DapleShield] Envio bloqueado (typebot): ${shieldResult.reason}`);
+        return;
+      }
+    }
 
     const { urlN8N: url,
         typebotExpires,
@@ -403,6 +418,9 @@ const typebotListener = async ({
         }
     } catch (error) {
         logger.info("Error on typebotListener: ", error);
+        if (wbot.id) {
+          await dapleShield.reportSendError(wbot.id, ticket.companyId, String(error));
+        }
         await ticket.update({
             typebotSessionId: null
         })

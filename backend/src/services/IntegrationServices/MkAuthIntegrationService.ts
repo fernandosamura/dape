@@ -7,6 +7,8 @@ import axios from "axios";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import puppeteer from "puppeteer";
 import fs from "fs";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
+import { logger } from "../../utils/logger";
 
 export interface MkAuthSettings {
   urlmkauth: string;
@@ -24,6 +26,19 @@ export const handleMkAuthBoleto = async (
 ): Promise<void> => {
   const { urlmkauth, url, clientId: Client_Id, clientSecret: Client_Secret } = settings;
   let numberCPFCNPJ = cpfcnpj;
+
+  // DAPLE Shield — blocking check before any integration sends
+  const shieldResult = await dapleShield.evaluate({
+    companyId: ticket.companyId,
+    whatsappId: ticket.whatsappId,
+    source: "integration",
+    ticketId: ticket.id,
+    contactNumber: ticket.contact?.number
+  });
+  if (!shieldResult.allowed) {
+    logger.warn(`[DapleShield] Envio bloqueado (mkauth integration): ${shieldResult.reason}`);
+    return;
+  }
 
   if (urlmkauth != "" && Client_Id != "" && Client_Secret != "") {
     if (isNumeric(numberCPFCNPJ) === true) {

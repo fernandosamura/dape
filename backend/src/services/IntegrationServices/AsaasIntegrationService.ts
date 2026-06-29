@@ -5,6 +5,8 @@ import { isNumeric, sleep, validaCpfCnpj, sendMessageImage } from "../WbotServic
 import formatBody from "../../helpers/Mustache";
 import axios from "axios";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
+import { logger } from "../../utils/logger";
 
 export interface AsaasSettings {
   asaastk: string;
@@ -19,6 +21,19 @@ export const handleAsaasBoleto = async (
 ): Promise<void> => {
   const { asaastk } = settings;
   let numberCPFCNPJ = cpfcnpj;
+
+  // DAPLE Shield — blocking check before any integration sends
+  const shieldResult = await dapleShield.evaluate({
+    companyId: ticket.companyId,
+    whatsappId: ticket.whatsappId,
+    source: "integration",
+    ticketId: ticket.id,
+    contactNumber: ticket.contact?.number
+  });
+  if (!shieldResult.allowed) {
+    logger.warn(`[DapleShield] Envio bloqueado (asaas integration): ${shieldResult.reason}`);
+    return;
+  }
 
   if (asaastk !== "") {
     if (isNumeric(numberCPFCNPJ) === true) {

@@ -34,8 +34,8 @@ The Shield service (`dapleShield`) exposes:
 | `src/services/WbotServices/wbotMessageListener.ts` | `sendWithTypingDelay` | ai/bot | ✅ YES (via handleOpenAi) | HIGH | Shield is evaluated in `handleOpenAi` before this is called |
 | `src/services/WbotServices/wbotMessageListener.ts` | `sendMessageImage` | bot/flow | ⚠️ NO (indirect) | MEDIUM | Called from within chatbot/flow context; shield applied at calling function level |
 | `src/services/WbotServices/wbotMessageListener.ts` | `sendMessageLink` | bot/flow | ⚠️ NO (indirect) | MEDIUM | Called from within chatbot/flow context; shield applied at calling function level |
-| `src/services/WbotServices/wbotMessageListener.ts` | Out-of-hours messages (company/queue) | bot | ⚠️ NO (partial) | MEDIUM | These are inside `handleMessageUpsert` — same ticket context. Shield via `verifyQueue`/`handleChartbot` covers most paths. Low volume, fail-open safe. |
-| `src/services/WbotServices/wbotMessageListener.ts` | Greeting message (connection-level) | bot | ⚠️ NO | LOW | Simple greeting at connection open — very low rate, fail-open acceptable. |
+| `src/services/WbotServices/wbotMessageListener.ts` | Out-of-hours messages (company/queue) | bot | ✅ YES (non-blocking) | MEDIUM | Added non-blocking shield in `handleMessage` before scheduling block — source: "bot". Logs warning but does not block send. |
+| `src/services/WbotServices/wbotMessageListener.ts` | Greeting message (connection-level) | bot | ✅ YES (non-blocking) | LOW | Covered by the same non-blocking shield evaluation added before the scheduling block in `handleMessage`. |
 | `src/services/TicketServices/UpdateTicketService.ts` | Rating message send | bot/automation | ✅ YES (blocking) | HIGH | Added shield around `SendWhatsAppMessage` for rating |
 | `src/services/TicketServices/UpdateTicketService.ts` | Completion message send | bot/automation | ✅ YES (blocking) | HIGH | Added shield around `SendWhatsAppMessage` for completion |
 | `src/services/TicketServices/UpdateTicketService.ts` | Transfer messages (queue/agent) × 4 | bot/automation | ✅ YES (blocking) | HIGH | Added single shield evaluation, all 4 `wbot.sendMessage` blocks conditioned on result |
@@ -47,17 +47,17 @@ The Shield service (`dapleShield`) exposes:
 | `src/controllers/MessageController.ts` | `store` (manual send) | manual | ✅ YES (via SendWhatsAppMessage) | MEDIUM | Calls `SendWhatsAppMessage`/`SendWhatsAppMedia` which now have non-blocking shield |
 | `src/controllers/MessageController.ts` | `send` (API send) | api | ✅ YES (via MessageQueue) | HIGH | Enqueues to `MessageQueue` which now has blocking shield |
 | `src/controllers/MessageController.ts` | `sendMessageFlow` | flow | ⚠️ NO | LOW | Enqueues to `MessageQueue` (shielded) — covered upstream |
-| `src/services/TypebotServices/typebotListener.ts` | `typebotListener` | typebot/bot | ⚠️ NO | MEDIUM | Called from `handleMessageIntegration` in wbotMessageListener — outside direct shield scope. Typebot manages its own flow; volume is request-triggered. Human review recommended. |
+| `src/services/TypebotServices/typebotListener.ts` | `typebotListener` | typebot/bot | ✅ YES (blocking) | MEDIUM | Added blocking shield at function entry (source: "typebot") — uses `wbot.id` and `ticket.companyId`. `reportSendError` added in catch block. |
 | `src/services/IntegrationsServices/OpenAiService.ts` | `handleOpenAi` (service) | ai | ⚠️ NO | MEDIUM | Separate from `handleOpenAi` in wbotMessageListener. Called from `ActionsWebhookService` which is now shielded. |
-| `src/services/IntegrationServices/MkAuthIntegrationService.ts` | Various sends | integration | ⚠️ NO | MEDIUM | External billing integration (ISP auth). Called in-context of ticket. Human review recommended for direct shield. |
-| `src/services/IntegrationServices/IxcIntegrationService.ts` | Various sends | integration | ⚠️ NO | MEDIUM | External billing integration. Same as above. |
-| `src/services/IntegrationServices/AsaasIntegrationService.ts` | Various sends | integration | ⚠️ NO | MEDIUM | External payment integration. Same as above. |
+| `src/services/IntegrationServices/MkAuthIntegrationService.ts` | Various sends | integration | ✅ YES (blocking) | MEDIUM | Added blocking shield at function entry (source: "integration") — uses `ticket.companyId` and `ticket.whatsappId`. |
+| `src/services/IntegrationServices/IxcIntegrationService.ts` | Various sends (boleto + religue) | integration | ✅ YES (blocking) | MEDIUM | Added blocking shield at entry of both `handleIxcBoleto` and `handleIxcReligue` (source: "integration"). |
+| `src/services/IntegrationServices/AsaasIntegrationService.ts` | Various sends | integration | ✅ YES (blocking) | MEDIUM | Added blocking shield at function entry (source: "integration") — uses `ticket.companyId` and `ticket.whatsappId`. |
 
 ---
 
 ## Changes Made
 
-### Files Modified (8)
+### Files Modified (11)
 
 1. **`/tmp/dape_push/backend/src/services/WbotServices/SendWhatsAppMessage.ts`**
    - Added `import { dapleShield }` and `import { logger }`
@@ -98,6 +98,27 @@ The Shield service (`dapleShield`) exposes:
    - Added `import { dapleShield }`
    - **Added** blocking shield at top of `ActionsWebhookService` main body, before all flow node processing (source: `"flow"`)
 
+9. **`/tmp/dape_push/backend/src/services/TypebotServices/typebotListener.ts`**
+   - Added `import { dapleShield }` from shield service
+   - **Added** blocking shield at function entry (source: `"typebot"`) using `wbot.id` and `ticket.companyId`
+   - **Added** `reportSendError()` call in catch block
+
+10. **`/tmp/dape_push/backend/src/services/IntegrationServices/MkAuthIntegrationService.ts`**
+    - Added `import { dapleShield }` and `import { logger }`
+    - **Added** blocking shield at entry of `handleMkAuthBoleto` (source: `"integration"`) using `ticket.companyId` and `ticket.whatsappId`
+
+11. **`/tmp/dape_push/backend/src/services/IntegrationServices/IxcIntegrationService.ts`**
+    - Added `import { dapleShield }` and `import { logger }`
+    - **Added** blocking shield at entry of `handleIxcBoleto` (source: `"integration"`)
+    - **Added** blocking shield at entry of `handleIxcReligue` (source: `"integration"`)
+
+12. **`/tmp/dape_push/backend/src/services/IntegrationServices/AsaasIntegrationService.ts`**
+    - Added `import { dapleShield }` and `import { logger }`
+    - **Added** blocking shield at entry of `handleAsaasBoleto` (source: `"integration"`) using `ticket.companyId` and `ticket.whatsappId`
+
+13. **`/tmp/dape_push/backend/src/services/WbotServices/wbotMessageListener.ts`** (additional, session 2)
+    - **Added** non-blocking shield evaluation in `handleMessage` before the out-of-hours scheduling block (source: `"bot"`) — covers company out-of-hours, queue out-of-hours, and connection-level greeting messages
+
 ### Files Created (1)
 
 - **`/tmp/dape_push/DAPLE_SHIELD_COVERAGE.md`** — this report
@@ -119,13 +140,19 @@ The Shield service (`dapleShield`) exposes:
 
 ## Items Requiring Human Review
 
-1. **`typebotListener.ts`** — Typebot integration sends messages directly via `wbot.sendMessage`. Shield should be added at the entry of `typebotListener` with source `"typebot"`. Deferred because it requires understanding Typebot session context to get `companyId` and `whatsappId`.
+1. **`sendMessageImage` / `sendMessageLink` in `wbotMessageListener.ts`** — These helper functions are called from bot/chatbot flows. They are indirectly covered because their callers (`handleChartbot`, `verifyQueue`) now have shield. However, if these helpers are ever called from outside a shielded context, they would be unprotected.
 
-2. **`MkAuthIntegrationService.ts`, `IxcIntegrationService.ts`, `AsaasIntegrationService.ts`** — External billing/payment integrations send messages triggered by payment events. These have access to `ticket` and `wbot` objects. Shield should be added with source `"integration"`. Deferred to avoid breaking integration business logic without full review.
+2. **`OpenAiService.ts` (IntegrationsServices)** — Called from `ActionsWebhookService` which is now shielded upstream. Direct shield not required unless called from an unshielded path in the future.
 
-3. **`sendMessageImage` / `sendMessageLink` in `wbotMessageListener.ts`** — These helper functions are called from bot/chatbot flows. They are indirectly covered because their callers (`handleChartbot`, `verifyQueue`) now have shield. However, if these helpers are ever called from outside a shielded context, they would be unprotected.
+---
 
-4. **Out-of-hours and greeting messages in `handleMessageUpsert`** — These `wbot.sendMessage` calls (~4 locations) are inside debounced closures and trigger only once per ticket/session. Volume is very low and fail-open is safe, but explicit shield could be added with `source: "bot"`.
+## Completed Items (previously deferred)
+
+1. **`typebotListener.ts`** — Implemented blocking shield at function entry with source `"typebot"`. Uses `wbot.id` as `whatsappId` and `ticket.companyId`. `reportSendError` added in catch block.
+
+2. **`MkAuthIntegrationService.ts`, `IxcIntegrationService.ts`, `AsaasIntegrationService.ts`** — Implemented blocking shield at entry of each function (and both functions in IxcIntegrationService). Source: `"integration"`. Uses `ticket.companyId` and `ticket.whatsappId`.
+
+3. **Out-of-hours and greeting messages in `handleMessage`** — Implemented non-blocking shield evaluation before the scheduling/out-of-hours block. Covers all debounced sends for company out-of-hours, queue out-of-hours, and connection-level greeting messages.
 
 ---
 
@@ -134,3 +161,5 @@ The Shield service (`dapleShield`) exposes:
 **TypeScript compilation: SUCCESS (0 errors)**
 
 Command: `./node_modules/.bin/tsc --noEmit`
+
+Last verified: 2026-06-29 (after session 2 changes)

@@ -2662,6 +2662,19 @@ const handleMessage = async (
       }
     });
 
+    // DAPLE Shield — non-blocking check for out-of-hours / greeting auto-responses
+    const shieldAutoResponse = await dapleShield.evaluate({
+      companyId: ticket.companyId,
+      whatsappId: ticket.whatsappId,
+      source: "bot",
+      ticketId: ticket.id,
+      contactNumber: contact.number
+    });
+    if (!shieldAutoResponse.allowed) {
+      logger.warn(`[DapleShield] Alerta Shield (saudação/fora-horário, envio permitido): ${shieldAutoResponse.reason}`);
+      // non-blocking: continue execution
+    }
+
     try {
       if (!msg.key.fromMe && scheduleType) {
         /**
