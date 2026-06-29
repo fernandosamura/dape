@@ -8,6 +8,8 @@ import moment from "moment";
 import ShowTicketService from "../TicketServices/ShowTicketService";
 import { verifyMessage } from "./wbotMessageListener";
 import TicketTraking from "../../models/TicketTraking";
+import { logger } from "../../utils/logger";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
 
 export const ClosedAllOpenTickets = async (companyId: number): Promise<void> => {
 
@@ -89,9 +91,18 @@ export const ClosedAllOpenTickets = async (companyId: number): Promise<void> => 
             closeTicket(showTicket, showTicket.status, bodyExpiresMessageInactive);
 
             if (expiresInactiveMessage !== "" && expiresInactiveMessage !== undefined) {
-              const sentMessage = await SendWhatsAppMessage({ body: bodyExpiresMessageInactive, ticket: showTicket });
-
-              await verifyMessage(sentMessage, showTicket, showTicket.contact);
+              const shieldClose = await dapleShield.evaluate({
+                companyId: showTicket.companyId,
+                whatsappId: showTicket.whatsappId,
+                source: "bot",
+                ticketId: showTicket.id,
+              });
+              if (shieldClose.allowed) {
+                const sentMessage = await SendWhatsAppMessage({ body: bodyExpiresMessageInactive, ticket: showTicket });
+                await verifyMessage(sentMessage, showTicket, showTicket.contact);
+              } else {
+                logger.warn(`[DAPLE Shield] Auto-close message blocked for ticket ${showTicket.id}: ${shieldClose.reason}`);
+              }
             }
 
             await ticketTraking.update({

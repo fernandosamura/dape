@@ -10,6 +10,8 @@ import Message from "../../models/Message";
 import { lookup } from "mime-types";
 import formatBody from "../../helpers/Mustache";
 import { downloadFromR2 } from "../StorageServices/R2Service";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
+import { logger } from "../../utils/logger";
 
 interface Request {
   media: Express.Multer.File;
@@ -154,6 +156,20 @@ const SendWhatsAppMedia = async ({
 }: Request): Promise<WAMessage> => {
   let tempR2File: string | null = null;
 
+  // DAPLE Shield — manual media sends are non-blocking (log only)
+  try {
+    const shieldMedia = await dapleShield.evaluate({
+      companyId: ticket.companyId,
+      whatsappId: ticket.whatsappId,
+      source: "manual",
+      ticketId: ticket.id,
+      messagePreview: body ? body.substring(0, 200) : media?.originalname ?? "",
+    });
+    if (!shieldMedia.allowed) {
+      logger.warn(`[DAPLE Shield] Alert (manual media send allowed) for ticket ${ticket.id}: ${shieldMedia.reason}`);
+    }
+  } catch (_shieldErr) { /* shield errors must never block manual sends */ }
+
   try {
     const wbot = await GetTicketWbot(ticket);
 
@@ -242,6 +258,7 @@ const SendWhatsAppMedia = async ({
   } catch (err) {
     Sentry.captureException(err);
     console.log(err);
+    await dapleShield.reportSendError(ticket.whatsappId, ticket.companyId, String(err));
     throw new AppError("ERR_SENDING_WAPP_MSG");
   } finally {
     // Garante limpeza do arquivo temporário baixado do R2

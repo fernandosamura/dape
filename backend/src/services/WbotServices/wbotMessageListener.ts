@@ -66,6 +66,7 @@ import { FlowBuilderModel } from "../../models/FlowBuilder";
 import { FlowDefaultModel } from "../../models/FlowDefault";
 import { FlowCampaignModel } from "../../models/FlowCampaign";
 import { IOpenAi } from "../../@types/openai";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
 
 import { IConnections, INodes } from "../WebhookService/DispatchWebHookService";
 import { ActionsWebhookService } from "../WebhookService/ActionsWebhookService";
@@ -751,6 +752,18 @@ const handleOpenAi = async (
     return;
   }
 
+  // DAPLE Shield — AI auto-responses are blocking
+  const shieldResultAi = await dapleShield.evaluate({
+    companyId: ticket.companyId,
+    whatsappId: ticket.whatsappId,
+    source: "bot",
+    ticketId: ticket.id,
+  });
+  if (!shieldResultAi.allowed) {
+    logger.warn(`[DAPLE Shield] AI response blocked for ticket ${ticket.id}: ${shieldResultAi.reason}`);
+    return;
+  }
+
   const bodyMessage = getBodyMessage(msg);
 
   if (!bodyMessage) return;
@@ -1262,6 +1275,18 @@ const verifyQueue = async (
 
   const companyId = ticket.companyId;
 
+  // DAPLE Shield — automated queue/greeting messages are blocking
+  const shieldResultQueue = await dapleShield.evaluate({
+    companyId: ticket.companyId,
+    whatsappId: ticket.whatsappId,
+    source: "bot",
+    ticketId: ticket.id,
+  });
+  if (!shieldResultQueue.allowed) {
+    logger.warn(`[DAPLE Shield] Queue/greeting message blocked for ticket ${ticket.id}: ${shieldResultQueue.reason}`);
+    return;
+  }
+
   const { queues, greetingMessage, maxUseBotQueues, timeUseBotQueues } =
     await ShowWhatsAppService(wbot.id!, ticket.companyId);
 
@@ -1605,6 +1630,18 @@ const handleChartbot = async (
   wbot: Session,
   dontReadTheFirstQuestion: boolean = false
 ) => {
+  // DAPLE Shield — chatbot responses are blocking
+  const shieldResultBot = await dapleShield.evaluate({
+    companyId: ticket.companyId,
+    whatsappId: ticket.whatsappId,
+    source: "bot",
+    ticketId: ticket.id,
+  });
+  if (!shieldResultBot.allowed) {
+    logger.warn(`[DAPLE Shield] Chatbot response blocked for ticket ${ticket.id}: ${shieldResultBot.reason}`);
+    return;
+  }
+
   const queue = await Queue.findByPk(ticket.queueId, {
     include: [
       {

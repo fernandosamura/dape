@@ -12,6 +12,8 @@ import SendWhatsAppMessage from "../WbotServices/SendWhatsAppMessage";
 import FindOrCreateATicketTrakingService from "./FindOrCreateATicketTrakingService";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
 import { verifyMessage } from "../WbotServices/wbotMessageListener";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
+import { logger } from "../../utils/logger";
 import ListSettingsServiceOne from "../SettingServices/ListSettingsServiceOne"; //NOVO PLW DESIGN//
 import ShowUserService from "../UserServices/ShowUserService"; //NOVO PLW DESIGN//
 import { isNil } from "lodash";
@@ -125,7 +127,17 @@ const UpdateTicketService = async ({
           let bodyRatingMessage = `\u200e${ratingTxt}\n\n`;
           bodyRatingMessage +=
             "Digite de 1 à 3 para qualificar nosso atendimento:\n*1* - _Insatisfeito_\n*2* - _Satisfeito_\n*3* - _Muito Satisfeito_\n\n";
-          await SendWhatsAppMessage({ body: bodyRatingMessage, ticket });
+          const shieldRating = await dapleShield.evaluate({
+            companyId: ticket.companyId,
+            whatsappId: ticket.whatsappId,
+            source: "bot",
+            ticketId: ticket.id,
+          });
+          if (shieldRating.allowed) {
+            await SendWhatsAppMessage({ body: bodyRatingMessage, ticket });
+          } else {
+            logger.warn(`[DAPLE Shield] Rating message blocked for ticket ${ticket.id}: ${shieldRating.reason}`);
+          }
 
           await ticketTraking.update({
             ratingAt: moment().toDate(),
@@ -148,7 +160,17 @@ const UpdateTicketService = async ({
 
       if (!isNil(complationMessage) && complationMessage !== "") {
         const body = `\u200e${complationMessage}`;
-        await SendWhatsAppMessage({ body, ticket });
+        const shieldCompletion = await dapleShield.evaluate({
+          companyId: ticket.companyId,
+          whatsappId: ticket.whatsappId,
+          source: "bot",
+          ticketId: ticket.id,
+        });
+        if (shieldCompletion.allowed) {
+          await SendWhatsAppMessage({ body, ticket });
+        } else {
+          logger.warn(`[DAPLE Shield] Completion message blocked for ticket ${ticket.id}: ${shieldCompletion.reason}`);
+        }
       }
       await ticket.update({
         promptId: null,
@@ -173,8 +195,16 @@ const UpdateTicketService = async ({
     const settingsTransfTicket = await ListSettingsServiceOne({ companyId: companyId, key: "sendMsgTransfTicket" });
 
     if (settingsTransfTicket?.value === "enabled") {
+      // DAPLE Shield — transfer messages are automated bot messages
+      const shieldTransfer = await dapleShield.evaluate({
+        companyId: ticket.companyId,
+        whatsappId: ticket.whatsappId,
+        source: "bot",
+        ticketId: ticket.id,
+      });
+
       // Mensagem de transferencia da FILA
-      if (oldQueueId !== queueId && oldUserId === userId && !isNil(oldQueueId) && !isNil(queueId)) {
+      if (shieldTransfer.allowed && oldQueueId !== queueId && oldUserId === userId && !isNil(oldQueueId) && !isNil(queueId)) {
 
         const {language} = await Company.findByPk(companyId);
         const queue = await Queue.findByPk(queueId);
@@ -196,7 +226,7 @@ const UpdateTicketService = async ({
       }
       else
         // Mensagem de transferencia do ATENDENTE
-        if (oldUserId !== userId && oldQueueId === queueId && !isNil(oldUserId) && !isNil(userId)) {
+        if (shieldTransfer.allowed && oldUserId !== userId && oldQueueId === queueId && !isNil(oldUserId) && !isNil(userId)) {
 
           const {language} = await Company.findByPk(companyId);
           const wbot = await GetTicketWbot(ticket);
@@ -218,7 +248,7 @@ const UpdateTicketService = async ({
         }
         else
           // Mensagem de transferencia do ATENDENTE e da FILA
-          if (oldUserId !== userId && !isNil(oldUserId) && !isNil(userId) && oldQueueId !== queueId && !isNil(oldQueueId) && !isNil(queueId)) {
+          if (shieldTransfer.allowed && oldUserId !== userId && !isNil(oldUserId) && !isNil(userId) && oldQueueId !== queueId && !isNil(oldQueueId) && !isNil(queueId)) {
 
             const {language} = await Company.findByPk(companyId);
             const wbot = await GetTicketWbot(ticket);
@@ -239,7 +269,7 @@ const UpdateTicketService = async ({
             );
             await verifyMessage(queueChangedMessage, ticket, ticket.contact);
           } else
-            if (oldUserId !== undefined && isNil(userId) && oldQueueId !== queueId && !isNil(queueId)) {
+            if (shieldTransfer.allowed && oldUserId !== undefined && isNil(userId) && oldQueueId !== queueId && !isNil(queueId)) {
 
               const {language} = await Company.findByPk(companyId);
               const queue = await Queue.findByPk(queueId);

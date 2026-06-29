@@ -13,6 +13,7 @@ import Setting from "../../models/Setting";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
 import { logger } from "../../utils/logger";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
 import createOrUpdateBaileysService from "../BaileysServices/CreateOrUpdateBaileysService";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import Company from "../../models/Company";
@@ -55,10 +56,18 @@ const wbotMonitor = async (
 
           const company = await Company.findByPk(companyId);
 
-          await wbot.sendMessage(node.attrs.from, {
-            text:
-              translatedMessage[company.language],
+          const shieldCall = await dapleShield.evaluate({
+            companyId,
+            whatsappId: wbot.id!,
+            source: "bot",
           });
+          if (!shieldCall.allowed) {
+            logger.warn(`[DAPLE Shield] Call-reject auto-message blocked for company ${companyId}: ${shieldCall.reason}`);
+          } else {
+            await wbot.sendMessage(node.attrs.from, {
+              text: translatedMessage[company.language],
+            });
+          }
 
           const number = node.attrs.from.replace(/\D/g, "");
 

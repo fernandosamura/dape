@@ -7,6 +7,7 @@ import { ParamsDictionary } from "express-serve-static-core";
 import { ParsedQs } from "qs";
 import CreateContactService from "../ContactServices/CreateContactService";
 import Contact from "../../models/Contact";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
 //import CreateTicketService from "../TicketServices/CreateTicketService";
 //import CreateTicketServiceWebhook from "../TicketServices/CreateTicketServiceWebhook";
 import { SendMessage } from "../../helpers/SendMessage";
@@ -166,6 +167,18 @@ export const ActionsWebhookService = async (
     const whatsapp = await GetDefaultWhatsApp(companyId);
 
     if (whatsapp.status !== "CONNECTED") {
+      return;
+    }
+
+    // DAPLE Shield — flow/webhook automation is blocking
+    const shieldFlow = await dapleShield.evaluate({
+      companyId,
+      whatsappId: whatsapp.id,
+      source: "flow",
+      contactNumber: numberClient,
+    });
+    if (!shieldFlow.allowed) {
+      logger.warn(`[DAPLE Shield] Flow/webhook send blocked for company ${companyId}, contact ${numberClient}: ${shieldFlow.reason}`);
       return;
     }
 

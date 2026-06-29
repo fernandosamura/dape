@@ -8,6 +8,8 @@ import Ticket from "../../models/Ticket";
 import User from "../../models/User";
 
 import formatBody from "../../helpers/Mustache";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
+import { logger } from "../../utils/logger";
 
 interface Request {
   body: string;
@@ -24,6 +26,21 @@ const SendWhatsAppMessage = async ({
   userId
 }: Request): Promise<WAMessage> => {
   let options = {};
+
+  // DAPLE Shield — manual sends are non-blocking (log only)
+  try {
+    const shieldResult = await dapleShield.evaluate({
+      companyId: ticket.companyId,
+      whatsappId: ticket.whatsappId,
+      source: "manual",
+      ticketId: ticket.id,
+      messagePreview: body ? body.substring(0, 200) : "",
+    });
+    if (!shieldResult.allowed) {
+      logger.warn(`[DAPLE Shield] Alert (manual send allowed) for ticket ${ticket.id}: ${shieldResult.reason}`);
+    }
+  } catch (_shieldErr) { /* shield errors must never block manual sends */ }
+
   const wbot = await GetTicketWbot(ticket);
 
   // Determine the correct JID domain (some contacts use @lid for Advanced Privacy)
@@ -93,6 +110,7 @@ const SendWhatsAppMessage = async ({
   } catch (err) {
     Sentry.captureException(err);
     console.log(err);
+    await dapleShield.reportSendError(ticket.whatsappId, ticket.companyId, String(err));
     throw new AppError("ERR_SENDING_WAPP_MSG");
   }
 };

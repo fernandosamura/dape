@@ -87,6 +87,18 @@ async function handleSendMessage(job) {
 
     const messageData: MessageData = data.data;
 
+    const shieldDecision = await dapleShield.evaluate({
+      companyId: whatsapp.companyId,
+      whatsappId: whatsapp.id,
+      source: "api",
+      contactNumber: String(messageData.number),
+      messagePreview: (messageData.body ?? "").substring(0, 200),
+    });
+    if (!shieldDecision.allowed) {
+      logger.warn(`[DAPLE Shield] MessageQueue send blocked for ${messageData.number}: ${shieldDecision.reason}`);
+      return;
+    }
+
     await SendMessage(whatsapp, messageData);
   } catch (e: any) {
     Sentry.captureException(e);
@@ -266,6 +278,19 @@ async function handleSendScheduledMessage(job) {
 
   try {
     const whatsapp = await GetDefaultWhatsApp(schedule.companyId);
+
+    const shieldDecision = await dapleShield.evaluate({
+      companyId: schedule.companyId,
+      whatsappId: whatsapp.id,
+      source: "schedule",
+      contactNumber: schedule.contact.number,
+      messagePreview: (schedule.body ?? "").substring(0, 200),
+    });
+    if (!shieldDecision.allowed) {
+      logger.warn(`[DAPLE Shield] Scheduled message blocked for contact ${schedule.contact.number}: ${shieldDecision.reason}`);
+      await scheduleRecord?.update({ status: "ERRO" });
+      return;
+    }
 
     let filePath = null;
     if (schedule.mediaPath) {
