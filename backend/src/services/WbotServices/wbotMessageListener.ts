@@ -865,8 +865,10 @@ const handleOpenAi = async (
           prompt.voice,
           prompt.ttsProvider || "azure"
         );
+        const oggPath = `${publicFolder}/${fileNameWithOutExtension}.ogg`;
+        const audioBuffer = fs.readFileSync(oggPath);
         const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-          audio: { url: `${publicFolder}/${fileNameWithOutExtension}.ogg` },
+          audio: audioBuffer,
           mimetype: "audio/ogg; codecs=opus",
           ptt: true
         });
@@ -909,6 +911,8 @@ const handleOpenAi = async (
         r2AudioDownloaded = true;
       } catch (err) {
         logger.error(`[R2] Erro ao baixar áudio para transcrição: ${err}`);
+        const fallbackMsg = "Desculpe, não consegui processar o áudio enviado. Poderia escrever sua mensagem em texto? 😊";
+        await sendWithTypingDelay(wbot, msg.key.remoteJid!, fallbackMsg, ticket, contact);
         return;
       }
     }
@@ -935,17 +939,30 @@ const handleOpenAi = async (
       }
     } else if (aiProvider === "openai" || aiProvider === "manus") {
       // OpenAI / Manus: transcrição via Whisper
-      const file = fs.createReadStream(audioFilePath) as any;
-      const whisperConfig = new Configuration({
-        apiKey: prompt.apiKey,
-        ...(aiProvider === "manus" && prompt.baseUrl ? { basePath: prompt.baseUrl } : {})
-      });
-      const openaiWhisper = new OpenAIApi(whisperConfig);
-      const transcription = await openaiWhisper.createTranscription(file, "whisper-1");
-      transcribedText = transcription.data.text;
+      try {
+        const file = fs.createReadStream(audioFilePath) as any;
+        const whisperConfig = new Configuration({
+          apiKey: prompt.apiKey,
+          ...(aiProvider === "manus" && prompt.baseUrl ? { basePath: prompt.baseUrl } : {})
+        });
+        const openaiWhisper = new OpenAIApi(whisperConfig);
+        const transcription = await openaiWhisper.createTranscription(file, "whisper-1");
+        transcribedText = transcription.data.text;
+      } catch (err) {
+        logger.error(`[AI] Erro na transcrição Whisper: ${err}`);
+        transcribedText = "";
+      }
     } else {
       // Anthropic não suporta transcrição de áudio nativa
       logger.info(`[AI] Transcrição de áudio não suportada para provider: ${aiProvider}`);
+      return;
+    }
+
+    // Fallback: se transcrição falhou ou retornou vazio, avisar o usuário
+    if (!transcribedText || transcribedText.trim() === "") {
+      const fallbackMsg = "Desculpe, não consegui ouvir o áudio enviado. Poderia escrever sua mensagem em texto para que eu possa te ajudar? 😊";
+      await sendWithTypingDelay(wbot, msg.key.remoteJid!, fallbackMsg, ticket, contact);
+      if (r2AudioDownloaded) deleteFileSync(audioFilePath);
       return;
     }
 
@@ -1004,8 +1021,10 @@ const handleOpenAi = async (
           prompt.voice,
           prompt.ttsProvider || "azure"
         );
+        const oggPath = `${publicFolder}/${fileNameWithOutExtension}.ogg`;
+        const audioBuffer = fs.readFileSync(oggPath);
         const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-          audio: { url: `${publicFolder}/${fileNameWithOutExtension}.ogg` },
+          audio: audioBuffer,
           mimetype: "audio/ogg; codecs=opus",
           ptt: true
         });
@@ -1030,7 +1049,102 @@ const handleOpenAi = async (
 
     if (transferToQueue2 && targetQueueId2) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      await transferQueue(targetQueueId2, ticket, contact);
+      await transferQueue(targetQueueId2!, ticket, contact);
+    }
+  } else if (msg.message?.imageMessage || msg.message?.videoMessage) {
+    // Análise de imagem/vídeo: Gemini (vision nativo) ou OpenAI GPT-4V
+    const mediaUrl = mediaSent?.mediaUrl?.split("/").pop();
+    const mediaFilePath = mediaUrl ? `${publicFolder}/${mediaUrl}` : null;
+    let visionDescription = "";
+
+    if (mediaFilePath && fs.existsSync(mediaFilePath)) {
+      try {
+        if (aiProvider === "gemini") {
+          const { GoogleGenerativeAI } = require("@google/generative-ai");
+          const fileBuffer = fs.readFileSync(mediaFilePath);
+          const fileBase64 = fileBuffer.toString("base64");
+          const mimeType = msg.message?.imageMessage ? "image/jpeg" : "video/mp4";
+          const genAI = new GoogleGenerativeAI(prompt.apiKey);
+          const geminiModel = genAI.getGenerativeModel({ model: aiModel });
+          const result = await geminiModel.generateContent([
+            { text: "Descreva o conteúdo desta mídia de forma objetiva para contexto de atendimento ao cliente." },
+            { inlineData: { mimeType, data: fileBase64 } }
+          ]);
+          visionDescription = result.response.text().trim();
+          logger.info(`[AI] Gemini descreveu mídia: "${visionDescription.slice(0, 80)}..."`);
+        } else if (aiProvider === "openai" || aiProvider === "manus") {
+          // GPT-4V / GPT-4o via image_url (base64)
+          const fileBuffer = fs.readFileSync(mediaFilePath);
+          const fileBase64 = fileBuffer.toString("base64");
+          const config = new Configuration({
+            apiKey: prompt.apiKey,
+            ...(aiProvider === "manus" && prompt.baseUrl ? { basePath: prompt.baseUrl } : {})
+          });
+          const openaiVision = new OpenAIApi(config);
+          const visionResponse = await openaiVision.createChatCompletion({
+            model: aiModel,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: "Descreva o conteúdo desta imagem de forma objetiva para contexto de atendimento ao cliente." },
+                  { type: "image_url", image_url: { url: `data:image/jpeg;base64,${fileBase64}` } }
+                ] as any
+              }
+            ],
+            max_tokens: 300
+          });
+          visionDescription = visionResponse.data.choices[0]?.message?.content ?? "";
+        }
+      } catch (err) {
+        logger.error(`[AI] Erro na análise de imagem/vídeo: ${err}`);
+        visionDescription = "";
+      }
+    }
+
+    // Fallback se análise falhou ou arquivo não existe
+    if (!visionDescription) {
+      const mediaType = msg.message?.imageMessage ? "imagem" : "vídeo";
+      const fallbackMsg = `Desculpe, não consegui visualizar a ${mediaType} enviada. Poderia descrever o que precisa em texto para que eu possa te ajudar? 😊`;
+      await sendWithTypingDelay(wbot, msg.key.remoteJid!, fallbackMsg, ticket, contact);
+      return;
+    }
+
+    // Contexto com descrição da mídia + histórico de texto
+    const caption = msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || "";
+    const userContent = caption
+      ? `[Imagem/vídeo enviado — descrição: ${visionDescription}]\nLegenda do usuário: ${caption}`
+      : `[Imagem/vídeo enviado — descrição: ${visionDescription}]`;
+
+    messagesAI = [];
+    messagesAI.push({ role: "system", content: promptSystem });
+    for (let i = 0; i < Math.min(maxMessages, messages.length); i++) {
+      const message = messages[i];
+      if (message.mediaType === "conversation" || message.mediaType === "extendedTextMessage") {
+        messagesAI.push({ role: message.fromMe ? "assistant" : "user", content: message.body });
+      }
+    }
+    messagesAI.push({ role: "user", content: userContent });
+
+    let response = await callAIProvider({
+      provider: aiProvider,
+      apiKey: prompt.apiKey,
+      model: aiModel,
+      messages: messagesAI,
+      maxTokens: prompt.maxTokens,
+      temperature: prompt.temperature,
+      baseUrl: prompt.baseUrl
+    });
+
+    const transferMatchImg = response?.match(/Ação: Transferir para (\d+)/);
+    if (transferMatchImg) {
+      const targetQueueIdImg = parseInt(transferMatchImg[1]);
+      response = response.replace(/Ação: Transferir para \d+/, "").trim();
+      await sendWithTypingDelay(wbot, msg.key.remoteJid!, response!, ticket, contact);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await transferQueue(targetQueueIdImg, ticket, contact);
+    } else {
+      await sendWithTypingDelay(wbot, msg.key.remoteJid!, response!, ticket, contact);
     }
   }
   messagesAI = [];
