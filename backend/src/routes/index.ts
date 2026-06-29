@@ -37,6 +37,7 @@ import flowCampaignRoutes from "./flowCampaignRoutes";
 import webHookRoutes from "./webHookRoutes";
 import dapeRoutes from "../dape/dape.routes";
 import { handleAsaasWebhook } from "../dape/billing/billingWebhook.controller";
+import metaCloudRoutes from "./metaCloud.routes";
 
 const routes = Router();
 
@@ -79,4 +80,6 @@ routes.use("/webhook", webHookRoutes);
 routes.post("/webhooks/asaas", handleAsaasWebhook);
 
 routes.use("/dape", dapeRoutes);
+routes.use(metaCloudRoutes);
+
 export default routes;

@@ -19,6 +19,7 @@ import SendWhatsAppMedia from "../services/WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
 import SendFacebookMessage from "../services/FacebookServices/SendFacebookMessage";
 import SendInstagramMessage from "../services/FacebookServices/SendInstagramMessage";
+import SendMetaCloudMessage from "../services/MetaCloudServices/SendMetaCloudMessage";
 import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
 import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
@@ -103,7 +104,9 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     );
   } else {
     const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
-    if (whatsapp?.channel === "facebook") {
+    if (whatsapp?.providerType === "meta_cloud") {
+      await SendMetaCloudMessage({ body, ticket, quotedMsg, source: "manual" });
+    } else if (whatsapp?.channel === "facebook") {
       await SendFacebookMessage({ body, ticket, quotedMsg });
     } else if (whatsapp?.channel === "instagram") {
       await SendInstagramMessage({ body, ticket, quotedMsg });

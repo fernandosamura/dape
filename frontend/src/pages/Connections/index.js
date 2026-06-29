@@ -46,6 +46,7 @@ import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import usePlans from "../../hooks/usePlans";
 import { Can } from "../../components/Can";
+import EmbeddedSignupButton from "../../components/EmbeddedSignupButton";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -103,7 +104,7 @@ const CustomToolTip = ({ title, content, children }) => {
 	);
 };
 
-const ChannelBadge = ({ channel }) => {
+const ChannelBadge = ({ channel, providerType }) => {
 	const classes = useStyles();
 	if (channel === "facebook") {
 		return (
@@ -127,6 +128,27 @@ const ChannelBadge = ({ channel }) => {
 				style={{ background: "#fce4ec", color: "#E1306C", borderColor: "#E1306C" }}
 				variant="outlined"
 			/>
+		);
+	}
+	if (providerType === "meta_cloud") {
+		return (
+			<>
+				<Chip
+					icon={<WhatsApp style={{ color: "#25D366", fontSize: 16 }} />}
+					label="WhatsApp"
+					size="small"
+					className={classes.channelChip}
+					style={{ background: "#e8f5e9", color: "#25D366", borderColor: "#25D366" }}
+					variant="outlined"
+				/>
+				<Chip
+					label="Meta Cloud"
+					size="small"
+					className={classes.channelChip}
+					style={{ background: "#DBEAFE", color: "#1E40AF", borderColor: "#1E40AF", marginLeft: 4 }}
+					variant="outlined"
+				/>
+			</>
 		);
 	}
 	return (
@@ -260,6 +282,17 @@ const Connections = () => {
 
 	const renderActionButtons = whatsApp => {
 		const isMeta = whatsApp.channel === "facebook" || whatsApp.channel === "instagram";
+		const isMetaCloud = whatsApp.providerType === "meta_cloud";
+
+		if (isMetaCloud) {
+			return (
+				<Chip
+					label="Meta Cloud Ativo"
+					size="small"
+					style={{ background: "#DBEAFE", color: "#1E40AF", fontWeight: 700 }}
+				/>
+			);
+		}
 
 		if (isMeta) {
 			// Meta channels show "Conectado" when facebookToken is set
@@ -486,7 +519,7 @@ const Connections = () => {
 										.map(whatsApp => (
 										<TableRow key={whatsApp.id}>
 											<TableCell align="center">
-												<ChannelBadge channel={whatsApp.channel || "whatsapp"} />
+												<ChannelBadge channel={whatsApp.channel || "whatsapp"} providerType={whatsApp.providerType} />
 											</TableCell>
 											<TableCell align="center">{whatsApp.name}</TableCell>
 											<TableCell align="center">
@@ -516,6 +549,13 @@ const Connections = () => {
 												perform="connections-page:editOrDeleteConnection"
 												yes={() => (
 													<TableCell align="center">
+														{(!whatsApp.providerType || whatsApp.providerType === "session") && whatsApp.channel === "whatsapp" && (
+															<EmbeddedSignupButton
+																whatsappId={whatsApp.id}
+																companyId={whatsApp.companyId}
+																onSuccess={() => {}}
+															/>
+														)}
 														<IconButton
 															size="small"
 															onClick={() => handleEditWhatsApp(whatsApp)}

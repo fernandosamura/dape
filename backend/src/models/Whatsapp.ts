@@ -172,6 +172,40 @@ class Whatsapp extends Model<Whatsapp> {
   @AllowNull
   @Column(DataType.TEXT)
   facebookUserToken: string;
+
+  @AllowNull(true)
+  @Default("session")
+  @Column
+  providerType: string;
+
+  @AllowNull(true)
+  @Column
+  wabaId: string;
+
+  @AllowNull(true)
+  @Column
+  phoneNumberId: string;
+
+  @AllowNull(true)
+  @Column(DataType.TEXT)
+  metaAccessToken: string;
+
+  @AllowNull(true)
+  @Column
+  tokenExpiresAt: Date;
+
+  @AllowNull(true)
+  @Column
+  embeddedSignupSessionId: string;
+
+  @AllowNull(true)
+  @Default("none")
+  @Column
+  migrationStatus: string;
+
+  @AllowNull(true)
+  @Column
+  previousProviderType: string;
 }
 
 export default Whatsapp;
