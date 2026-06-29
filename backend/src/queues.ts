@@ -28,6 +28,7 @@ import FilesOptions from './models/FilesOptions';
 import { addSeconds, differenceInSeconds } from "date-fns";
 import formatBody from "./helpers/Mustache";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
+import { dapleShield } from "./dape/shield/dapleShield.service";
 
 
 const nodemailer = require('nodemailer');
@@ -810,6 +811,18 @@ async function handleDispatchCampaign(job) {
 
     if (!campaignShipping) {
       logger.error(`[🚨] - CampaignShipping ${campaignShippingId} não encontrado`);
+      return;
+    }
+
+    const shieldDecision = await dapleShield.evaluate({
+      companyId: campaign.companyId,
+      whatsappId: campaign.whatsappId,
+      source: "campaign",
+      contactNumber: campaignShipping.number,
+      messagePreview: (campaignShipping.message ?? "").substring(0, 200),
+    });
+    if (!shieldDecision.allowed) {
+      logger.warn(`[DAPLE Shield] Campaign ${campaignId} blocked: ${shieldDecision.reason}`);
       return;
     }
 

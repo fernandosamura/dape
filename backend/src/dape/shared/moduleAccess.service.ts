@@ -18,6 +18,7 @@ const ALL_DAPE_MODULES = [
   'dape_growth',
   'dape_intelligence',
   'dape_radar',
+  'dape_shield',
 ];
 
 const MODULE_NAMES: Record<string, string> = {
@@ -27,6 +28,7 @@ const MODULE_NAMES: Record<string, string> = {
   dape_growth:       'DAPE Growth',
   dape_intelligence: 'DAPE Intelligence',
   dape_radar:        'DAPE Radar',
+  dape_shield:       'DAPLE Shield',
 };
 
 // Simple in-memory cache with TTL

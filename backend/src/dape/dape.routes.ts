@@ -8,6 +8,7 @@ import dapeIARoutes from './ia/dapeIA.routes';
 import dapeGrowthRoutes from './growth/dapeGrowth.routes';
 import dapeIntelligenceRoutes from './intelligence/dapeIntelligence.routes';
 import dapeRadarRoutes from './radar/dapeRadar.routes';
+import dapeShieldRoutes from './shield/dapleShield.routes';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/growth', dapeGrowthRoutes);
 router.use('/intelligence', dapeIntelligenceRoutes);
 router.use('/radar', dapeRadarRoutes);
 router.use('/billing', dapeBillingRoutes);
+router.use('/', dapeShieldRoutes);
 
 export default router;
