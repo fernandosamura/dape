@@ -7,7 +7,7 @@ import envTokenAuth from "../middleware/envTokenAuth";
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,                   // max 20 attempts per window per IP
+  max: 100,                  // max 100 attempts per window per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "ERR_TOO_MANY_REQUESTS" },
