@@ -110,7 +110,8 @@ const SendWhatsAppMessage = async ({
   } catch (err) {
     Sentry.captureException(err);
     console.log(err);
-    await dapleShield.reportSendError(ticket.whatsappId, ticket.companyId, String(err));
+    const errMsg = (err as any)?.message || (err as any)?.output?.statusCode || String(err);
+    await dapleShield.reportSendError(ticket.whatsappId, ticket.companyId, errMsg);
     throw new AppError("ERR_SENDING_WAPP_MSG");
   }
 };

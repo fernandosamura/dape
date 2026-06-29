@@ -135,10 +135,12 @@ export const dapleShield = {
 
       if (counters.minute >= config.max_msgs_per_minute) {
         await logDecision(ctx, { allowed: false, reason: "RATE_LIMIT" }, counters);
+        await dapleShield.reportSendError(ctx.whatsappId, ctx.companyId, "RATE_LIMIT_EXCEEDED");
         return { allowed: false, reason: "RATE_LIMIT", msgsInLastMinute: counters.minute };
       }
       if (counters.hour >= config.max_msgs_per_hour) {
         await logDecision(ctx, { allowed: false, reason: "RATE_LIMIT" }, counters);
+        await dapleShield.reportSendError(ctx.whatsappId, ctx.companyId, "RATE_LIMIT_EXCEEDED");
         return { allowed: false, reason: "RATE_LIMIT", msgsInLastHour: counters.hour };
       }
       if (counters.day >= config.max_msgs_per_day) {

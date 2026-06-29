@@ -801,7 +801,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
                     />
                   )}
                   {message.quotedMsg && renderQuotedMessage(message)}
-                  <MarkdownWrapper>{message.mediaType === "locationMessage" ? null : message.body}</MarkdownWrapper>
+                  <MarkdownWrapper>{message.mediaType === "locationMessage" ? null : (groupSenderName ? message.body.replace(/^\[[^\]]+\]\s*/, "") : message.body)}</MarkdownWrapper>
                   <span className={classes.timestamp}>
 				    {message.isEdited && <span>{i18n.t("messagesList.edited")}</span>}
                     {format(parseISO(message.createdAt), "HH:mm")}
