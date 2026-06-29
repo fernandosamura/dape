@@ -82,7 +82,35 @@ const ListTicketsService = async ({
   ];
 
   if (showAll === "true") {
+    // Admin/allTicket: vê todos os tickets das filas permitidas
     whereCondition = { queueId: { [Op.or]: [queueIds, null] } };
+  }
+
+  // Isolamento por status:
+  // - pending: apenas filas do usuário (sem fila = apenas allTicket/admin)
+  // - open: apenas tickets do próprio usuário (showAll sobrescreve para admin)
+  // - closed: apenas filas do usuário (sem fila = apenas allTicket/admin)
+  // Grupos sempre visíveis para todos
+  if (status === "pending" && showAll !== "true") {
+    whereCondition = {
+      [Op.or]: [
+        // Tickets com fila que o usuário tem permissão
+        { queueId: { [Op.in]: queueIds } },
+        // Grupos sem fila: sempre visíveis
+        { isGroup: true, queueId: null }
+      ]
+    };
+  }
+
+  if (status === "closed" && showAll !== "true") {
+    whereCondition = {
+      [Op.or]: [
+        // Tickets com fila que o usuário tem permissão
+        { queueId: { [Op.in]: queueIds } },
+        // Grupos: sempre visíveis
+        { isGroup: true }
+      ]
+    };
   }
 
   if (status) {

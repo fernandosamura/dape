@@ -277,7 +277,7 @@ const TicketsManager = () => {
       <TagsFilter onFiltered={handleSelectedTags} />
         <TicketsList
           status="pending"
-          showAll={true}
+          showAll={showAllTickets}
           selectedQueueIds={selectedQueueIds}
           updateCount={(val) => setPendingCount(val)}
         />
@@ -289,7 +289,7 @@ const TicketsManager = () => {
       <TagsFilter onFiltered={handleSelectedTags} />
         <TicketsList
           status="closed"
-          showAll={true}
+          showAll={showAllTickets}
           selectedQueueIds={selectedQueueIds}
         />
       </TabPanel>
@@ -298,7 +298,7 @@ const TicketsManager = () => {
         <TicketsList
           searchParam={searchParam}
           tags={selectedTags}
-          showAll={true}
+          showAll={showAllTickets}
           selectedQueueIds={selectedQueueIds}
         />
       </TabPanel>
