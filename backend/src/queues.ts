@@ -28,7 +28,7 @@ import FilesOptions from './models/FilesOptions';
 import { addSeconds, differenceInSeconds } from "date-fns";
 import formatBody from "./helpers/Mustache";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
-import { dapleShield } from "./dape/shield/dapleShield.service";
+import { dapleShield, applySafeDelay } from "./dape/shield/dapleShield.service";
 
 
 const nodemailer = require('nodemailer');
@@ -297,6 +297,7 @@ async function handleSendScheduledMessage(job) {
       filePath = path.resolve("public", schedule.mediaPath);
     }
 
+    await applySafeDelay("schedule", schedule.companyId, whatsapp.id);
     await SendMessage(whatsapp, {
       number: schedule.contact.number,
       body: formatBody(schedule.body, schedule.contact),
@@ -850,6 +851,8 @@ async function handleDispatchCampaign(job) {
       logger.warn(`[DAPLE Shield] Campaign ${campaignId} blocked: ${shieldDecision.reason}`);
       return;
     }
+
+    await applySafeDelay("campaign", campaign.companyId, campaign.whatsappId);
 
     const chatId = `${campaignShipping.number}@s.whatsapp.net`;
 
