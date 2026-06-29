@@ -51,6 +51,7 @@ export default async function DashboardDataService(
       left join "Tickets" t on t.id = tt."ticketId"
       left join "Contacts" ct on ct.id = t."contactId"
       -- filterPeriod
+      and (t."isGroup" is null or t."isGroup" = false)
     ),
     counters as (
       select
@@ -59,12 +60,12 @@ export default async function DashboardDataService(
         (
           select count(distinct "id")
           from "Tickets"
-          where status like 'open' and "companyId" = ?
+          where status like 'open' and "companyId" = ? and ("isGroup" is null or "isGroup" = false)
         ) "supportHappening",
         (
           select count(distinct "id")
           from "Tickets"
-          where status like 'pending' and "companyId" = ?
+          where status like 'pending' and "companyId" = ? and ("isGroup" is null or "isGroup" = false)
         ) "supportPending",
         (select count(id) from traking where finished) "supportFinished",
         (

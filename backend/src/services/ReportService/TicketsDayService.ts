@@ -35,6 +35,9 @@ export const TicketsDayService = async ({ initialDate, finalDate, companyId }: R
       tick."companyId" = ${companyId}
       and DATE(tick."createdAt") >= '${initialDate} 00:00:00'
       AND DATE(tick."createdAt") <= '${finalDate} 23:59:59'
+      and tick."ticketId" not in (
+        select id from "Tickets" where "isGroup" = true and "companyId" = ${companyId}
+      )
     GROUP BY
       extract(hour from tick."createdAt")
       --to_char(DATE(tick."createdAt"), 'dd-mm-YYYY')
@@ -52,6 +55,9 @@ export const TicketsDayService = async ({ initialDate, finalDate, companyId }: R
     tick."companyId" = ${companyId}
     and DATE(tick."createdAt") >= '${initialDate}'
     AND DATE(tick."createdAt") <= '${finalDate}'
+    and tick."ticketId" not in (
+      select id from "Tickets" where "isGroup" = true and "companyId" = ${companyId}
+    )
   GROUP BY
     to_char(DATE(tick."createdAt"), 'dd/mm/YYYY')
   ORDER BY

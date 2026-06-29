@@ -40,6 +40,9 @@ export const TicketsAttendance = async ({ initialDate, finalDate, companyId }: R
     and tt."userId" is not null
     and tt."finishedAt" >= '${initialDate} 00:00:00'
     and tt."finishedAt" <= '${finalDate} 23:59:59'
+    and tt."ticketId" not in (
+      select id from "Tickets" where "isGroup" = true and "companyId" = ${companyId}
+    )
   group by
     nome
   ORDER BY

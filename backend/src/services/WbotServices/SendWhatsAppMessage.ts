@@ -106,6 +106,21 @@ const SendWhatsAppMessage = async ({
     );
 
     await ticket.update({ lastMessage: finalBody });
+
+    // Para grupos: Baileys não dispara messages.update com ack confiável.
+    // Forçar ack=2 (SERVER_ACK = enviado) imediatamente após envio bem-sucedido.
+    if (ticket.isGroup && sentMessage?.key?.id) {
+      const { Message } = require("../../models");
+      setTimeout(async () => {
+        try {
+          await Message.update(
+            { ack: 2 },
+            { where: { id: sentMessage.key.id } }
+          );
+        } catch (_) {}
+      }, 1500);
+    }
+
     return sentMessage;
   } catch (err) {
     Sentry.captureException(err);
