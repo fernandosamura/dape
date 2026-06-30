@@ -57,7 +57,7 @@ api.interceptors.response.use(
 
 		if (
 			error.response?.status === 403 &&
-			error.response?.data?.message === "CSRF_INVALID" &&
+			error.response?.data?.error === "CSRF_INVALID" &&
 			!originalRequest._csrfRetried
 		) {
 			originalRequest._csrfRetried = true;

@@ -22,6 +22,11 @@ Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const app = express();
 
+// Necessário para req.ip correto atrás de nginx/docker proxy
+// Sem isso, req.ip retorna o IP interno do proxy para todos os usuários,
+// o que afeta rate limiting e getSessionIdentifier do CSRF.
+app.set("trust proxy", 1);
+
 app.set("queues", {
   messageQueue,
   sendScheduledMessages
