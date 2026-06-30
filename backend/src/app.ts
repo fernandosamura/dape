@@ -128,7 +128,12 @@ app.use(routes);
 
 app.use(Sentry.Handlers.errorHandler());
 
-app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
+app.use(async (err: any, req: Request, res: Response, _: NextFunction) => {
+
+  // CSRF token inválido — retorna 403 com código identificável pelo frontend
+  if (err?.code === "EBADCSRFTOKEN") {
+    return res.status(403).json({ error: "CSRF_INVALID" });
+  }
 
   if (err instanceof AppError) {
     logger.warn(err);
