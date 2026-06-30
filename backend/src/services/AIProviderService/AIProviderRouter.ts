@@ -46,6 +46,8 @@ export async function callAIProvider(opts: AIRequestOptions): Promise<string> {
   }
 }
 
+const AI_TIMEOUT_MS = 30_000; // 30 s para todos os providers
+
 // ─── OpenAI v3 / Manus (OpenAI-compatible) ────────────────────────────────
 async function callOpenAI(opts: {
   apiKey: string;
@@ -57,6 +59,8 @@ async function callOpenAI(opts: {
 }): Promise<string> {
   const config = new Configuration({
     apiKey: opts.apiKey,
+    // baseOptions são repassados ao axios interno do SDK openai v3
+    baseOptions: { timeout: AI_TIMEOUT_MS },
     ...(opts.basePath ? { basePath: opts.basePath } : {})
   });
   const openai = new OpenAIApi(config);
@@ -79,7 +83,7 @@ async function callAnthropic(opts: {
   maxTokens: number;
   temperature: number;
 }): Promise<string> {
-  const client = new Anthropic({ apiKey: opts.apiKey });
+  const client = new Anthropic({ apiKey: opts.apiKey, timeout: AI_TIMEOUT_MS });
 
   const systemMsg = opts.messages.find(m => m.role === "system");
   const chatMessages = opts.messages
@@ -132,7 +136,13 @@ async function callGemini(opts: {
     : (lastMsg?.content ?? "");
 
   const chat = geminiModel.startChat({ history });
-  const result = await chat.sendMessage(userText);
+  // Gemini SDK não tem timeout nativo; usamos Promise.race
+  const result = await Promise.race([
+    chat.sendMessage(userText),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini request timed out")), AI_TIMEOUT_MS)
+    ),
+  ]);
   return result.response.text();
 }
 

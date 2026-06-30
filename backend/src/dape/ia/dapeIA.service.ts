@@ -322,6 +322,7 @@ export async function generateAudioReply(companyId: number, ticketId: number, te
     {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       responseType: "arraybuffer",
+      timeout: 30_000,
     }
   );
 
