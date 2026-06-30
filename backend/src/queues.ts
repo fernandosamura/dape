@@ -75,6 +75,12 @@ export const sendScheduledMessages = new BullQueue(
 
 export const campaignQueue = new BullQueue("CampaignQueue", connection);
 
+// ── Billing Queue — processa eventos do Asaas de forma persistida ──────────
+// Retry automático com backoff exponencial; job sobrevive a restart do servidor.
+export const billingQueue = new BullQueue("BillingQueue", connection);
+
+// ────────────────────────────────────────────────────────────────────────────
+
 async function handleSendMessage(job) {
   try {
     const { data } = job;
@@ -1003,6 +1009,36 @@ export async function startQueueProcess() {
   logger.info("[🏁] - Iniciando processamento de filas");
 
   messageQueue.process("SendMessage", handleSendMessage);
+
+  // Worker do Billing — processa eventos Asaas com retry exponencial
+  billingQueue.process("ProcessBillingEvent", 2, async (job) => {
+    const { eventType, payment, eventId } = job.data;
+    try {
+      const { processPaymentEvent } = await import("./dape/billing/billing.service");
+      await processPaymentEvent(eventType, payment || {});
+
+      const { QueryTypes: QT } = await import("sequelize");
+      const db = (await import("./database")).default;
+      await db.query(
+        `UPDATE dape_billing_events SET processing_status = 'processed', processed_at = NOW()
+         WHERE event_id = :eventId AND gateway = 'asaas'`,
+        { replacements: { eventId }, type: QT.UPDATE }
+      );
+    } catch (err: any) {
+      const { QueryTypes: QT } = await import("sequelize");
+      const db = (await import("./database")).default;
+      await db.query(
+        `UPDATE dape_billing_events SET processing_status = 'error', processing_error = :error
+         WHERE event_id = :eventId AND gateway = 'asaas'`,
+        { replacements: { eventId, error: err.message?.substring(0, 500) }, type: QT.UPDATE }
+      ).catch(() => {});
+      throw err; // Re-throw para Bull registrar a falha e agendar retry
+    }
+  });
+
+  billingQueue.on("failed", (job, err) => {
+    logger.error({ jobId: job.id, attempt: job.attemptsMade, err: err.message }, "[BillingQueue] job failed");
+  });
 
   scheduleMonitor.process("Verify", handleVerifySchedules);
 

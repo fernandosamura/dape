@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { QueryTypes } from "sequelize";
 import sequelize from "../../database";
 import { processPaymentEvent } from "./billing.service";
+import { billingQueue } from "../../queues";
 
 const RELEVANT_EVENTS = new Set([
   "PAYMENT_CREATED",
@@ -72,23 +73,18 @@ export const handleAsaasWebhook = async (req: Request, res: Response) => {
     // 5. Responder 200 imediatamente (Asaas exige resposta rápida)
     res.status(200).json({ status: "received" });
 
-    // 6. Processar o evento de forma assíncrona (não bloqueia a resposta)
-    setImmediate(async () => {
-      try {
-        await processPaymentEvent(eventType, event?.payment || {});
-
-        await sequelize.query(
-          `UPDATE dape_billing_events SET processing_status = 'processed', processed_at = NOW() WHERE event_id = :eventId AND gateway = 'asaas'`,
-          { replacements: { eventId }, type: QueryTypes.UPDATE }
-        );
-      } catch (err: any) {
-        console.error(`[DAPLE Billing] Erro ao processar evento ${eventType} (${eventId}):`, err.message);
-        await sequelize.query(
-          `UPDATE dape_billing_events SET processing_status = 'error', processing_error = :error WHERE event_id = :eventId AND gateway = 'asaas'`,
-          { replacements: { eventId, error: err.message }, type: QueryTypes.UPDATE }
-        ).catch(() => {});
+    // 6. Enfileira o processamento pesado com retry automático.
+    // A fila persiste no Redis — sobrevive a restart do servidor.
+    await billingQueue.add(
+      "ProcessBillingEvent",
+      { eventType, payment: event?.payment || {}, eventId },
+      {
+        attempts: 5,
+        backoff: { type: "exponential", delay: 5_000 },
+        removeOnComplete: { age: 60 * 60 * 24 * 7 }, // 7 dias
+        removeOnFail: false,
       }
-    });
+    );
   } catch (err: any) {
     console.error("[DAPLE Billing] handleAsaasWebhook error:", err);
     // Sempre responder 200 para o Asaas não reenviar em loop
