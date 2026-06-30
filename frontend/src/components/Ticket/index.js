@@ -103,18 +103,27 @@ const Ticket = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [ticketId, user, history]);
 
+  // Ref para acesso ao ticket.id sem colocar `ticket` nas deps do socket effect.
+  // Sem isso, qualquer update do ticket (ex: lastMessage) re-executaria o effect,
+  // removendo o listener de appMessage por um instante e fazendo a mensagem
+  // recém-enviada ser perdida (race condition).
+  const ticketIdRef = useRef(null);
+  useEffect(() => {
+    ticketIdRef.current = ticket.id ?? null;
+  }, [ticket.id]);
+
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on("ready", () => socket.emit("joinChatBox", `${ticket.id}`));
+    socket.on("ready", () => socket.emit("joinChatBox", `${ticketId}`));
 
     socket.on(`company-${companyId}-ticket`, (data) => {
-      if (data.action === "update" && data.ticket.id === ticket.id) {
+      if (data.action === "update" && data.ticket.id === ticketIdRef.current) {
         setTicket(data.ticket);
       }
 
-      if (data.action === "delete" && data.ticketId === ticket.id) {
+      if (data.action === "delete" && data.ticketId === ticketIdRef.current) {
         // toast.success("Ticket deleted sucessfully.");
         history.push("/tickets");
       }
@@ -134,7 +143,7 @@ const Ticket = () => {
     return () => {
       socket.disconnect();
     };
-  }, [ticketId, ticket, history, socketManager]);
+  }, [ticketId, history, socketManager]);
 
   const handleDrawerOpen = () => {
     setDrawerOpen(true);

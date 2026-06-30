@@ -372,7 +372,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on("ready", () => socket.emit("joinChatBox", `${ticket.id}`));
+    socket.on("ready", () => socket.emit("joinChatBox", `${ticketId}`));
 
     socket.on(`company-${companyId}-appMessage`, (data) => {
       if (data.action === "create" && data.message.ticketId === currentTicketId.current) {
@@ -388,7 +388,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
     return () => {
       socket.disconnect();
     };
-  }, [ticketId, ticket, socketManager]);
+  }, [ticketId, socketManager]);
 
   const loadMore = () => {
     setPageNumber((prevPageNumber) => prevPageNumber + 1);
