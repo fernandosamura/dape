@@ -1,4 +1,4 @@
-import { sign } from "jsonwebtoken";
+import { sign, SignOptions } from "jsonwebtoken";
 import authConfig from "../config/auth";
 import User from "../models/User";
 
@@ -15,7 +15,8 @@ export const createAccessToken = (user: User): string => {
     },
     secret,
     {
-      expiresIn
+      expiresIn: expiresIn as SignOptions["expiresIn"],
+      algorithm: "HS256",
     }
   );
 };
@@ -27,7 +28,8 @@ export const createRefreshToken = (user: User): string => {
     { id: user.id, tokenVersion: user.tokenVersion, companyId: user.companyId },
     refreshSecret,
     {
-      expiresIn: refreshExpiresIn
+      expiresIn: refreshExpiresIn as SignOptions["expiresIn"],
+      algorithm: "HS256",
     }
   );
 };

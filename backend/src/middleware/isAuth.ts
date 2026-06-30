@@ -24,7 +24,7 @@ const isAuth = (req: Request, res: Response, next: NextFunction): void => {
   const [, token] = authHeader.split(" ");
 
   try {
-    const decoded = verify(token, authConfig.secret);
+    const decoded = verify(token, authConfig.secret, { algorithms: ["HS256"] });
     const { id, profile, companyId, super: superUser } = decoded as TokenPayload;
     req.user = {
       id,
