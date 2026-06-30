@@ -50,6 +50,17 @@ interface AISettings {
   baseUrl?: string;
 }
 
+function resolveApiKey(provider: AIProvider, get: (key: string) => string | undefined): string {
+  switch (provider) {
+    case "anthropic": return get("anthropicApiKey") || process.env.ANTHROPIC_API_KEY || "";
+    case "gemini":    return get("geminiApiKey")    || process.env.GEMINI_API_KEY    || "";
+    case "manus":     return get("manusApiKey")     || process.env.MANUS_API_KEY     || "";
+    default:
+      return get("openaiApiKey") || get("OPENAI_API_KEY") || get("openai_api_key")
+             || process.env.OPENAI_API_KEY || "";
+  }
+}
+
 async function getCompanyAISettings(companyId: number): Promise<AISettings> {
   const rows = await sequelize.query<{ key: string; value: string }>(
     `SELECT key, value FROM "Settings" WHERE "companyId" = :companyId`,
@@ -59,22 +70,29 @@ async function getCompanyAISettings(companyId: number): Promise<AISettings> {
 
   const provider = (get("aiProvider") || "openai") as AIProvider;
   const model = get("aiModel") || DEFAULT_MODEL;
-
-  let apiKey: string;
-  switch (provider) {
-    case "anthropic": apiKey = get("anthropicApiKey") || process.env.ANTHROPIC_API_KEY || ""; break;
-    case "gemini":    apiKey = get("geminiApiKey")    || process.env.GEMINI_API_KEY    || ""; break;
-    case "manus":     apiKey = get("manusApiKey")     || process.env.MANUS_API_KEY     || ""; break;
-    default:
-      apiKey = get("openaiApiKey") || get("OPENAI_API_KEY") || get("openai_api_key")
-               || process.env.OPENAI_API_KEY || "";
-  }
-
+  const apiKey = resolveApiKey(provider, get);
   const baseUrl = provider === "manus" ? (get("manusBaseUrl") || undefined) : undefined;
 
   if (!apiKey) throw new Error(`API_KEY_NOT_CONFIGURED:${provider}`);
 
   return { provider, model, apiKey, baseUrl };
+}
+
+async function getFallbackAISettings(companyId: number): Promise<AISettings | null> {
+  const rows = await sequelize.query<{ key: string; value: string }>(
+    `SELECT key, value FROM "Settings" WHERE "companyId" = :companyId`,
+    { replacements: { companyId }, type: QueryTypes.SELECT }
+  );
+  const get = (key: string) => rows.find(r => r.key === key)?.value;
+
+  const fallbackProvider = get("aiFallbackProvider") as AIProvider | undefined;
+  if (!fallbackProvider) return null;
+
+  const fallbackApiKey = resolveApiKey(fallbackProvider, get);
+  if (!fallbackApiKey) return null;
+
+  const fallbackModel = get("aiFallbackModel") || DEFAULT_MODEL;
+  return { provider: fallbackProvider, model: fallbackModel, apiKey: fallbackApiKey };
 }
 
 async function callAI(companyId: number, prompt: string): Promise<{ content: string; tokens: number }> {
@@ -91,14 +109,43 @@ async function callAI(companyId: number, prompt: string): Promise<{ content: str
       temperature: 0.7,
       baseUrl: settings.baseUrl,
     });
-  } catch (err: any) {
-    const msg = err?.message || String(err);
-    // Re-throw rate limit and config errors so callers can handle them
-    if (msg.includes('RATE_LIMIT') || msg.includes('API_KEY') || msg.includes('429')) {
-      throw err;
+  } catch (primaryErr: any) {
+    const primaryMsg = primaryErr?.message || String(primaryErr);
+
+    // Erros de config ou rate-limit do próprio sistema: re-throw direto
+    if (primaryMsg.includes('RATE_LIMIT') || primaryMsg.includes('API_KEY') || primaryMsg.includes('429')) {
+      throw primaryErr;
     }
-    // For transient provider errors (5xx, timeout, etc.) throw a typed error
-    throw new Error('IA_PROVIDER_ERROR:' + settings.provider + '::' + msg.slice(0, 120));
+
+    // Erro transitório do provider (5xx, timeout, etc.) — tenta fallback
+    const fallback = await getFallbackAISettings(companyId);
+    if (fallback) {
+      try {
+        content = await callAIProvider({
+          provider: fallback.provider,
+          apiKey: fallback.apiKey,
+          model: fallback.model,
+          messages: [{ role: "user", content: prompt }],
+          maxTokens: 600,
+          temperature: 0.7,
+        });
+        // Log do fallback para rastreamento no Sentry
+        const Sentry = await import("@sentry/node");
+        Sentry.captureMessage("IA fallback usado", {
+          level: "warning" as any,
+          extra: {
+            primary_provider: settings.provider,
+            fallback_provider: fallback.provider,
+            fallback_used: true,
+            primary_error: primaryMsg.slice(0, 200),
+          },
+        });
+      } catch (fallbackErr: any) {
+        throw new Error('IA_PROVIDER_ERROR:' + settings.provider + '::' + primaryMsg.slice(0, 120));
+      }
+    } else {
+      throw new Error('IA_PROVIDER_ERROR:' + settings.provider + '::' + primaryMsg.slice(0, 120));
+    }
   }
 
   // Token counting is only precise for OpenAI; for other providers we estimate
