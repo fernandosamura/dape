@@ -72,6 +72,9 @@ const Ticket = () => {
   const socketManager = useContext(SocketContext);
 
   useEffect(() => {
+    // Aguarda o router carregar o parâmetro antes de disparar a requisição
+    if (!ticketId || ticketId === "undefined") return;
+
     setLoading(true);
     const delayDebounceFn = setTimeout(() => {
       const fetchTicket = async () => {
