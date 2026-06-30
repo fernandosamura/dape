@@ -8,6 +8,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import * as Sentry from "@sentry/node";
 import rateLimit from "express-rate-limit";
+import { doubleCsrf } from "csrf-csrf";
 
 import "./database";
 import uploadConfig from "./config/upload";
@@ -83,6 +84,42 @@ app.use(
     message: { error: "Muitas tentativas de autenticação. Aguarde 15 minutos." },
   })
 );
+// ────────────────────────────────────────────────────────────────────────────
+
+// ── CSRF (Double Submit Cookie) ────────────────────────────────────────────
+// Protege mutações (POST/PUT/DELETE) contra ataques cross-site.
+// Rotas excluídas: /auth/* (sem cookie de sessão ainda), /webhooks/* (Asaas),
+//                  /forgot-password, /health (monitoring).
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
+  getSecret: () => process.env.CSRF_SECRET || "daple-csrf-default-secret-32ch!!",
+  cookieName: "csrf-token",
+  cookieOptions: {
+    sameSite: "lax",
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+  },
+  getTokenFromRequest: (req) => req.headers["x-csrf-token"] as string,
+} as any);
+
+// Endpoint público para o frontend buscar o token CSRF
+app.get("/csrf-token", (req: Request, res: Response) => {
+  const token = (generateCsrfToken as any)(req, res);
+  return res.json({ token });
+});
+
+// Rotas que NÃO precisam de CSRF
+const csrfExcludes = ["/auth/", "/webhooks/", "/forgetpassword", "/health", "/csrf-token"];
+const skipCsrf = (req: Request) =>
+  req.method === "GET" ||
+  req.method === "HEAD" ||
+  req.method === "OPTIONS" ||
+  csrfExcludes.some(p => req.path.startsWith(p));
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (skipCsrf(req)) return next();
+  return doubleCsrfProtection(req, res, next);
+});
 // ────────────────────────────────────────────────────────────────────────────
 
 app.use(routes);
