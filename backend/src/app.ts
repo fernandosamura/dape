@@ -7,6 +7,7 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import * as Sentry from "@sentry/node";
+import rateLimit from "express-rate-limit";
 
 import "./database";
 import uploadConfig from "./config/upload";
@@ -53,6 +54,37 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(Sentry.Handlers.requestHandler());
 app.use("/public", express.static(uploadConfig.directory));
+
+// ── Rate limiting ──────────────────────────────────────────────────────────
+// Rotas excluídas: webhooks (Asaas não controla cadência), /health (monitoring)
+const skipRateLimit = (req: Request) =>
+  req.path.startsWith("/webhooks/") || req.path === "/health";
+
+// Global: 1000 req / 15 min por IP — protege toda a API
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: skipRateLimit,
+    message: { error: "Muitas requisições. Tente novamente em alguns minutos." },
+  })
+);
+
+// Autenticação: 100 req / 15 min — protege brute-force em /auth/*
+app.use(
+  "/auth",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Muitas tentativas de autenticação. Aguarde 15 minutos." },
+  })
+);
+// ────────────────────────────────────────────────────────────────────────────
+
 app.use(routes);
 
 app.use(Sentry.Handlers.errorHandler());
