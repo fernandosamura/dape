@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
+import sequelize from "../database";
 
 import userRoutes from "./userRoutes";
 import authRoutes from "./authRoutes";
@@ -40,6 +41,15 @@ import { handleAsaasWebhook } from "../dape/billing/billingWebhook.controller";
 import metaCloudRoutes from "./metaCloud.routes";
 
 const routes = Router();
+
+routes.get("/health", async (req: Request, res: Response) => {
+  try {
+    await sequelize.authenticate();
+    return res.status(200).json({ status: "ok", db: "ok", ts: new Date().toISOString() });
+  } catch (err) {
+    return res.status(503).json({ status: "error", db: "unreachable" });
+  }
+});
 
 routes.use(userRoutes);
 routes.use("/auth", authRoutes);

@@ -1,4 +1,5 @@
 import { QueryTypes } from "sequelize";
+import cron from "node-cron";
 import sequelize from "../../database";
 import { SUMMARY_PROMPT, SUGGEST_REPLY_PROMPT, NEXT_ACTION_PROMPT } from "./dapeIA.prompts";
 import { callAIProvider, AIProvider, AIMessage } from "../../services/AIProviderService/AIProviderRouter";
@@ -8,6 +9,16 @@ import axios from "axios";
 
 const MAX_CALLS_PER_MINUTE = 50;
 const DEFAULT_MODEL = "gpt-4o-mini";
+
+// Cleanup diário: remove rate_limits com mais de 7 dias para evitar crescimento indefinido
+cron.schedule("0 4 * * *", async () => {
+  try {
+    await sequelize.query(
+      `DELETE FROM dape_ia_rate_limits WHERE window_start < NOW() - INTERVAL '7 days'`,
+      { type: QueryTypes.DELETE }
+    );
+  } catch (_) {}
+});
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
 

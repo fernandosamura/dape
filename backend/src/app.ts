@@ -41,7 +41,11 @@ app.use(
     credentials: true,
     maxAge: 0,
     origin: (origin, callback) => {
-      callback(null, true); // allow all origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
     }
   })
 );

@@ -1,8 +1,9 @@
 import crypto from "crypto";
 
-const SECRET_KEY = (process.env.CRYPTO_SECRET_KEY || "dape_default_secret_32chars_key!")
-  .substring(0, 32)
-  .padEnd(32, "!");
+if (!process.env.CRYPTO_SECRET_KEY) {
+  throw new Error("CRYPTO_SECRET_KEY environment variable is required");
+}
+const SECRET_KEY = process.env.CRYPTO_SECRET_KEY.substring(0, 32).padEnd(32, "!");
 const IV_LENGTH = 16;
 
 export function encrypt(text: string): string {

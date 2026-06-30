@@ -6,7 +6,7 @@ export const SendRefreshToken = (res: Response, token: string): void => {
   res.cookie("jrt", token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: false,
+    secure: process.env.NODE_ENV === "production",
     maxAge: SEVEN_DAYS_MS
   });
 };

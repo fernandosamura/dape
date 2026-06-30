@@ -6,11 +6,12 @@ type IndexQuery = { email?: string; token?: string; password?: string };
 export const store = async (req: Request, res: Response): Promise<Response> => {
   const { email } = req.params as IndexQuery;
   const TokenSenha = uuid();
-  const forgotPassword = await SendMail(email, TokenSenha);
-  if (!forgotPassword) {
-     return res.status(200).json({ message: "E-mail enviado com sucesso" });
+  try {
+    await SendMail(email, TokenSenha);
+  } catch (_) {
+    // silencioso — não revelar se e-mail existe ou não
   }
-  return res.status(404).json({ error: "E-mail enviado com sucesso" });
+  return res.status(200).json({ message: "Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação." });
 };
 export const resetPasswords = async (
   req: Request,

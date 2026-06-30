@@ -1,6 +1,26 @@
 import { QueryTypes } from "sequelize";
+import cron from "node-cron";
 import sequelize from "../../database";
 import { logger } from "../../utils/logger";
+
+// Cleanup diário: remove contadores antigos e audit_log com mais de 90 dias
+cron.schedule("0 2 * * *", async () => {
+  try {
+    await sequelize.query(
+      `DELETE FROM daple_shield_counters
+       WHERE (window_type = 'minute' AND window_key < to_char(NOW() - INTERVAL '1 day', 'YYYY-MM-DD"T"HH24:MI'))
+          OR (window_type = 'hour'   AND window_key < to_char(NOW() - INTERVAL '7 days', 'YYYY-MM-DD"T"HH24'))
+          OR (window_type = 'day'    AND window_key < to_char(NOW() - INTERVAL '90 days', 'YYYY-MM-DD'))`,
+      { type: QueryTypes.DELETE }
+    );
+    await sequelize.query(
+      `DELETE FROM daple_shield_audit_log WHERE created_at < NOW() - INTERVAL '90 days'`,
+      { type: QueryTypes.DELETE }
+    );
+  } catch (e: any) {
+    logger.error({ err: e }, "Shield cleanup cron failed");
+  }
+});
 
 export type MessageSource =
   | "manual"
@@ -63,20 +83,20 @@ async function getCounters(whatsappId: number): Promise<{ minute: number; hour: 
 
 async function incrementCounters(whatsappId: number): Promise<void> {
   const now = new Date();
-  const entries = [
-    { type: "minute", key: now.toISOString().substring(0, 16) },
-    { type: "hour",   key: now.toISOString().substring(0, 13) },
-    { type: "day",    key: now.toISOString().substring(0, 10) },
-  ];
-  for (const e of entries) {
-    await sequelize.query(
-      `INSERT INTO daple_shield_counters (whatsapp_id, window_type, window_key, count, updated_at)
-       VALUES (:wid, :type, :key, 1, NOW())
-       ON CONFLICT (whatsapp_id, window_type, window_key)
-       DO UPDATE SET count = daple_shield_counters.count + 1, updated_at = NOW()`,
-      { replacements: { wid: whatsappId, type: e.type, key: e.key }, type: QueryTypes.INSERT }
-    );
-  }
+  const minuteKey = now.toISOString().substring(0, 16);
+  const hourKey   = now.toISOString().substring(0, 13);
+  const dayKey    = now.toISOString().substring(0, 10);
+
+  await sequelize.query(
+    `INSERT INTO daple_shield_counters (whatsapp_id, window_type, window_key, count, updated_at)
+     VALUES
+       (:wid, 'minute', :minuteKey, 1, NOW()),
+       (:wid, 'hour',   :hourKey,   1, NOW()),
+       (:wid, 'day',    :dayKey,    1, NOW())
+     ON CONFLICT (whatsapp_id, window_type, window_key)
+     DO UPDATE SET count = daple_shield_counters.count + 1, updated_at = NOW()`,
+    { replacements: { wid: whatsappId, minuteKey, hourKey, dayKey }, type: QueryTypes.INSERT }
+  );
 }
 
 function isWithinBusinessHours(start: string, end: string): boolean {
