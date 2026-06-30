@@ -81,21 +81,44 @@ async function getCounters(whatsappId: number): Promise<{ minute: number; hour: 
   return { minute: get("minute"), hour: get("hour"), day: get("day") };
 }
 
-async function incrementCounters(whatsappId: number): Promise<void> {
+// Retorna as janelas de tempo atuais para uso em compensação
+function currentWindowKeys(): { minuteKey: string; hourKey: string; dayKey: string } {
   const now = new Date();
-  const minuteKey = now.toISOString().substring(0, 16);
-  const hourKey   = now.toISOString().substring(0, 13);
-  const dayKey    = now.toISOString().substring(0, 10);
+  return {
+    minuteKey: now.toISOString().substring(0, 16),
+    hourKey:   now.toISOString().substring(0, 13),
+    dayKey:    now.toISOString().substring(0, 10),
+  };
+}
 
-  await sequelize.query(
+// Incrementa ANTES de verificar o limite (elimina race condition).
+// Retorna os contadores APÓS o incremento, via RETURNING.
+async function incrementCounters(whatsappId: number): Promise<{ minute: number; hour: number; day: number }> {
+  const { minuteKey, hourKey, dayKey } = currentWindowKeys();
+
+  const rows = await sequelize.query<{ window_type: string; count: number }>(
     `INSERT INTO daple_shield_counters (whatsapp_id, window_type, window_key, count, updated_at)
      VALUES
        (:wid, 'minute', :minuteKey, 1, NOW()),
        (:wid, 'hour',   :hourKey,   1, NOW()),
        (:wid, 'day',    :dayKey,    1, NOW())
      ON CONFLICT (whatsapp_id, window_type, window_key)
-     DO UPDATE SET count = daple_shield_counters.count + 1, updated_at = NOW()`,
-    { replacements: { wid: whatsappId, minuteKey, hourKey, dayKey }, type: QueryTypes.INSERT }
+     DO UPDATE SET count = daple_shield_counters.count + 1, updated_at = NOW()
+     RETURNING window_type, count`,
+    { replacements: { wid: whatsappId, minuteKey, hourKey, dayKey }, type: QueryTypes.SELECT }
+  );
+
+  const get = (type: string) => Number(rows.find(r => r.window_type === type)?.count ?? 0);
+  return { minute: get("minute"), hour: get("hour"), day: get("day") };
+}
+
+// Compensação: decrementa 1 unidade quando o limite foi ultrapassado pós-incremento.
+async function decrementCounter(whatsappId: number, windowType: string, windowKey: string): Promise<void> {
+  await sequelize.query(
+    `UPDATE daple_shield_counters
+     SET count = GREATEST(0, count - 1), updated_at = NOW()
+     WHERE whatsapp_id = :wid AND window_type = :windowType AND window_key = :windowKey`,
+    { replacements: { wid: whatsappId, windowType, windowKey }, type: QueryTypes.UPDATE }
   );
 }
 
@@ -151,32 +174,44 @@ export const dapleShield = {
         }
       }
 
-      const counters = await getCounters(ctx.whatsappId);
-
-      if (counters.minute >= config.max_msgs_per_minute) {
-        await logDecision(ctx, { allowed: false, reason: "RATE_LIMIT" }, counters);
-        await dapleShield.reportSendError(ctx.whatsappId, ctx.companyId, "RATE_LIMIT_EXCEEDED");
-        return { allowed: false, reason: "RATE_LIMIT", msgsInLastMinute: counters.minute };
-      }
-      if (counters.hour >= config.max_msgs_per_hour) {
-        await logDecision(ctx, { allowed: false, reason: "RATE_LIMIT" }, counters);
-        await dapleShield.reportSendError(ctx.whatsappId, ctx.companyId, "RATE_LIMIT_EXCEEDED");
-        return { allowed: false, reason: "RATE_LIMIT", msgsInLastHour: counters.hour };
-      }
-      if (counters.day >= config.max_msgs_per_day) {
-        await logDecision(ctx, { allowed: false, reason: "QUOTA_EXCEEDED" }, counters);
-        return { allowed: false, reason: "QUOTA_EXCEEDED", msgsToday: counters.day };
-      }
-
-      // Degraded mode for campaigns when risk is high
+      // ── Degraded mode check (antes do incremento, não consome quota) ──────
       if ((ctx.source === "campaign") && config?.is_enabled) {
         try {
           const risk = await calculateConnectionRisk(ctx.companyId, ctx.whatsappId);
           if (risk.level === "HIGH" || risk.level === "CRITICAL") {
+            const counters = await getCounters(ctx.whatsappId);
             await logDecision(ctx, { allowed: false, reason: "DEGRADED_MODE" }, counters);
             return { allowed: false, reason: "DEGRADED_MODE" };
           }
         } catch { /* fail-open */ }
+      }
+
+      // ── Increment-first: incrementa ANTES de verificar o limite ──────────
+      // Elimina a race condition: dois threads não conseguem mais passar ambos
+      // quando o contador está em max-1. O que "ganhar" o incremento que passa
+      // do limite recebe compensação (-1) e é bloqueado.
+      const postCounters = await incrementCounters(ctx.whatsappId);
+      const { minuteKey, hourKey, dayKey } = currentWindowKeys();
+
+      if (postCounters.minute > config.max_msgs_per_minute) {
+        await decrementCounter(ctx.whatsappId, "minute", minuteKey);
+        const compensated = { ...postCounters, minute: postCounters.minute - 1 };
+        await logDecision(ctx, { allowed: false, reason: "RATE_LIMIT" }, compensated);
+        await dapleShield.reportSendError(ctx.whatsappId, ctx.companyId, "RATE_LIMIT_EXCEEDED");
+        return { allowed: false, reason: "RATE_LIMIT", msgsInLastMinute: compensated.minute };
+      }
+      if (postCounters.hour > config.max_msgs_per_hour) {
+        await decrementCounter(ctx.whatsappId, "hour", hourKey);
+        const compensated = { ...postCounters, hour: postCounters.hour - 1 };
+        await logDecision(ctx, { allowed: false, reason: "RATE_LIMIT" }, compensated);
+        await dapleShield.reportSendError(ctx.whatsappId, ctx.companyId, "RATE_LIMIT_EXCEEDED");
+        return { allowed: false, reason: "RATE_LIMIT", msgsInLastHour: compensated.hour };
+      }
+      if (postCounters.day > config.max_msgs_per_day) {
+        await decrementCounter(ctx.whatsappId, "day", dayKey);
+        const compensated = { ...postCounters, day: postCounters.day - 1 };
+        await logDecision(ctx, { allowed: false, reason: "QUOTA_EXCEEDED" }, compensated);
+        return { allowed: false, reason: "QUOTA_EXCEEDED", msgsToday: compensated.day };
       }
 
       // Repeated content detection (campaign and api sources)
@@ -193,9 +228,8 @@ export const dapleShield = {
         }
       }
 
-      await incrementCounters(ctx.whatsappId);
-      await logDecision(ctx, { allowed: true }, counters);
-      return { allowed: true, msgsInLastMinute: counters.minute, msgsInLastHour: counters.hour, msgsToday: counters.day };
+      await logDecision(ctx, { allowed: true }, postCounters);
+      return { allowed: true, msgsInLastMinute: postCounters.minute, msgsInLastHour: postCounters.hour, msgsToday: postCounters.day };
     } catch (e) {
       logger.warn(`[DAPLE Shield] evaluate error — allowing by default: ${e}`);
       return { allowed: true }; // fail-open: never block due to shield internal error
