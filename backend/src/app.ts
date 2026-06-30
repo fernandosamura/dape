@@ -92,6 +92,8 @@ app.use(
 //                  /forgot-password, /health (monitoring).
 const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => process.env.CSRF_SECRET || "daple-csrf-default-secret-32ch!!",
+  // csrf-csrf v4 exige getSessionIdentifier para amarrar o token à sessão/IP
+  getSessionIdentifier: (req: Request) => (req as any).ip || "unknown",
   cookieName: "csrf-token",
   cookieOptions: {
     sameSite: "lax",
