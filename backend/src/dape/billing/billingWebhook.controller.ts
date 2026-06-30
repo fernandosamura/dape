@@ -40,25 +40,18 @@ export const handleAsaasWebhook = async (req: Request, res: Response) => {
       return res.status(200).json({ status: "ignored" });
     }
 
-    // 3. Idempotência: verificar se já processamos este evento
-    const [existing] = await sequelize.query(
-      `SELECT id, processing_status FROM dape_billing_events WHERE gateway = 'asaas' AND event_id = :eventId`,
-      { replacements: { eventId }, type: QueryTypes.SELECT }
-    ) as any[];
-
-    if (existing) {
-      // Já recebemos este evento — responder 200 sem reprocessar
-      return res.status(200).json({ status: "already_processed" });
-    }
-
-    // 4. Salvar evento bruto como "pending"
-    await sequelize.query(
+    // 3 + 4. Idempotência DB-level: INSERT atômico com ON CONFLICT.
+    // Se o evento já existir (gateway + event_id únicos via uq_billing_events_gateway_event),
+    // DO NOTHING garante que não há duplicate e RETURNING retorna zero linhas.
+    const inserted = await sequelize.query(
       `INSERT INTO dape_billing_events
          (gateway, event_id, event_type, asaas_payment_id, asaas_subscription_id,
           payload, processing_status, received_at)
        VALUES
          ('asaas', :eventId, :eventType, :paymentId, :subscriptionId,
-          :payload, 'pending', NOW())`,
+          :payload, 'pending', NOW())
+       ON CONFLICT ON CONSTRAINT uq_billing_events_gateway_event DO NOTHING
+       RETURNING id`,
       {
         replacements: {
           eventId,
@@ -67,9 +60,14 @@ export const handleAsaasWebhook = async (req: Request, res: Response) => {
           subscriptionId: event?.payment?.subscription || null,
           payload: JSON.stringify(event),
         },
-        type: QueryTypes.INSERT,
+        type: QueryTypes.SELECT,
       }
-    );
+    ) as any[];
+
+    if (inserted.length === 0) {
+      // Conflito: evento duplicado — responder 200 sem reprocessar
+      return res.status(200).json({ status: "already_processed" });
+    }
 
     // 5. Responder 200 imediatamente (Asaas exige resposta rápida)
     res.status(200).json({ status: "received" });
