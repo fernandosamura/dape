@@ -81,17 +81,14 @@ const Ticket = () => {
         try {
           const { data } = await api.get("/tickets/u/" + ticketId);
           const { queueId } = data;
-          const { queues, profile, allTicket } = user;
+          const { queues, profile, allTicket, id: currentUserId } = user;
 
-          // Verificação de acesso ao ticket
           const isAdmin = profile === "admin";
           const hasAllTickets = allTicket === "enabled";
-          const isOwner = data.userId === user.id;
+          const isOwner = data.userId === currentUserId;
           const isGroup = data.isGroup === true;
-          const queueAllowed = queues.find((q) => q.id === queueId);
-          const hasQueueAccess = queueId === null ? false : queueAllowed !== undefined;
+          const hasQueueAccess = queueId !== null && queues.find((q) => q.id === queueId) !== undefined;
 
-          // Acesso permitido se: admin, allTicket ativo, dono do ticket, grupo, ou fila permitida
           const canAccess = isAdmin || hasAllTickets || isOwner || isGroup || hasQueueAccess;
 
           if (!canAccess) {

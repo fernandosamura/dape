@@ -185,30 +185,28 @@ const NewTicketModal = ({ modalOpen, onClose, initialContact }) => {
         whatsappId,
         userId: user.id,
         status: "open",
-      });      
-
+      });
+      // Garante que o status está correto antes de fechar o modal
+      if (!ticket.status) ticket.status = "open";
       onClose(ticket);
     } catch (err) {
-      
-      console.log(err);
-      const ticket  = err.response.data.error;
-      console.log(ticket);
-
-      if( ticket === "ERR_OTHER_OPEN_TICKET" )
+      const errorData = err?.response?.data?.error;
+      if (!errorData || errorData === "ERR_OTHER_OPEN_TICKET") {
         toastError(err);
-      
-      if ( ticket !== "ERR_OTHER_OPEN_TICKET" && ticket.userId !== user?.id) {
-        setOpenAlert(true);
-        setUserTicketOpen(ticket.user.name);
-        setQueueTicketOpen(ticket.queue.name);
-      } else {
-        setOpenAlert(false);
-        setUserTicketOpen("");
-        setQueueTicketOpen("");
         setLoading(false);
-        onClose(ticket);
+        return;
       }
-    }  
+      // Ticket já existe — pertence a outro usuário
+      if (typeof errorData === "object" && errorData.userId !== user?.id) {
+        setOpenAlert(true);
+        setUserTicketOpen(errorData.user?.name || "");
+        setQueueTicketOpen(errorData.queue?.name || "");
+      } else {
+        // Ticket já existe — pertence ao próprio usuário, abre direto
+        if (!errorData.status) errorData.status = "open";
+        onClose(errorData);
+      }
+    }
     setLoading(false);
   };
 
