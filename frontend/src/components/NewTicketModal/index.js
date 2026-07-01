@@ -190,21 +190,20 @@ const NewTicketModal = ({ modalOpen, onClose, initialContact }) => {
       if (!ticket.status) ticket.status = "open";
       onClose(ticket);
     } catch (err) {
+      console.error("NewTicketModal Error:", err?.response?.data || err);
       const errorData = err?.response?.data?.error;
       if (!errorData || errorData === "ERR_OTHER_OPEN_TICKET") {
         toastError(err);
         setLoading(false);
         return;
       }
-      // Ticket já existe — pertence a outro usuário
       if (typeof errorData === "object" && errorData.userId !== user?.id) {
         setOpenAlert(true);
         setUserTicketOpen(errorData.user?.name || "");
         setQueueTicketOpen(errorData.queue?.name || "");
       } else {
-        // Ticket já existe — pertence ao próprio usuário, abre direto
-        if (!errorData.status) errorData.status = "open";
-        onClose(errorData);
+        if (typeof errorData === "object" && !errorData.status) errorData.status = "open";
+        onClose(typeof errorData === "object" ? errorData : undefined);
       }
     }
     setLoading(false);

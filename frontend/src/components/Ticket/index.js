@@ -92,6 +92,7 @@ const Ticket = () => {
           const canAccess = isAdmin || hasAllTickets || isOwner || isGroup || hasQueueAccess;
 
           if (!canAccess) {
+            console.error("Ticket/index.js: Acesso bloqueado.", { ticketId, queueId, queues, profile, allTicket, isOwner, isGroup });
             toast.error(i18n.t("tickets.toasts.unauthorized"));
             history.push("/tickets");
             return;
