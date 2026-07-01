@@ -80,26 +80,19 @@ const Ticket = () => {
       const fetchTicket = async () => {
         try {
           const { data } = await api.get("/tickets/u/" + ticketId);
-          const { queueId, userId: ticketUserId, isGroup } = data;
-          const { queues, profile, id: currentUserId, allTicket } = user;
+          const { queueId } = data;
+          const { queues, profile, allTicket } = user;
 
-          // Regras de acesso ao ticket:
-          // 1. Admin sempre tem acesso
-          // 2. allTicket="enabled" tem acesso a todos
-          // 3. Ticket atribuído ao próprio usuário: sempre tem acesso
-          // 4. Ticket de grupo: sempre tem acesso
-          // 5. Ticket com fila: apenas se a fila estiver nas filas do usuário
-          // 6. Ticket sem fila (queueId=null) e não atribuído: apenas allTicket/admin
-          const isTicketOwner = ticketUserId === currentUserId;
-          const hasQueueAccess = queueId !== null && queues.find((q) => q.id === queueId) !== undefined;
-          const hasAllTicketAccess = allTicket === "enabled";
+          // Verificação de acesso ao ticket
+          const isAdmin = profile === "admin";
+          const hasAllTickets = allTicket === "enabled";
+          const isOwner = data.userId === user.id;
+          const isGroup = data.isGroup === true;
+          const queueAllowed = queues.find((q) => q.id === queueId);
+          const hasQueueAccess = queueId === null ? false : queueAllowed !== undefined;
 
-          const canAccess =
-            profile === "admin" ||
-            hasAllTicketAccess ||
-            isTicketOwner ||
-            isGroup ||
-            hasQueueAccess;
+          // Acesso permitido se: admin, allTicket ativo, dono do ticket, grupo, ou fila permitida
+          const canAccess = isAdmin || hasAllTickets || isOwner || isGroup || hasQueueAccess;
 
           if (!canAccess) {
             toast.error(i18n.t("tickets.toasts.unauthorized"));
