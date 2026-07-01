@@ -254,6 +254,9 @@ const MessageInput = ({ ticketStatus }) => {
 		};
 		try {
 			await api.post(`/messages/${ticketId}`, message);
+			if (ticketStatus === "closed") {
+				await api.put(`/tickets/${ticketId}`, { status: "open" });
+			}
 		} catch (err) {
 			toastError(err);
 		}
@@ -332,7 +335,7 @@ const MessageInput = ({ ticketStatus }) => {
 				<IconButton
 					aria-label="showRecorder"
 					component="span"
-					disabled={loading || ticketStatus !== "open"}
+					disabled={loading}
 					onClick={() => setReplyingMessage(null)}
 				>
 					<ClearIcon className={classes.sendMessageIcons} />
@@ -380,7 +383,7 @@ const MessageInput = ({ ticketStatus }) => {
 					<IconButton
 						aria-label="emojiPicker"
 						component="span"
-						disabled={loading || recording || ticketStatus !== "open"}
+						disabled={loading || recording}
 						onClick={e => setShowEmoji(prevState => !prevState)}
 					>
 						<MoodIcon className={classes.sendMessageIcons} />
@@ -400,7 +403,7 @@ const MessageInput = ({ ticketStatus }) => {
 						multiple
 						type="file"
 						id="upload-button"
-						disabled={loading || recording || ticketStatus !== "open"}
+						disabled={loading || recording}
 						className={classes.uploadInput}
 						onChange={handleChangeMedias}
 					/>
@@ -408,7 +411,7 @@ const MessageInput = ({ ticketStatus }) => {
 						<IconButton
 							aria-label="upload"
 							component="span"
-							disabled={loading || recording || ticketStatus !== "open"}
+							disabled={loading || recording}
 						>
 							<AttachFileIcon className={classes.sendMessageIcons} />
 						</IconButton>
@@ -445,9 +448,9 @@ const MessageInput = ({ ticketStatus }) => {
 							maxRows={5}
 							value={inputMessage}
 							onChange={handleChangeInput}
-							disabled={recording || loading || ticketStatus !== "open"}
+							disabled={recording || loading}
 							onPaste={e => {
-								ticketStatus === "open" && handleInputPaste(e);
+								handleInputPaste(e);
 							}}
 							onKeyPress={e => {
 								if (loading || e.shiftKey) return;
@@ -498,7 +501,7 @@ const MessageInput = ({ ticketStatus }) => {
 						<IconButton
 							aria-label="showRecorder"
 							component="span"
-							disabled={loading || ticketStatus !== "open"}
+							disabled={loading}
 							onClick={handleStartRecording}
 						>
 							<MicIcon className={classes.sendMessageIcons} />

@@ -389,7 +389,7 @@ const useStyles = makeStyles((theme) => ({
                 height: "55px",
                 borderRadius: "10%",
               }}
-              src={ticket?.contact?.profilePicUrl}
+              src={ticket?.contact?.profilePicUrl} imgProps={{ onError: (e) => { e.currentTarget.src = "/nopicture.png"; } }}
             />
             :
             <Avatar
@@ -400,7 +400,7 @@ const useStyles = makeStyles((theme) => ({
                 height: "50px",
                 borderRadius: "10%",
               }}
-              src={ticket?.contact?.profilePicUrl}
+              src={ticket?.contact?.profilePicUrl} imgProps={{ onError: (e) => { e.currentTarget.src = "/nopicture.png"; } }}
             />
           }
         </ListItemAvatar>

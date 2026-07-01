@@ -35,7 +35,8 @@ const MODULE_KEYS = [
   { key: "dape_ia", label: "IA" },
   { key: "dape_growth", label: "Growth" },
   { key: "dape_intelligence", label: "Intelligence" },
-  { key: "dape_radar", label: "Radar" }
+  { key: "dape_radar", label: "Radar" },
+  { key: "dape_shield", label: "Shield" }
 ];
 
 const EMPTY_PLAN = {
@@ -48,11 +49,11 @@ const EMPTY_PLAN = {
   use_ia_audio_reply: false,
   allowed_ia_models: "",
   modules: {
-    dape_pipeline: false, dape_analytics: false, dape_ia: false,
+    dape_pipeline: false, dape_analytics: false, dape_ia: false, dape_shield: false,
     dape_growth: false, dape_intelligence: false, dape_radar: false
   },
   modulesModes: {
-    dape_pipeline: "assisted", dape_analytics: "assisted", dape_ia: "assisted",
+    dape_pipeline: "assisted", dape_analytics: "assisted", dape_ia: "assisted", dape_shield: "assisted",
     dape_growth: "assisted", dape_intelligence: "assisted", dape_radar: "assisted"
   }
 };

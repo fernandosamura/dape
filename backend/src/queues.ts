@@ -27,6 +27,7 @@ import ShowFileService from "./services/FileServices/ShowService";
 import FilesOptions from './models/FilesOptions';
 import { addSeconds, differenceInSeconds } from "date-fns";
 import formatBody from "./helpers/Mustache";
+import { getWbot } from "./libs/wbot";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
 import { dapleShield, applySafeDelay } from "./dape/shield/dapleShield.service";
 
@@ -1003,6 +1004,56 @@ async function handleInvoiceCreate() {
 handleCloseTicketsAutomatic()
 
 handleInvoiceCreate()
+
+async function refreshContactsProfilePics() {
+  const job = new CronJob('0 2 * * *', async () => {
+    logger.info('[🖼️] Iniciando refresh de fotos de perfil dos contatos...');
+    try {
+      const companies = await Company.findAll({ include: [{ model: Whatsapp, as: 'whatsapps', where: { status: 'CONNECTED' }, required: false }] });
+      for (const company of companies) {
+        const whatsapps = (company as any).whatsapps;
+        if (!whatsapps || whatsapps.length === 0) continue;
+        const wapp = whatsapps[0];
+        let wbot: any;
+        try { wbot = getWbot(wapp.id); } catch (_) { continue; }
+
+        // Buscar contatos com URL do WhatsApp (pps.whatsapp.net) — potencialmente expiradas
+        const contacts = await Contact.findAll({
+          where: {
+            companyId: company.id,
+            profilePicUrl: { [Op.like]: '%pps.whatsapp.net%' }
+          },
+          limit: 200
+        });
+
+        let refreshed = 0;
+        for (const contact of contacts) {
+          try {
+            const jid = contact.isLid
+              ? `${contact.number}@lid`
+              : `${contact.number}@${contact.isGroup ? 'g.us' : 's.whatsapp.net'}`;
+            const newUrl = await wbot.profilePictureUrl(jid, 'image');
+            if (newUrl && newUrl !== contact.profilePicUrl) {
+              await contact.update({ profilePicUrl: newUrl });
+              refreshed++;
+            }
+          } catch (_) {
+            // Contato sem foto — mantém nopicture
+            await contact.update({ profilePicUrl: `${process.env.FRONTEND_URL}/nopicture.png` });
+          }
+          // Respeitar rate limit do WhatsApp
+          await new Promise(r => setTimeout(r, 300));
+        }
+        logger.info(`[🖼️] Empresa ${company.id}: ${refreshed}/${contacts.length} fotos atualizadas`);
+      }
+    } catch (err) {
+      logger.error(`[🖼️] Erro no refresh de fotos: ${err}`);
+      Sentry.captureException(err);
+    }
+  });
+  job.start();
+}
+
 
 export async function startQueueProcess() {
 

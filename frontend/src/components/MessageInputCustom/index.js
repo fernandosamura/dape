@@ -320,7 +320,7 @@ const ActionButtons = (props) => {
       <IconButton
         aria-label="showRecorder"
         component="span"
-        disabled={loading || ticketStatus !== "open"}
+        disabled={loading}
         onClick={handleStartRecording}
       >
         <MicIcon className={classes.sendMessageIcons} />
@@ -398,9 +398,7 @@ const CustomInput = (props) => {
   };
 
   const onPaste = (e) => {
-    if (ticketStatus === "open") {
-      handleInputPaste(e);
-    }
+    handleInputPaste(e);
   };
 
   const renderPlaceholder = () => {
@@ -622,6 +620,9 @@ const MessageInputCustom = (props) => {
     };
     try {
       await api.post(`/messages/${ticketId}`, message);
+      if (ticketStatus === "closed") {
+        await api.put(`/tickets/${ticketId}`, { status: "open" });
+      }
     } catch (err) {
       toastError(err);
     }
@@ -697,7 +698,7 @@ const MessageInputCustom = (props) => {
   };
 
   const disableOption = () => {
-    return loading || recording || ticketStatus !== "open";
+    return loading || recording;
   };
 
   const renderReplyingMessage = (message) => {
@@ -721,7 +722,7 @@ const MessageInputCustom = (props) => {
         <IconButton
           aria-label="showRecorder"
           component="span"
-          disabled={loading || ticketStatus !== "open"}
+          disabled={loading}
           onClick={() => setReplyingMessage(null)}
         >
           <ClearIcon className={classes.sendMessageIcons} />

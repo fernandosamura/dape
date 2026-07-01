@@ -10,6 +10,7 @@ import User from "../../models/User";
 import formatBody from "../../helpers/Mustache";
 import { dapleShield } from "../../dape/shield/dapleShield.service";
 import { logger } from "../../utils/logger";
+import CreateMessageService from "../MessageServices/CreateMessageService";
 
 interface Request {
   body: string;
@@ -46,18 +47,24 @@ const SendWhatsAppMessage = async ({
   // Determine the correct JID domain (some contacts use @lid for Advanced Privacy)
   let jidDomain = ticket.isGroup ? "g.us" : "s.whatsapp.net";
   if (!ticket.isGroup) {
-    const lastContactMsg = await Message.findOne({
-      where: { ticketId: ticket.id, fromMe: false },
-      order: [["createdAt", "DESC"]]
-    });
-    if (lastContactMsg?.dataJson) {
-      try {
-        const parsedMsg = JSON.parse(lastContactMsg.dataJson);
-        const remoteJid: string = parsedMsg?.key?.remoteJid || "";
-        if (remoteJid.includes("@lid")) {
-          jidDomain = "lid";
-        }
-      } catch (_) {}
+    // Priority 1: check contact.isLid flag (works even when contact never replied)
+    if (ticket.contact.isLid) {
+      jidDomain = "lid";
+    } else {
+      // Fallback: detect lid from last incoming message JID
+      const lastContactMsg = await Message.findOne({
+        where: { ticketId: ticket.id, fromMe: false },
+        order: [["createdAt", "DESC"]]
+      });
+      if (lastContactMsg?.dataJson) {
+        try {
+          const parsedMsg = JSON.parse(lastContactMsg.dataJson);
+          const remoteJid: string = parsedMsg?.key?.remoteJid || "";
+          if (remoteJid.includes("@lid")) {
+            jidDomain = "lid";
+          }
+        } catch (_) {}
+      }
     }
   }
 
@@ -106,6 +113,28 @@ const SendWhatsAppMessage = async ({
     );
 
     await ticket.update({ lastMessage: finalBody });
+
+    // Feedback instantâneo: persiste e emite via socket ANTES do echo do Baileys chegar.
+    // O echo em wbotMessageListener é descartado por deduplicação (Message.count check).
+    if (sentMessage?.key?.id) {
+      try {
+        await CreateMessageService({
+          messageData: {
+            id: sentMessage.key.id,
+            ticketId: ticket.id,
+            body: finalBody,
+            fromMe: true,
+            mediaType: "conversation",
+            read: true,
+            ack: 1,
+          },
+          companyId: ticket.companyId,
+        });
+      } catch (optimisticErr) {
+        // Não bloqueia: o echo do Baileys criará a mensagem normalmente
+        logger.warn(`[SendWhatsAppMessage] optimistic emit falhou (ticket ${ticket.id}): ${(optimisticErr as any)?.message}`);
+      }
+    }
 
     // Para grupos: Baileys não dispara messages.update com ack confiável.
     // Forçar ack=2 (SERVER_ACK = enviado) imediatamente após envio bem-sucedido.

@@ -135,7 +135,7 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 								style={{ cursor: "pointer", width: '100%' }}
 								titleTypographyProps={{ noWrap: true }}
 								subheaderTypographyProps={{ noWrap: true }}
-								avatar={<Avatar src={contact.profilePicUrl} alt="contact_image" style={{ width: 60, height: 60 }} />}
+								avatar={<Avatar src={contact.profilePicUrl} alt="contact_image" style={{ width: 60, height: 60 }} imgProps={{ onError: (e) => { e.currentTarget.src = "/nopicture.png"; } }} />}
 								title={
 									<>
 										<Typography onClick={() => setOpenForm(true)}>

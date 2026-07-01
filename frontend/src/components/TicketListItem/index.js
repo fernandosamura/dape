@@ -162,7 +162,7 @@ const TicketListItem = ({ ticket }) => {
           ></span>
         </Tooltip>
         <ListItemAvatar>
-          <Avatar src={ticket?.contact?.profilePicUrl} />
+          <Avatar src={ticket?.contact?.profilePicUrl} imgProps={{ onError: (e) => { e.currentTarget.src = "/nopicture.png"; } }} />
         </ListItemAvatar>
         <ListItemText
           disableTypography
