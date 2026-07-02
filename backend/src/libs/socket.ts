@@ -63,10 +63,21 @@ export const initIO = (httpServer: Server): SocketIO => {
       if (!ticketId || ticketId === "undefined") {
         return;
       }
+      // Rejeita IDs não-inteiros (ex: UUIDs enviados por engano) sem derrubar a query no Postgres
+      if (!/^\d+$/.test(ticketId)) {
+        logger.debug(`joinChatBox: ticketId não-inteiro ignorado: ${ticketId}`);
+        return;
+      }
       Ticket.findByPk(ticketId).then(
         (ticket) => {
-          if (ticket && ticket.companyId === user.companyId
-            && (ticket.userId === user.id || user.profile === "admin")) {
+          const isAdmin = user.profile === "admin";
+          const hasAllTickets = (user as any).allTicket === "enabled";
+          const isOwner = ticket?.userId === user.id;
+          const isGroup = ticket?.isGroup === true;
+          const hasQueueAccess = ticket?.queueId != null && user.queues?.some((q: any) => q.id === ticket.queueId);
+          const canAccess = ticket && ticket.companyId === user.companyId
+            && (isAdmin || hasAllTickets || isOwner || isGroup || hasQueueAccess);
+          if (canAccess) {
             let c: number;
             if ((c = counters.incrementCounter(`ticket-${ticketId}`)) === 1) {
               socket.join(ticketId);

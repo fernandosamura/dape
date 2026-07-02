@@ -74,6 +74,8 @@ const Ticket = () => {
   useEffect(() => {
     // Aguarda o router carregar o parâmetro antes de disparar a requisição
     if (!ticketId || ticketId === "undefined") return;
+    // Aguarda o usuário ser carregado pelo useAuth antes de verificar permissões
+    if (!user || !user.id) return;
 
     setLoading(true);
     const delayDebounceFn = setTimeout(() => {
@@ -87,7 +89,7 @@ const Ticket = () => {
           const hasAllTickets = allTicket === "enabled";
           const isOwner = data.userId === currentUserId;
           const isGroup = data.isGroup === true;
-          const hasQueueAccess = queueId !== null && queues.find((q) => q.id === queueId) !== undefined;
+          const hasQueueAccess = queueId !== null && (queues || []).find((q) => q.id === queueId) !== undefined;
 
           const canAccess = isAdmin || hasAllTickets || isOwner || isGroup || hasQueueAccess;
 
