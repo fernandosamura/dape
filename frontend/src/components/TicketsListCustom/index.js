@@ -189,9 +189,20 @@ const TicketsListCustom = (props) => {
 
   useEffect(() => {
     const queueIds = queues.map((q) => q.id);
-    const filteredTickets = tickets.filter(
-      (t) => queueIds.indexOf(t.queueId) > -1
-    );
+    const filteredTickets = tickets.filter((t) => {
+      // 1. Grupos são sempre permitidos
+      if (t.isGroup) return true;
+      
+      // 2. O ticket precisa estar em uma fila que o usuário tem acesso
+      const hasQueueAccess = queueIds.indexOf(t.queueId) > -1;
+      
+      // 3. Se o ticket estiver aberto, ele SÓ pode ver se for o dono (isolamento)
+      if (t.status === "open" && t.userId !== user.id) {
+        return false;
+      }
+      
+      return hasQueueAccess;
+    });
 
     const allTicketEnabled = user.allTicket === "enabled";
     if (profile === "user" && !allTicketEnabled) {

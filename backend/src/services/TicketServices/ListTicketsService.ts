@@ -113,6 +113,18 @@ const ListTicketsService = async ({
     };
   }
 
+  // ISOLAMENTO DE TICKETS ABERTOS PARA USUÁRIO COMUM
+  if (status === "open" && showAll !== "true") {
+    whereCondition = {
+      [Op.or]: [
+        // Ticket é atribuído ao próprio usuário
+        { userId },
+        // Ou é um grupo
+        { isGroup: true }
+      ]
+    };
+  }
+
   if (status) {
     whereCondition = {
       ...whereCondition,
