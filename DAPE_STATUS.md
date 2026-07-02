@@ -10,8 +10,134 @@ metadata:
 # DAPLE — Status do Projeto
 
 **Servidor:** root@187.127.25.246
+**Domínio:** https://daple.pubplus.com.br
+**SSL:** Let's Encrypt — válido até 23/09/2026 (renovação automática ativa)
 **Repo local:** /tmp/dape_push
-**Branch em produção:** sprint2/seguranca-resiliencia (commit d6b7f4b)
+**Branch em produção:** sprint2/seguranca-resiliencia
+
+---
+
+## Módulos
+
+| Modulo             | Backend | Frontend | Migration | Status   |
+|--------------------|---------|----------|-----------|----------|
+| DAPE Foundation    | OK      | OK       | OK        | Completo |
+| DAPE Pipeline      | OK      | OK       | OK        | Completo |
+| DAPE Analytics     | OK      | OK       | OK        | Completo |
+| DAPE IA            | OK      | OK       | OK        | Completo |
+| DAPE Growth        | OK      | OK       | OK        | Completo |
+| DAPE Intelligence  | OK      | OK       | OK        | Completo |
+| DAPE Radar         | OK      | OK       | OK        | Completo |
+| DAPE Automation    | OK      | --       | OK        | Completo |
+| Channels por Plano | OK      | OK       | OK        | Completo |
+| DAPE Billing       | OK      | OK       | OK        | Completo |
+| Grupos WhatsApp    | OK      | OK       | OK        | Completo |
+
+---
+
+## Sessão 2026-06-25 — Migração VPS + UI/UX
+
+### 1. Migração de Servidor (EUA -> Brasil)
+- Nova VPS Hostinger Brasil: 187.127.25.246 (VPS antiga EUA 2.25.196.154 DESCOMISSIONADA em 2026-06-25)
+- Docker 29.6 instalado + repo clonado + backup restaurado
+- Banco restaurado: 71 tabelas, 14 usuarios, 1.189 contatos, 108 mensagens
+- Nginx configurado como proxy reverso: /api -> 3000, / -> 3001
+- SSL Let's Encrypt gerado para daple.pubplus.com.br
+- DNS apontado via Hostinger: A daple -> 187.127.25.246 (TTL 300)
+- docker compose up --build -d executado com sucesso na nova maquina
+
+### 2. UI/UX — Menu Lateral (MainListItems.js + pt.js)
+- Removidos emojis dos itens DAPE: Pipeline, Kanban DAPE, Analytics, Growth, Intelligence, Radar, DAPLE Master, Assinatura
+- Renomeado Open.Ai para Daple AI em pt.js
+- Movido bloco Assinatura (/dape/billing) para secao ADMINISTRACAO (logo apos Informativos)
+
+### 3. Favicon — Mascote DAPLE (robo no foguete)
+- PNG original sem canal alpha (cor de fundo branca)
+- Fundo removido com ImageMagick (-fuzz 5% -transparent white)
+- ICO construido manualmente em Python com PNGs RGBA embutidos (ColorType=6)
+- Tamanhos: 16x16, 32x32, 48x48, 64x64, 256x256
+- Arquivo salvo em brands/dape-favicon.ico (copiado automaticamente no build)
+
+### 4. Fix TypeScript — MessageController.ts
+- req.user.id e tipo string, userId em SendWhatsAppMessage espera number
+- Corrigido: Number(req.user.id) nas linhas 69 e 171
+
+### 5. UI — Chat Interno (bolhas + lista premium)
+- ChatMessages.js: boxLeft (outro usuario) blue -> #daeeff (azul pastel claro)
+- ChatMessages.js: boxRight (proprio usuario) green -> #d6f5e3 (verde pastel claro)
+- Ambas com borderRadius 12px, boxShadow suave e borda semi-transparente
+- ChatList.js: itens com borderRadius 8px, margin, hover com fundo sutil e sombra
+- Item selecionado: borda azul #1976d2 + fundo rgba(25,118,210,0.08) + sombra
+
+### 6. Grupos WhatsApp — multi-atendente (commit e5c002c)
+- Tabela TicketUsers (migration 20260624000003)
+- Model TicketUser.ts + BelongsToMany em Ticket.ts
+- Rotas: POST /tickets/:id/join, POST /tickets/:id/leave, GET /tickets/:id/users
+- SendWhatsAppMessage: prefixo [Nome] em mensagens de grupo
+- Frontend: botoes Entrar/Sair do Grupo + exibicao do remetente em grupos
+
+Commits: ec7eda6 · c18d068 · 67f52af · 28ded8c · 867e369 · e5c002c
+
+---
+
+## Correções aplicadas (2026-06-24 sessão 2) — handleOpenAi 4 melhorias
+
+1. **Roteamento para Fila corrigido** — transferQueue: status=pending, userId=null, chatbot=false
+2. **Delay Humanizado — Sammy Digitando** — sendWithTypingDelay: presenceSubscribe + composing + delay clamp(palavras×60ms+jitter, 800-4000ms)
+3. **Novos Modelos Gemini** — famílias 2.5 e 3.1 (flash, flash-lite, pro, pro-preview, flash-live, etc.)
+4. **Transcrição de Áudio com Gemini Multimodal** — base64 via inlineData direto no payload
+
+---
+
+## Correções aplicadas (2026-06-24 sessão 1) — DapeDeal + IA Rate Limit
+- DapeDeal "column does not exist" — corrigido com `@Table({ underscored: true })`
+- Rate Limit IA: MAX_CALLS_PER_MINUTE 10 → 50
+- Migrations: dape_ia_rate_limits, dape_ia_summaries, dape_ia_suggestions, colunas Prompts
+
+---
+
+## Correções anteriores (2026-06-18 a 2026-06-23)
+- Billing/Asaas: tabelas dape_billing_invoices, dape_billing_events
+- Constraints por empresa: Queues, Whatsapps, QueueIntegrations, Settings
+- Parecer Técnico Manus AI: 6 correções de backend
+
+---
+
+## Sessão 2026-06-25 (tarde) — Migração de Armazenamento para Cloudflare R2
+
+**Objetivo:** migrar arquivos de mídia de /public na VPS para Cloudflare R2 (S3-compatível), por economia de disco e escalabilidade.
+
+1. **Variáveis de ambiente** (.env backend): CLOUDFLARE_R2_ENABLED, CLOUDFLARE_R2_BUCKET_NAME=daplemidias, ACCESS_KEY_ID/SECRET_ACCESS_KEY, ENDPOINT, PUBLIC_URL
+2. **R2Service.ts (novo)** — S3Client (endpoint R2, region auto): uploadToR2, deleteFromR2, downloadFromR2
+3. **upload.ts** — com R2 ativo, destino forçado para public/temp (staging); sem R2, comportamento original
+4. **FilesController.ts** — uploadMedias: salva no disco → uploadToR2 → unlinkSync
+5. **MessageController.ts** — store/send: upload antes de enfileirar/enviar, depois remove local
+6. **verifyMediaMessage (wbotMessageListener.ts)** — mídia recebida salva em temp → R2 → unlink
+7. **SendWhatsAppMedia.ts** — resolveLocalPath(): baixa do R2 para temp se não existir localmente; finally limpa temp
+8. **Message.ts** — getter mediaUrl: retorna URL do R2 se ativo e configurado, senão fallback disco local
+9. **3 bugs críticos corrigidos no módulo de IA:**
+   - TTS: uploadToR2 do .ogg ANTES de deleteFileSync (senão mediaUrl apontava pra arquivo já deletado)
+   - Transcrição de áudio: downloadFromR2 antes de ler, limpeza do temp depois (Gemini e Whisper)
+   - .env.example atualizado com todas as variáveis CLOUDFLARE_R2_*
+
+Commits: a33cb53 · a8f18a1
+
+---
+
+## Sessão 2026-06-26 — Landing Page Mobile + Bug Troca de Senha
+
+### 1-2. Landing Page — Layout Mobile (planos + cards Intelligence/Radar)
+- Cards apareciam lado a lado no celular por inline style `grid-template-columns` sem a class esperada pelo media query
+- Fix: regras CSS `!important` mirando os containers reais (`.plans-section .inner>div[style]`, nova class `intel-sub-grid`)
+- Commits: 9b8f170 · 80630fc
+
+### 3. Bug crítico — Troca de senha pelo próprio usuário (4 correções)
+- **Fix 1** (UserController.ts): usuário não-admin recebia 403 ao editar o próprio perfil — `isSelf` agora permite, com campos sensíveis (profile/queueIds/whatsappId) filtrados para não-admins. Commit 4c52ba6
+- **Fix 2** (UpdateUserService.ts): hash de senha não persistia — `password` é campo VIRTUAL no Sequelize v5, hook BeforeUpdate gerava passwordHash mas não entrava no UPDATE. Corrigido com hash manual antes do `user.update()`. Commit cfed0ec
+- **Fix 3** (UpdateUserService.ts): erro 400 por companyId undefined após o Fix 1 filtrar o body. Verificação só roda se `companyId !== undefined`. Commit c637369
+- **Fix 4** (UserController.ts): queueIds vazio no self-edit apagava todas as filas do usuário (`$set("queues", [])`). Corrigido preservando filas atuais. Commit 151954a
+
+Commits: 9b8f170 · 80630fc · 4c52ba6 · cfed0ec · c637369 · 151954a
 
 ---
 
@@ -108,6 +234,9 @@ Saúde pós-deploy: `/health` → `{"status":"ok","db":"ok"}` ✅ | sessões WA 
 - #037 Socket.IO namespaces por tenant
 
 ---
+
+## Issues conhecidos
+- git push configurado com PAT (token armazenado apenas no remote URL do servidor)
 
 ## Documentos no repositório
 - BACKUP_RUNBOOK.md · DEPLOY_SPRINT1.md · SPRINT1_VALIDATION.md
