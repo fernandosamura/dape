@@ -146,7 +146,7 @@ const TicketListItem = ({ ticket }) => {
           if (ticket.status === "pending") return;
           handleSelectTicket(ticket);
         }}
-        selected={ticketId && +ticketId === ticket.id}
+        selected={ticketId && (ticketId === ticket.uuid || +ticketId === ticket.id)}
         className={clsx(classes.ticket, {
           [classes.pendingTicket]: ticket.status === "pending",
         })}

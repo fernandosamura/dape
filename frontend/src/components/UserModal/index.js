@@ -261,7 +261,7 @@ const UserModal = ({ open, onClose, userId }) => {
 								<Can
 									role={loggedInUser.profile}
 									perform="user-modal:editProfile"
-									yes={() => (!loading &&
+									yes={() => (!loading && loggedInUser.profile === "admin" &&
 										<div className={classes.textField}>
 											<FormControl
 												variant="outlined"

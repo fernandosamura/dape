@@ -1,6 +1,8 @@
 const rules = {
 	user: {
-		static: [],
+		static: [
+			"user-modal:editQueues"
+		],
 	},
 
 	admin: {
