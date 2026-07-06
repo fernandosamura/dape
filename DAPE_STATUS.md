@@ -251,6 +251,16 @@ Verificado: `curl -I` num arquivo já existente no R2 (`1783355045540_folha_paga
 
 **Lição:** ao investigar bugs de mídia/upload neste projeto, sempre checar 1) limites de nginx (`client_max_body_size`) e 2) qual `.env` realmente alimenta o container via `env_file` no `docker-compose.yml` — não assumir que `backend/.env` é o arquivo ativo.
 
+### ⚠️ Update 2026-07-06 (cont.) — usuário testou de novo, console mostrou 2 problemas novos
+
+**Commit:** c3f97a9 — "fix: corrige upload R2 (ContentLength/checksum) e remove dependencia de CORS no ModalImageCors"
+
+1. **Upload pro R2 quebrado por incompatibilidade AWS SDK v3 x R2:** `TypeError [ERR_HTTP_INVALID_HEADER_VALUE]: Invalid value "undefined" for header "x-amz-decoded-content-length"`. SDK instalado (3.1078.0, via range `^3.600.0`) calcula checksum "flexible" por padrão em uploads via stream sem `ContentLength` explícito, o que o R2 não suporta corretamente. Isso causava falha no upload e, em cascata, `ENOENT` ao tentar ler o arquivo temp já removido. **Fix em `R2Service.ts`:** `requestChecksumCalculation: "WHEN_REQUIRED"` no `S3Client` + `ContentLength: fs.statSync(filePath).size` explícito no `PutObjectCommand`. Testado com upload real dentro do container: `UPLOAD_OK` / `DELETE_OK`.
+
+2. **CORS bloqueado ao carregar imagens do R2 no navegador:** o fix anterior fazia o browser buscar a imagem via XHR direto do domínio R2 (`pub-xxxx.r2.dev`), mas o bucket não tem CORS liberado pra `daple.pubplus.com.br`. **Fix real (mais robusto que configurar CORS no bucket):** áudio/vídeo/documento no `MessagesList` já usam `<audio src>`/`<video src>`/`<a href>` diretos (não passam por XHR, não são afetados). Só `ModalImageCors` fazia fetch via blob. Como URLs do R2 já são públicas, não precisam de fetch autenticado — agora `ModalImageCors` detecta URL absoluta e usa direto como `src` da imagem, sem chamar XHR nenhuma, eliminando a dependência de CORS no bucket.
+
+Deploy: rebuild conjunto backend+frontend, containers iniciados 2026-07-06 17:03 UTC. `/health` OK.
+
 ---
 
 ## 🔜 Sprint 3 — pendente
