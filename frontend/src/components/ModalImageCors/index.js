@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 
 import ModalImage from "react-modal-image";
-import axios from "axios";
 import api from "../../services/api";
 
 const useStyles = makeStyles(theme => ({
@@ -24,13 +23,18 @@ const ModalImageCors = ({ imageUrl }) => {
 
 	useEffect(() => {
 		if (!imageUrl) return;
+
+		// URL absoluta (ex: R2) já é pública — usa direto, sem fetch via XHR
+		// (evita depender de CORS estar configurado no bucket)
+		if (imageUrl.startsWith("http")) {
+			setBlobUrl(imageUrl);
+			setFetching(false);
+			return;
+		}
+
 		const fetchImage = async () => {
 			try {
-				// Se a URL for absoluta (ex: R2), usa axios puro sem o baseURL do backend
-				const isAbsolute = imageUrl.startsWith("http");
-				const axiosInstance = isAbsolute ? axios : api;
-
-				const { data, headers } = await axiosInstance.get(imageUrl, {
+				const { data, headers } = await api.get(imageUrl, {
 					responseType: "blob",
 				});
 				const url = window.URL.createObjectURL(

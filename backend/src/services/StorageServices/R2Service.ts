@@ -14,7 +14,10 @@ const r2Client = new S3Client({
   credentials: {
     accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!
-  }
+  },
+  // R2 não suporta o checksum "flexible" que o AWS SDK v3 recente calcula
+  // por padrão em uploads via stream, o que quebra com ContentLength "undefined"
+  requestChecksumCalculation: "WHEN_REQUIRED"
 });
 
 const BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
@@ -25,12 +28,14 @@ export const uploadToR2 = async (
   mimeType: string
 ): Promise<string> => {
   const fileStream = fs.createReadStream(filePath);
+  const { size } = fs.statSync(filePath);
   await r2Client.send(
     new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: fileName,
       Body: fileStream,
-      ContentType: mimeType
+      ContentType: mimeType,
+      ContentLength: size
     })
   );
   return fileName;
