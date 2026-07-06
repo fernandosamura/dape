@@ -98,8 +98,8 @@ const useStyles = makeStyles(theme => ({
     background: "rgba(255,255,255,0.08)",
   },
   logoLeft: {
-    width: "180px",
-    marginBottom: "12px",
+    width: "230px",
+    marginBottom: "4px",
     filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.3))",
     position: "relative",
     zIndex: 1,
@@ -107,10 +107,10 @@ const useStyles = makeStyles(theme => ({
   platformTag: {
     color: "#1a1a1a",
     fontWeight: 700,
-    fontSize: "14px",
+    fontSize: "17px",
     letterSpacing: "0.3px",
     textAlign: "center",
-    marginBottom: "24px",
+    marginBottom: "20px",
     position: "relative",
     zIndex: 1,
   },
@@ -313,10 +313,10 @@ const Login = () => {
           </Typography>
           <img src={dapleMascote} alt="DAPLE Mascote" className={classes.sammyImg} />
           <Typography className={classes.tagline}>
-            Transforme conversas<br />em vendas
+            Inteligência que Conecta
           </Typography>
           <Typography className={classes.subtagline}>
-            Inteligência artificial que atende, qualifica e fecha negócio por você
+            Transforme informações em decisões e resultados consistentes.
           </Typography>
         </div>
 
