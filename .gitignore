@@ -29,3 +29,5 @@ logs/
 
 # Cache
 .cache/
+.env.bak-*
+backend/.env.bak-*

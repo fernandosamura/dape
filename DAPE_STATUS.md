@@ -239,6 +239,18 @@ Saúde pós-deploy: `/health` → `{"status":"ok","db":"ok"}` ✅ | sessão WA P
 
 **Pendente de verificação manual (não testável via SSH):** enviar imagem do celular pro painel, anexo com nome complexo do painel pro celular, e áudio gravado no painel — conforme roteiro do prompt original.
 
+### ⚠️ Update 2026-07-06 — usuário reportou que os 3 fixes acima NÃO resolveram (mídia continuava sem enviar/receber)
+
+Causas raiz reais eram de **infraestrutura**, não só código:
+
+1. **Nginx sem `client_max_body_size`** — usava o default de 1MB, rejeitando com 413 qualquer mídia maior antes de chegar no backend (por isso nenhum log de upload aparecia). Corrigido: `client_max_body_size 50M;` adicionado em `/etc/nginx/sites-enabled/dape-frontend` (backup salvo como `dape-frontend.nginx.bak-*` em `/root`). Nginx recarregado.
+
+2. **`CLOUDFLARE_R2_PUBLIC_URL` com valor inválido** — estava setada como um token (`cfat_Q89gP6yXNN2HTqMm7...`), não uma URL. Isso corrompia `mediaUrl` de toda mensagem com mídia armazenada no R2 (getter em `Message.ts:55`). **IMPORTANTE:** o valor real usado pelo container vem de `/root/dape/.env` (raiz do projeto, via `env_file` no docker-compose), **não** de `backend/.env` — este último não tem efeito no container em produção, apesar de existir e parecer o lugar óbvio. Corrigido para `https://pub-8178b70f9db24ba3a98c650406e67e52.r2.dev` em ambos os arquivos por consistência. Backend recriado com `docker compose up -d --force-recreate backend` (só troca de env var, não precisa rebuild de imagem).
+
+Verificado: `curl -I` num arquivo já existente no R2 (`1783355045540_folha_pagamento_corrigida.xlsx`) retornou HTTP 200 pela nova URL pública — confirma que a mídia armazenada volta a ser acessível.
+
+**Lição:** ao investigar bugs de mídia/upload neste projeto, sempre checar 1) limites de nginx (`client_max_body_size`) e 2) qual `.env` realmente alimenta o container via `env_file` no `docker-compose.yml` — não assumir que `backend/.env` é o arquivo ativo.
+
 ---
 
 ## 🔜 Sprint 3 — pendente
