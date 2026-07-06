@@ -263,6 +263,27 @@ Deploy: rebuild conjunto backend+frontend, containers iniciados 2026-07-06 17:03
 
 ---
 
+## ✅ Feature — Nome do bot na conversa, tickets órfãos em "Aguardando", tela de login (2026-07-06)
+
+**Commit:** fec3c58 — "feat: nome do bot na conversa, tickets orfaos em Aguardando, fixes e melhorias na tela de login"
+
+| # | Mudança | Arquivo |
+|---|---------|---------|
+| 1 | Subheader do ticket mostra nome do Prompt de IA (`ticket.queue.prompt.name` + 🤖) quando o bot atende (sem `user`) — antes só mostrava quando havia atendente humano | `frontend/src/components/TicketInfo/index.js` |
+| 2 | `ListTicketsService` agora inclui `queue.prompt` (antes só `ShowTicketService` incluía) — necessário pra lista de tickets também ter o nome do bot disponível | `backend/src/services/TicketServices/ListTicketsService.ts` |
+| 3 | Tickets sem fila E sem atendente (`queueId: null, userId: null, isGroup: false`) agora aparecem em "Aguardando" pra qualquer atendente, não só admin/showAll — antes ficavam órfãos e invisíveis pra atendentes comuns | `backend/src/services/TicketServices/ListTicketsService.ts` (bloco `status === "pending"`) |
+| 4 | Fix bug real de autofill do Chrome: fundo branco forçado deixava o label (cor clara) ilegível — override `:-webkit-autofill` no `textField` | `frontend/src/pages/Login/index.js` |
+| 5 | Toggle de mostrar/ocultar senha (`Visibility`/`VisibilityOff`) | `frontend/src/pages/Login/index.js` |
+| 6 | Tag "Plataforma de Inteligência Comercial" adicionada como `Typography` real (antes só existia embutida na imagem do logo, se existisse) | `frontend/src/pages/Login/index.js` |
+| 7 | Nova copy: tagline "Transforme conversas em vendas" / subtagline "Inteligência artificial que atende, qualifica e fecha negócio por você" (era "Seu atendimento inteligente começa aqui" / "Gerencie, automatize e conquiste clientes") | `frontend/src/pages/Login/index.js` |
+| 8 | Rodapé do login: `DAPE v6.0.0` → `DAPLE v6.07` | `frontend/package.json` (`nomeEmpresa`, `versionSystem`) |
+
+Deploy: rebuild conjunto backend+frontend, containers iniciados 2026-07-06 18:15 UTC. `/health` OK, `/login` HTTP 200.
+
+**Pendente de verificação visual (extensão Chrome não conectou nesta sessão):** confirmar autofill não deixa mais o label ilegível, toggle de senha funciona, tag da plataforma aparece, copy nova está no ar.
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
