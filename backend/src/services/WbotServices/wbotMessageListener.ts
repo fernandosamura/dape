@@ -1185,7 +1185,8 @@ export const verifyMediaMessage = async (
   }
 
   try {
-    const fileBuffer = Buffer.from(media.data, 'base64');
+    // media.data já é um Buffer retornado pelo downloadMediaMessage
+    const fileBuffer = Buffer.isBuffer(media.data) ? media.data : Buffer.from(media.data, 'base64');
     if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
       const fs = require("fs");
       const tempPath = join(__dirname, "..", "..", "..", "public", "temp", media.filename);

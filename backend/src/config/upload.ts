@@ -37,12 +37,18 @@ export default {
     },
     filename(req, file, cb) {
       const { typeArch } = req.body;
+
+      // Sanitiza o nome original mantendo apenas alfanuméricos, pontos e hífens
+      const sanitizedName = file.originalname
+        .normalize("NFD")
+        .replace(new RegExp("[\\u0300-\\u036f]", "g"), "") // Remove acentos
+        .replace(/[^a-zA-Z0-9.-]/g, "_"); // Substitui caracteres especiais por _
+
       const fileName =
         typeArch && typeArch !== "announcements"
-          ? file.originalname.replace("/", "-").replace(/ /g, "_")
-          : new Date().getTime() +
-            "_" +
-            file.originalname.replace("/", "-").replace(/ /g, "_");
+          ? sanitizedName
+          : `${new Date().getTime()}_${sanitizedName}`;
+
       return cb(null, fileName);
     }
   })
