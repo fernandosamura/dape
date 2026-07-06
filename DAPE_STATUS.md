@@ -224,6 +224,23 @@ Saúde pós-deploy: `/health` → `{"status":"ok","db":"ok"}` ✅ | sessões WA 
 
 ---
 
+## ✅ Fix — Fluxo completo de mídia (imagens, áudios, vídeos, anexos) (2026-07-06)
+
+**Commit:** fa7a6be — "fix: corrige fluxo de midia - buffer corrompido, sanitizacao de nomes de arquivo e CORS de imagens R2"
+
+| # | Fix | Arquivo |
+|---|-----|---------|
+| 1 | `media.data` do `downloadMediaMessage` já é um Buffer nativo — fazia `Buffer.from(media.data, 'base64')` de novo e corrompia o arquivo. Agora checa `Buffer.isBuffer()` antes | backend/src/services/WbotServices/wbotMessageListener.ts |
+| 2 | Multer não sanitizava nomes com acentos/caracteres especiais, quebrando path local e URL do R2. Agora normaliza NFD, remove diacríticos e substitui não-alfanuméricos por `_` | backend/src/config/upload.ts |
+| 3 | `ModalImageCors` usava a instância `api` (com baseURL do backend) mesmo para URLs absolutas do R2, gerando 404. Agora detecta URL absoluta (`startsWith("http")`) e usa `axios` puro nesse caso | frontend/src/components/ModalImageCors/index.js |
+
+Deploy: rebuild conjunto de backend + frontend (`docker compose stop/rm/up --build backend frontend`), containers iniciados 2026-07-06 16:11 UTC.
+Saúde pós-deploy: `/health` → `{"status":"ok","db":"ok"}` ✅ | sessão WA POP 4081 reconectou "open" ✅
+
+**Pendente de verificação manual (não testável via SSH):** enviar imagem do celular pro painel, anexo com nome complexo do painel pro celular, e áudio gravado no painel — conforme roteiro do prompt original.
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
