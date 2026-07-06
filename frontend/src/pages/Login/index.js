@@ -8,8 +8,8 @@ import Grid from "@material-ui/core/Grid";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
 import { makeStyles } from "@material-ui/core/styles";
-import { IconButton, Menu, MenuItem } from "@material-ui/core";
-import { LanguageOutlined } from "@material-ui/icons";
+import { IconButton, Menu, MenuItem, InputAdornment } from "@material-ui/core";
+import { LanguageOutlined, Visibility, VisibilityOff } from "@material-ui/icons";
 import { versionSystem } from "../../../package.json";
 import { nomeEmpresa } from "../../../package.json";
 import { i18n } from "../../translate/i18n";
@@ -99,8 +99,18 @@ const useStyles = makeStyles(theme => ({
   },
   logoLeft: {
     width: "180px",
-    marginBottom: "24px",
+    marginBottom: "12px",
     filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.3))",
+    position: "relative",
+    zIndex: 1,
+  },
+  platformTag: {
+    color: "#1a1a1a",
+    fontWeight: 700,
+    fontSize: "14px",
+    letterSpacing: "0.3px",
+    textAlign: "center",
+    marginBottom: "24px",
     position: "relative",
     zIndex: 1,
   },
@@ -169,6 +179,12 @@ const useStyles = makeStyles(theme => ({
     },
     "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.45)" },
     "& .MuiInputLabel-root.Mui-focused": { color: "#F5C300" },
+    // Chrome/Safari forçam fundo branco no autofill, deixando o label (claro) ilegível
+    "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus": {
+      WebkitTextFillColor: "#fff",
+      WebkitBoxShadow: "0 0 0px 1000px rgba(255,255,255,0.05) inset",
+      transition: "background-color 5000s ease-in-out 0s",
+    },
     marginBottom: "16px",
   },
   submitBtn: {
@@ -214,6 +230,7 @@ const Login = () => {
   const [pendingApproval, setPendingApproval] = useState(false);
   const [anchorElLanguage, setAnchorElLanguage] = useState(null);
   const [menuLanguageOpen, setMenuLanguageOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { handleLogin } = useContext(AuthContext);
 
   const handleChangeInput = e => setUser({ ...user, [e.target.name]: e.target.value });
@@ -291,12 +308,15 @@ const Login = () => {
           <div className={classes.leftDecorCircle} />
           <div className={classes.leftDecorCircle2} />
           <img src={logo} alt="DAPLE" className={classes.logoLeft} />
+          <Typography className={classes.platformTag}>
+            Plataforma de Inteligência Comercial
+          </Typography>
           <img src={dapleMascote} alt="DAPLE Mascote" className={classes.sammyImg} />
           <Typography className={classes.tagline}>
-            Seu atendimento<br />inteligente começa aqui
+            Transforme conversas<br />em vendas
           </Typography>
           <Typography className={classes.subtagline}>
-            Gerencie, automatize e conquiste clientes
+            Inteligência artificial que atende, qualifica e fecha negócio por você
           </Typography>
         </div>
 
@@ -327,11 +347,25 @@ const Login = () => {
               fullWidth
               name="password"
               label={i18n.t("login.form.password")}
-              type="password"
+              type={showPassword ? "text" : "password"}
               id="password"
               value={user.password}
               onChange={handleChangeInput}
               autoComplete="current-password"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                      style={{ color: "rgba(255,255,255,0.45)" }}
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
             />
             <Button
               type="submit"

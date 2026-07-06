@@ -62,7 +62,8 @@ const ListTicketsService = async ({
     {
       model: Queue,
       as: "queue",
-      attributes: ["id", "name", "color"]
+      attributes: ["id", "name", "color"],
+      include: ["prompt"]
     },
     {
       model: User,
@@ -97,7 +98,9 @@ const ListTicketsService = async ({
         // Tickets com fila que o usuário tem permissão
         { queueId: { [Op.in]: queueIds } },
         // Grupos sem fila: sempre visíveis
-        { isGroup: true, queueId: null }
+        { isGroup: true, queueId: null },
+        // Órfãos: sem fila e sem atendente, visíveis pra qualquer atendente puxar
+        { queueId: null, userId: null, isGroup: false }
       ]
     };
   }

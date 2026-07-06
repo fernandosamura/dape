@@ -26,9 +26,17 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 			if(document.body.offsetWidth < 600) {
 				setUserName(`${user.name}`);
 			}
+		} else if (!user && ticket.chatbot && ticket.queue?.prompt?.name && contact) {
+			setUserName(`${i18n.t("messagesList.header.assignedTo")} ${ticket.queue.prompt.name} 🤖`);
+
+			if(document.body.offsetWidth < 600) {
+				setUserName(`${ticket.queue.prompt.name} 🤖`);
+			}
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
+
+	const hasAssignee = user || (ticket.chatbot && ticket.queue?.prompt?.name);
 
 	return (
 		<CardHeader
@@ -38,7 +46,7 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 			subheaderTypographyProps={{ noWrap: true }}
 			avatar={<Avatar src={contact.profilePicUrl} alt="contact_image" imgProps={{ onError: (e) => { e.currentTarget.src = "/nopicture.png"; } }} />}
 			title={`${contactName} #${ticket.id}`}
-			subheader={ticket.user && `${userName}`}
+			subheader={hasAssignee && `${userName}`}
 		/>
 	);
 };
