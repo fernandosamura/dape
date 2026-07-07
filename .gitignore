@@ -6,6 +6,7 @@ node_modules/
 # Builds
 dist/
 build/
+build_new/
 .next/
 
 # Variáveis de ambiente (NUNCA commitar)
@@ -18,6 +19,11 @@ instances.json
 brands/
 certificates/
 backup/
+backups/
+*.tar.gz
+
+# Arquivos de backup manual
+*.bak
 
 # Sistema
 .DS_Store
