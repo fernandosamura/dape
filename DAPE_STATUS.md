@@ -301,14 +301,37 @@ Backup manual do banco rodado antes do push (`/opt/dape-backup/backup.sh`): `dap
 
 ---
 
+## ✅ Fix — Nome do bot para tickets com IA, limpeza de repositório (2026-07-07, continuação)
+
+**Commits:** `57504d6` (fix nome do bot) · `6bd4e07` (chore .gitignore/limpeza)
+
+- **Nome do bot não aparecia:** `ticket.chatbot` só reflete o fluxo de menu numérico (`queue.options.length > 0`); tickets atendidos por Prompt de IA (sem menu) ficavam com `chatbot=false` mesmo respondendo ativamente. `TicketInfo/index.js` passou a considerar também `ticket.useIntegration && ticket.promptId`. Corrigido também um `useEffect` com array de dependências vazio que nunca recalculava o nome ao trocar de ticket.
+- **Limpeza de repositório:** `.gitignore` passou a cobrir `backups/`, `*.tar.gz`, `*.bak`, `build_new/` (antes só `backup/` singular era ignorado). Apagados 3 tarballs velhos no root (2 continham `.env` + dump SQL completo — risco real de vazamento se alguém desse `git add -A`), `frontend/build_new/` (12M) e 4 arquivos `.bak` (1 estava versionado por engano, removido com `git rm --cached`). **Não apagados:** `backups/` (dumps reais, só ficou fora do git) e os 2 áudios em `public/` (um confirmado referenciado numa mensagem real no banco — `Messages.mediaUrl`).
+
+Deploy: rebuild completo, `/health` 200, containers saudáveis.
+
+---
+
+## ✅ Fix — #015 bcrypt rounds 8→12 com rehash transparente (2026-07-07)
+
+**Commit:** `fc38498` — "security: bcrypt rounds 8 para 12 com rehash transparente no login (#015)"
+
+- `User.ts`: hook `hashPassword` passa a usar `BCRYPT_ROUNDS = 12` (constante exportada) para senhas novas/trocadas.
+- `AuthUserService.ts`: após `checkPassword()` validar a senha, confere o custo do hash atual via `getRounds()` (bcryptjs); se `< 12`, rehasheia e persiste só a coluna `passwordHash` — sem tocar no fluxo normal de login, envolto em try/catch pra nunca bloquear o login por falha nesse hardening.
+- Hashes antigos em custo 8 continuam validando normalmente (bcrypt embute o custo no próprio hash) — upgrade é gradual, por usuário, no primeiro login após o deploy. Não precisou de migration nem reset de senha.
+- Validado antes do deploy: amostra de 5 usuários confirmada em `$2a$08$`. Backup manual rodado antes (`dape_backup_20260707_232811.sql.gz`). Após deploy: build sem erros, containers saudáveis, `/health` 200, rota de login testada com usuário inexistente (401 `ERR_USER_DONT_EXISTS`, sem 500).
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
 - #031 wbotMessageListener.ts refactor (god-file 3388 linhas)
 - #019 tokenVersion / logout-everywhere
-- #015 bcrypt rounds 8→12
 - #024 Encrypt WA session no DB
 - #037 Socket.IO namespaces por tenant
+
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → #019 (aditivo, coluna já existe no model) → #024 (precisa fallback de leitura + backfill) → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → #037 (rollout por tenant canário) → #031 (extração incremental, nunca reescrever o arquivo inteiro).
 
 ---
 
