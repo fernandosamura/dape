@@ -211,68 +211,73 @@ function Chat(props) {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on(`company-${companyId}-chat-user-${user.id}`, (data) => {
+    const chatUserEvent = `company-${companyId}-chat-user-${user.id}`;
+    const chatEvent = `company-${companyId}-chat`;
+
+    const handleChatUser = (data) => {
       if (data.action === "create") {
         setChats((prev) => [data.record, ...prev]);
       }
       if (data.action === "update") {
-        const changedChats = chats.map((chat) => {
-          if (chat.id === data.record.id) {
-            setCurrentChat(data.record);
-            return {
-              ...data.record,
-            };
-          }
-          return chat;
-        });
-        setChats(changedChats);
+        setCurrentChat((prev) =>
+          isObject(prev) && has(prev, "id") && prev.id === data.record.id
+            ? data.record
+            : prev
+        );
+        setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === data.record.id ? { ...data.record } : chat
+          )
+        );
       }
-    });
+    };
 
-    socket.on(`company-${companyId}-chat`, (data) => {
+    const handleChat = (data) => {
       if (data.action === "delete") {
-        const filteredChats = chats.filter((c) => c.id !== +data.id);
-        setChats(filteredChats);
+        setChats((prev) => prev.filter((c) => c.id !== +data.id));
         setMessages([]);
         setMessagesPage(1);
         setMessagesPageInfo({ hasMore: false });
         setCurrentChat({});
         history.push("/chats");
       }
-    });
+    };
+
+    socket.on(chatUserEvent, handleChatUser);
+    socket.on(chatEvent, handleChat);
+
+    let chatMessageEvent;
+    let handleChatMessage;
 
     if (isObject(currentChat) && has(currentChat, "id")) {
-      socket.on(`company-${companyId}-chat-${currentChat.id}`, (data) => {
+      chatMessageEvent = `company-${companyId}-chat-${currentChat.id}`;
+      handleChatMessage = (data) => {
         if (data.action === "new-message") {
           setMessages((prev) => [...prev, data.newMessage]);
-          const changedChats = chats.map((chat) => {
-            if (chat.id === data.newMessage.chatId) {
-              return {
-                ...data.chat,
-              };
-            }
-            return chat;
-          });
-          setChats(changedChats);
+          setChats((prev) =>
+            prev.map((chat) =>
+              chat.id === data.newMessage.chatId ? { ...data.chat } : chat
+            )
+          );
           scrollToBottomRef.current();
         }
 
         if (data.action === "update") {
-          const changedChats = chats.map((chat) => {
-            if (chat.id === data.chat.id) {
-              return {
-                ...data.chat,
-              };
-            }
-            return chat;
-          });
-          setChats(changedChats);
+          setChats((prev) =>
+            prev.map((chat) =>
+              chat.id === data.chat.id ? { ...data.chat } : chat
+            )
+          );
           scrollToBottomRef.current();
         }
-      });
+      };
+      socket.on(chatMessageEvent, handleChatMessage);
     }
 
     return () => {
+      socket.off(chatUserEvent, handleChatUser);
+      socket.off(chatEvent, handleChat);
+      if (chatMessageEvent) socket.off(chatMessageEvent, handleChatMessage);
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

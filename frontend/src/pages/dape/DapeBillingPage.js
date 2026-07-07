@@ -164,7 +164,7 @@ export default function DapeBillingPage() {
       const [statusRes, invoicesRes, plansRes] = await Promise.all([
         api.get("/dape/billing/status"),
         api.get("/dape/billing/invoices"),
-        api.get("/dape/master/plans"),
+        api.get("/dape/billing/plans"),
       ]);
       setData(statusRes.data);
       setInvoices(invoicesRes.data || []);

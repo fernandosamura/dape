@@ -138,9 +138,10 @@ export async function listLeadScores(
   const whereTemp = temperature ? `AND temperature = :temperature` : "";
 
   const scores = await sequelize.query<DapeLeadScore>(
-    `SELECT ls.*, 
+    `SELECT ls.*, c.name AS contact_name,
        (SELECT COUNT(*) FROM dape_score_events se WHERE se.contact_id = ls.contact_id AND se.company_id = ls.company_id) AS event_count
      FROM dape_lead_scores ls
+     LEFT JOIN "Contacts" c ON c.id = ls.contact_id
      WHERE ls.company_id = :companyId ${whereTemp}
      ORDER BY ls.score DESC
      LIMIT :limit OFFSET :offset`,

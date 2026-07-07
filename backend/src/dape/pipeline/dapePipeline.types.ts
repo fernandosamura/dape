@@ -1,6 +1,7 @@
 export interface DapeLeadScore {
   id: number;
   contactId: number;
+  contactName?: string;
   ticketId?: number;
   companyId: number;
   score: number;

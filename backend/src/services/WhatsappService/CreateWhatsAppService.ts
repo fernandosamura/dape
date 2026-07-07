@@ -5,6 +5,7 @@ import Whatsapp from "../../models/Whatsapp";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
 import AssociateWhatsappQueue from "./AssociateWhatsappQueue";
+import { dapleShield } from "../../dape/shield/dapleShield.service";
 
 interface Request {
   name: string;
@@ -187,6 +188,7 @@ const CreateWhatsAppService = async ({
   );
 
   await AssociateWhatsappQueue(whatsapp, queueIds);
+  await dapleShield.ensureDefaultConfig(companyId, whatsapp.id);
 
   return { whatsapp, oldDefaultWhatsapp };
 };

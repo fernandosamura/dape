@@ -11,6 +11,7 @@ import {
   masterBillingOverview,
 } from "./billing.controller";
 import { handleAsaasWebhook, retryPendingEvents } from "./billingWebhook.controller";
+import { listUnifiedPlans } from "../master/dapeMasterNative.controller";
 
 const router = Router();
 
@@ -22,6 +23,7 @@ router.post("/webhooks/asaas", handleAsaasWebhook);
 router.use(isAuth);
 
 router.get("/status", getSubscriptionStatus);
+router.get("/plans", listUnifiedPlans);
 router.post("/subscribe", subscribe);
 router.put("/extra-users", updateExtraUsersHandler);
 router.post("/cancel", cancelSubscriptionHandler);

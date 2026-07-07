@@ -122,7 +122,7 @@ export default function DapePipelineSummary() {
           <tbody>
             {filtered.map((s) => (
               <tr key={s.id}>
-                <td style={styles.td}>#{s.contact_id}</td>
+                <td style={styles.td}>{s.contact_name || `#${s.contact_id}`}</td>
                 <td style={styles.td}>
                   <span style={styles.badge(s.temperature)}>
                     {TEMP_LABELS[s.temperature] || s.temperature}
