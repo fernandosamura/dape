@@ -284,6 +284,23 @@ Deploy: rebuild conjunto backend+frontend, containers iniciados 2026-07-06 18:15
 
 ---
 
+## ✅ Fix — Billing 403, nomes no Pipeline, Shield sem config, chat interno apagando conversas (2026-07-07)
+
+**Commit:** aae53f3 — "fix: rota de plans do tenant no billing, nomes no pipeline e vazamento de estado no chat interno"
+
+| # | Bug | Causa raiz | Correção | Arquivo |
+|---|-----|-----------|----------|---------|
+| 1 | `GET /dape/master/plans` retornava 403 pra qualquer tenant ao abrir Financeiro | `DapeBillingPage` chamava rota `master`-only (`masterGuard`, exige `is_master=true`) em vez de uma rota de tenant | Nova rota `GET /dape/billing/plans` (só `isAuth`, reaproveita `listUnifiedPlans`) | `backend/src/dape/billing/billing.routes.ts`, `frontend/src/pages/dape/DapeBillingPage.js` |
+| 2 | Pipeline mostrava `#8`, `#7`... em vez do nome do contato | `listLeadScores` nunca fazia JOIN com `Contacts`, o nome nem chegava a existir na resposta da API | `LEFT JOIN "Contacts" c ON c.id = ls.contact_id`, retorna `contact_name` | `backend/src/dape/pipeline/dapePipeline.service.ts`, `.types.ts`, `frontend/src/components/dape/DapePipelineSummary.js` |
+| 3 | Shield mostrava "Inativo" e "Sem quarentena ativa" mesmo com módulo habilitado no plano | `daple_shield_config` nunca tinha linha criada — `ensureDefaultConfig()` existia no service mas nunca era chamada em lugar nenhum (código morto); `evaluate()` é fail-open (`!config → allowed`), ou seja, a conexão não tinha proteção real nenhuma | `CreateWhatsAppService` agora chama `dapleShield.ensureDefaultConfig` ao criar a conexão; backfill manual rodado no banco pras 3 conexões existentes que não tinham config (2 de 3 estavam sem) | `backend/src/services/WhatsappService/CreateWhatsAppService.ts` + backfill SQL direto (não versionado, é dado, não código) |
+| 4 | Ao excluir uma conversa no Chat Interno, outras conversas somem da lista (client-side, não eram apagadas no banco) | `useEffect` de socket com dependência `[currentChat, ...]` reregistrava listeners a cada troca de conversa sem nunca remover os antigos (`socket.off` nunca era chamado) — múltiplos listeners empilhados, cada um com uma cópia stale de `chats`, disputavam o `setChats()` no evento de delete | Handlers nomeados + `setChats(prev => ...)` (update funcional, imune a closures antigas) + `socket.off(...)` no cleanup do efeito | `frontend/src/pages/Chat/index.js` |
+
+Deploy: `docker compose down` + `up --build -d` (2x nesta sessão — um pro Shield, um pros demais fixes). Todos os containers subiram saudáveis, TypeScript compilou sem erros, sessões WhatsApp reconectaram normalmente.
+
+Backup manual do banco rodado antes do push (`/opt/dape-backup/backup.sh`): `dape_backup_20260707_223748.sql.gz` (302K) enviado ao R2 com sucesso.
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
