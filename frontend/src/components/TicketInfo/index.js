@@ -9,6 +9,10 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 	const [userName, setUserName] = useState('')
 	const [contactName, setContactName] = useState('')
 
+	// ticket.chatbot só reflete o fluxo de menu (queue.options); um ticket
+	// atendido por Prompt de IA (sem menu) tem chatbot=false mas useIntegration+promptId
+	const isBotAttending = ticket.chatbot || (ticket.useIntegration && !!ticket.promptId);
+
 	useEffect(() => {
 		if (contact) {
 			setContactName(contact.name);
@@ -26,17 +30,18 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 			if(document.body.offsetWidth < 600) {
 				setUserName(`${user.name}`);
 			}
-		} else if (!user && ticket.chatbot && ticket.queue?.prompt?.name && contact) {
+		} else if (!user && isBotAttending && ticket.queue?.prompt?.name && contact) {
 			setUserName(`${i18n.t("messagesList.header.assignedTo")} ${ticket.queue.prompt.name} 🤖`);
 
 			if(document.body.offsetWidth < 600) {
 				setUserName(`${ticket.queue.prompt.name} 🤖`);
 			}
+		} else {
+			setUserName('');
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [])
+	}, [ticket, contact, user, isBotAttending])
 
-	const hasAssignee = user || (ticket.chatbot && ticket.queue?.prompt?.name);
+	const hasAssignee = user || (isBotAttending && ticket.queue?.prompt?.name);
 
 	return (
 		<CardHeader
