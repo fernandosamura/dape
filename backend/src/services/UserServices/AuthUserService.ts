@@ -1,4 +1,5 @@
-import User from "../../models/User";
+import { getRounds, hash } from "bcryptjs";
+import User, { BCRYPT_ROUNDS } from "../../models/User";
 import AppError from "../../errors/AppError";
 import {
   createAccessToken,
@@ -44,6 +45,15 @@ const AuthUserService = async ({
 
   if (!(await user.checkPassword(password))) {
     throw new AppError("ERR_INVALID_CREDENTIALS", 401);
+  }
+
+  try {
+    if (getRounds(user.getDataValue("passwordHash")) < BCRYPT_ROUNDS) {
+      const upgradedHash = await hash(password, BCRYPT_ROUNDS);
+      await user.update({ passwordHash: upgradedHash });
+    }
+  } catch (err) {
+    // rehash e apenas um hardening em segundo plano, nunca deve bloquear o login
   }
 
   if (user.company && user.company.approved === false) {

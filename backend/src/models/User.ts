@@ -23,6 +23,8 @@ import Company from "./Company";
 import QuickMessage from "./QuickMessage";
 import Whatsapp from "./Whatsapp";
 
+export const BCRYPT_ROUNDS = 12;
+
 @Table
 class User extends Model<User> {
   @PrimaryKey
@@ -99,7 +101,7 @@ class User extends Model<User> {
   @BeforeCreate
   static hashPassword = async (instance: User): Promise<void> => {
     if (instance.password) {
-      instance.passwordHash = await hash(instance.password, 8);
+      instance.passwordHash = await hash(instance.password, BCRYPT_ROUNDS);
     }
   };
 
