@@ -375,17 +375,39 @@ Escolha de abordagem (perguntei ao usuário antes, entre 3 opções): criptograf
 
 ---
 
+## 🔍 Investigação — #031 wbotMessageListener.ts, mapeamento completo (2026-07-08)
+
+Antes de mexer em qualquer coisa, mapeei as 43 funções/consts do arquivo (3389 linhas, **zero teste automatizado cobrindo essa lógica**). Pelo menos 8 responsabilidades distintas misturadas no mesmo arquivo — os 4 maiores blocos sozinhos somam ~2.150 linhas (60%+ do arquivo): motor de IA (`handleOpenAi`, 421 linhas), motor de chatbot por menu (`verifyQueue` + `handleChartbot`, 612 linhas), motor do Flow Builder (`flowbuilderIntegration` + `flowBuilderQueue`, 425 linhas) e o orquestrador central `handleMessage` (**691 linhas**, a maior função do arquivo).
+
+Mapeei também os 9 arquivos externos que dependem de 12 funções específicas exportadas daqui (`isNumeric`, `sleep`, `validaCpfCnpj`, `sendMessageImage`, `sendMessageLink`, `verifyMessage`, `wbotMessageListener`, `getBodyMessage`, `convertTextToSpeechAndSaveToFile`, `keepOnlySpecifiedChars`, `transferQueue`, `verifyMediaMessage`) — qualquer extração precisa preservar esses caminhos de import. Achado interessante: `handleMessage` (a maior função) está exportada mas **nenhum arquivo externo a importa de verdade** — menor risco de quebra externa que o tamanho sugere.
+
+Plano de extração (mais seguro → mais arriscado): utilidades genéricas → parsing de mensagem (funções puras) → mídia/TTS → os 3 motores de bot (um de cada vez) → `handleMessage` (orquestrador).
+
+## ✅ Fix — #031 Fase 1: extração das utilidades genéricas (2026-07-08)
+
+**Commit:** `4024d7f` — "refactor: #031 fase 1 - extrai utilidades genericas do wbotMessageListener"
+
+Extraídas as 6 funções sem nenhuma relação com processamento de mensagem do WhatsApp: `isNumeric`, `validaCpfCnpj` (118 linhas!), `sleep`, `makeid`, `sanitizeName`, `keepOnlySpecifiedChars` → `backend/src/utils/generalHelpers.ts` (novo). `wbotMessageListener.ts` passa a importar as que usa internamente e reexporta todas as 6 no mesmo caminho de antes, pra não quebrar os 9 arquivos externos. 3389 → 3258 linhas.
+
+**⚠️ Incidente durante o deploy:** o primeiro build falhou (`tsc`: "Cannot find name 'timeout'") — a função privada `timeout()` (usada por `sleep`) também era chamada direto em `sendWithTypingDelay()`, uma função que ficou no arquivo original; não percebi esse uso na varredura inicial de dependências internas. **Produção ficou fora do ar por ~1 minuto** entre o `docker compose down` e a correção (trocar `timeout(delayMs)` por `new Promise(resolve => setTimeout(resolve, delayMs))` inline) subir. Backup já tinha sido feito antes do primeiro deploy (`dape_backup_20260708_041822.sql.gz`), então o risco de perda de dado era zero — o único impacto foi o downtime curto.
+
+**Lição:** ao mapear usos internos de uma função antes de extrair, checar TODOS os call sites (`grep -n 'nome('`), não só os que aparecem nas primeiras buscas — uma função "privada" auxiliar (`timeout`) pode ter mais de um chamador.
+
+Validado após a correção: build sem erros, containers saudáveis, `/health` 200, as 2 conexões WhatsApp reais (Pub Plus Brasil, POP 4081) reconectaram normalmente. Testadas as 6 funções extraídas direto no container (incluindo `validaCpfCnpj` com CPF real válido/inválido) e confirmado que o reexport em `wbotMessageListener.ts` continua acessível no caminho original.
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- #031 wbotMessageListener.ts refactor (god-file 3388 linhas)
+- #031 wbotMessageListener.ts refactor — **Fase 1 concluída** (utilidades genéricas). Faltam: parsing de mensagem, mídia/TTS, os 3 motores de bot, `handleMessage`
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → #031 (extração incremental, nunca reescrever o arquivo inteiro).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → #031 Fase 2+ (parsing, mídia, motores de bot, orquestrador).
 
-Restam só **#009** (Sequelize) e **#031** (refactor do god-file) — os dois de maior esforço/preparo da lista original.
+Restam **#009** (Sequelize) e o restante do **#031** (5 fases de extração pela frente).
 
 ---
 
