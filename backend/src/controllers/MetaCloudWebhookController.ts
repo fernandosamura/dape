@@ -21,12 +21,17 @@ export const receiveWebhook = async (
 ): Promise<Response> => {
   // Verify X-Hub-Signature-256
   const signature = req.headers["x-hub-signature-256"] as string;
+  const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
   if (signature && process.env.META_APP_SECRET) {
+    if (!rawBody) {
+      logger.error("[MetaCloud] rawBody ausente - nao foi possivel validar assinatura do webhook");
+      return res.sendStatus(401);
+    }
     const expectedSig =
       "sha256=" +
       crypto
         .createHmac("sha256", process.env.META_APP_SECRET)
-        .update(JSON.stringify(req.body))
+        .update(rawBody)
         .digest("hex");
     if (signature !== expectedSig) {
       logger.warn("[MetaCloud] Webhook signature inválida");

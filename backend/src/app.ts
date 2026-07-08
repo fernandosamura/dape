@@ -33,7 +33,15 @@ app.set("queues", {
 });
 
 const bodyparser = require('body-parser');
-app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.json({
+  limit: '10mb',
+  // Captura o corpo bruto da requisicao para validar a assinatura HMAC
+  // dos webhooks da Meta (X-Hub-Signature-256) - a Meta assina os bytes
+  // originais, nao um JSON.stringify do objeto ja parseado.
+  verify: (req: Request, _res: Response, buf: Buffer) => {
+    (req as Request & { rawBody?: Buffer }).rawBody = buf;
+  }
+}));
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
