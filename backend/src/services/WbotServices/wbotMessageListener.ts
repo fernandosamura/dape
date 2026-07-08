@@ -74,6 +74,14 @@ import { WebhookModel } from "../../models/Webhook";
 
 import {differenceInMilliseconds} from "date-fns";
 import Whatsapp from "../../models/Whatsapp";
+import {
+  isNumeric,
+  validaCpfCnpj,
+  sleep,
+  makeid,
+  sanitizeName,
+  keepOnlySpecifiedChars
+} from "../../utils/generalHelpers";
 
 const request = require("request");
 
@@ -101,8 +109,6 @@ interface IMessage {
   isLatest: boolean;
 }
 
-export const isNumeric = (value: string) => /^-?\d+$/.test(value);
-
 const writeFileAsync = promisify(writeFile);
 
 const getTypeMessage = (msg: proto.IWebMessageInfo): string => {
@@ -115,133 +121,6 @@ function hasCaption(title: string, fileName: string) {
   const fileNameExtension = fileName.substring(fileName.lastIndexOf('.') + 1);
 
   return !fileName.includes(`${title}.${fileNameExtension}`)
-}
-
-export function validaCpfCnpj(val) {
-  if (val.length == 11) {
-    var cpf = val.trim();
-
-    cpf = cpf.replace(/\./g, "");
-    cpf = cpf.replace("-", "");
-    cpf = cpf.split("");
-
-    var v1 = 0;
-    var v2 = 0;
-    var aux = false;
-
-    for (var i = 1; cpf.length > i; i++) {
-      if (cpf[i - 1] != cpf[i]) {
-        aux = true;
-      }
-    }
-
-    if (aux == false) {
-      return false;
-    }
-
-    for (var i = 0, p = 10; cpf.length - 2 > i; i++, p--) {
-      v1 += cpf[i] * p;
-    }
-
-    v1 = (v1 * 10) % 11;
-
-    if (v1 == 10) {
-      v1 = 0;
-    }
-
-    if (v1 != cpf[9]) {
-      return false;
-    }
-
-    for (var i = 0, p = 11; cpf.length - 1 > i; i++, p--) {
-      v2 += cpf[i] * p;
-    }
-
-    v2 = (v2 * 10) % 11;
-
-    if (v2 == 10) {
-      v2 = 0;
-    }
-
-    if (v2 != cpf[10]) {
-      return false;
-    } else {
-      return true;
-    }
-  } else if (val.length == 14) {
-    var cnpj = val.trim();
-
-    cnpj = cnpj.replace(/\./g, "");
-    cnpj = cnpj.replace("-", "");
-    cnpj = cnpj.replace("/", "");
-    cnpj = cnpj.split("");
-
-    var v1 = 0;
-    var v2 = 0;
-    var aux = false;
-
-    for (var i = 1; cnpj.length > i; i++) {
-      if (cnpj[i - 1] != cnpj[i]) {
-        aux = true;
-      }
-    }
-
-    if (aux == false) {
-      return false;
-    }
-
-    for (var i = 0, p1 = 5, p2 = 13; cnpj.length - 2 > i; i++, p1--, p2--) {
-      if (p1 >= 2) {
-        v1 += cnpj[i] * p1;
-      } else {
-        v1 += cnpj[i] * p2;
-      }
-    }
-
-    v1 = v1 % 11;
-
-    if (v1 < 2) {
-      v1 = 0;
-    } else {
-      v1 = 11 - v1;
-    }
-
-    if (v1 != cnpj[12]) {
-      return false;
-    }
-
-    for (var i = 0, p1 = 6, p2 = 14; cnpj.length - 1 > i; i++, p1--, p2--) {
-      if (p1 >= 2) {
-        v2 += cnpj[i] * p1;
-      } else {
-        v2 += cnpj[i] * p2;
-      }
-    }
-
-    v2 = v2 % 11;
-
-    if (v2 < 2) {
-      v2 = 0;
-    } else {
-      v2 = 11 - v2;
-    }
-
-    if (v2 != cnpj[13]) {
-      return false;
-    } else {
-      return true;
-    }
-  } else {
-    return false;
-  }
-}
-
-function timeout(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-export async function sleep(time) {
-  await timeout(time);
 }
 
 /**
@@ -262,7 +141,7 @@ async function sendWithTypingDelay(
 
   await wbot.presenceSubscribe(jid);
   await wbot.sendPresenceUpdate("composing", jid);
-  await timeout(delayMs);
+  await new Promise(resolve => setTimeout(resolve, delayMs));
   await wbot.sendPresenceUpdate("paused", jid);
 
   const sent = await wbot.sendMessage(jid, { text });
@@ -332,17 +211,6 @@ export const sendMessageLink = async (
   }
   verifyMessage(sentMessage, ticket, contact);
 };
-
-export function makeid(length) {
-  var result = "";
-  var characters =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  var charactersLength = characters.length;
-  for (var i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength));
-  }
-  return result;
-}
 
 const getBodyButton = (msg: proto.IWebMessageInfo): string => {
   if (
@@ -617,12 +485,6 @@ const verifyQuotedMessage = async (
   return quotedMsg;
 };
 
-const sanitizeName = (name: string): string => {
-  let sanitized = name.split(" ")[0];
-  sanitized = sanitized.replace(/[^a-zA-Z0-9]/g, "");
-  return sanitized.substring(0, 60);
-};
-
 // ── Converte qualquer áudio para OGG/Opus (exigido pelo WhatsApp Web/Baileys)
 const convertToOggOpus = (inputPath: string, outputPath: string): Promise<void> => {
   return new Promise((resolve, reject) => {
@@ -721,11 +583,6 @@ const deleteFileSync = (path: string): void => {
     console.error("Erro ao deletar o arquivo:", error);
   }
 };
-
-export const keepOnlySpecifiedChars = (str: string) => {
-  return str.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚâêîôûÂÊÎÔÛãõÃÕçÇ!?.,;:\s]/g, "");
-};
-
 
 
 const handleOpenAi = async (
@@ -3384,6 +3241,18 @@ const wbotMessageListener = async (
     Sentry.captureException(error);
     logger.error(`Error handling wbot message listener. Err: ${error}`);
   }
+};
+
+// Re-exportadas aqui pra nao quebrar os imports externos existentes
+// (isNumeric, sleep, validaCpfCnpj, makeid, sanitizeName, keepOnlySpecifiedChars
+// agora moram em utils/generalHelpers.ts - ver #031 Fase 1)
+export {
+  isNumeric,
+  validaCpfCnpj,
+  sleep,
+  makeid,
+  sanitizeName,
+  keepOnlySpecifiedChars
 };
 
 export { wbotMessageListener, handleMessage };
