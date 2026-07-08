@@ -437,17 +437,31 @@ Validado: build isolado antes de derrubar containers (mesmo processo, ~20s, sem 
 
 ---
 
+## ✅ Fix — #031 Fase 5: extração do motor de Flow Builder (2026-07-08)
+
+**Commit:** `d533c21` — "refactor: #031 fase 5 - extrai motor de Flow Builder do wbotMessageListener"
+
+Segundo dos 3 motores de bot: `flowbuilderIntegration`, `handleMessageIntegration` (dispatcher entre n8n/webhook, typebot ou flowbuilder) e `flowBuilderQueue` → `wbotMessageFlowBuilder.ts` (novo). 2195 → 1696 linhas.
+
+Confirmado antes de mexer: nenhuma das 3 chama `verifyQueue`/`handleChartbot` (motor de menu, fica pra Fase 6) — são chamadas por eles e pelo orquestrador, nunca o contrário. `flowbuilderIntegration`/`flowBuilderQueue` nunca foram exportadas originalmente (só `handleMessageIntegration`), moveram juntas por serem chamadas exclusivamente por ela.
+
+**Achado durante a extração (registrado, não corrigido agora):** dentro de `flowbuilderIntegration` há `io.of(String(companyId))` e `io.to(ticket.status)` — o mesmo padrão de sala sem prefixo de empresa que corrigimos no #037 Fase 1, numa parte do código que ainda não tinha sido auditada. Fica pra uma fase futura do #037.
+
+Validado: build isolado antes de derrubar containers (~20s, sem incidente — só uma falha transitória de autenticação SSH no primeiro comando, resolvida no retry, sem impacto em produção). As 2 conexões WhatsApp reais mantidas conectadas. `handleMessageIntegration` carregada via `require` sem travar, reexport confirmado. Backup rodado antes (`dape_backup_20260708_063731.sql.gz`).
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- #031 wbotMessageListener.ts refactor — **Fases 1, 2, 3 e 4 concluídas** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA). Faltam: motor de menu (chatbot), motor de Flow Builder, `handleMessage` (orquestrador)
+- #031 wbotMessageListener.ts refactor — **Fases 1 a 5 concluídas** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder). Faltam: motor de menu (chatbot), `handleMessage` (orquestrador)
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
-- ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora
+- ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achado um novo caso do mesmo bug dentro de `flowbuilderIntegration` (ver acima) pendente de correção
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → ~~#031 Fase 2~~ ✅ → ~~#031 Fase 3~~ ✅ → ~~#031 Fase 4~~ ✅ → #031 Fase 5+ (motor de menu, Flow Builder, orquestrador).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → ~~#031 Fase 2~~ ✅ → ~~#031 Fase 3~~ ✅ → ~~#031 Fase 4~~ ✅ → ~~#031 Fase 5~~ ✅ → #031 Fase 6+ (motor de menu, orquestrador — última fase).
 
-Restam **#009** (Sequelize) e o restante do **#031** (motor de menu/chatbot, motor de Flow Builder, e o orquestrador `handleMessage`).
+Restam **#009** (Sequelize) e o restante do **#031** (motor de menu/chatbot e o orquestrador `handleMessage` — a maior e mais arriscada função do arquivo).
 
 ---
 
