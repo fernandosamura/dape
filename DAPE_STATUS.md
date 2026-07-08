@@ -465,19 +465,21 @@ Validado: build isolado antes de derrubar containers (tsc limpo, 12.5s; troca de
 
 Com isso fecham os 3 motores de bot (Fases 4-6: IA, Flow Builder, Menu/Chatbot). Resta em `wbotMessageListener.ts`: `handleMessage` (o orquestrador, ~250 linhas), `handleMsgAck`, `verifyCampaignMessageAndCloseTicket`, o bootstrap `wbotMessageListener`, e `Push` (função morta, nunca chamada, mantida por ora).
 
+**Decisão de escopo (perguntei ao usuário depois da Fase 6):** encerrar o #031 aqui. 1023 linhas com `handleMessage` como orquestrador central foi considerado um ponto de parada razoável — não vale o risco de quebrar ainda mais o orquestrador, que é a função mais complexa e central do arquivo.
+
 ---
 
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- #031 wbotMessageListener.ts refactor — **Fases 1 a 6 concluídas** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). Falta avaliar: vale a pena quebrar `handleMessage` (o orquestrador, ~250 linhas) em partes menores, ou considerar 1023 linhas um ponto de parada razoável para este refactor?
+- ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → ~~#031 Fase 2~~ ✅ → ~~#031 Fase 3~~ ✅ → ~~#031 Fase 4~~ ✅ → ~~#031 Fase 5~~ ✅ → ~~#031 Fase 6~~ ✅ → decisão pendente: continuar quebrando `handleMessage` ou encerrar o #031 aqui.
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado).
 
-Restam **#009** (Sequelize) e a decisão sobre continuar ou não o **#031** com `handleMessage`.
+Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, e o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos).
 
 ---
 
