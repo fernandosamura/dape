@@ -451,17 +451,33 @@ Validado: build isolado antes de derrubar containers (~20s, sem incidente — s�
 
 ---
 
+## ✅ Fix — #031 Fase 6: extração do motor de Menu/Chatbot (2026-07-08)
+
+**Commit:** `bf219b5` — "refactor: #031 fase 6 - extrai motor de Menu/Chatbot do wbotMessageListener"
+
+Terceiro e último dos 3 motores de bot: `verifyQueue` (saudação/menu de filas), `verifyRating`, `handleRating` (processa nota e fecha ticket) e `handleChartbot` (motor de opções numeradas) → `wbotMessageMenu.ts` (novo). 1702 → 1023 linhas.
+
+Confirmado antes de mexer: as 4 funções são chamadas só por `handleMessage` (orquestrador, fica no arquivo). `handleChartbot` chama `verifyQueue` internamente (voltar ao menu inicial via `#`), mas isso fica dentro do próprio `wbotMessageMenu.ts` — sem dependência circular real com `wbotMessageListener.ts` (só `import type Session`).
+
+**Achado durante a extração:** bug de transcrição manual — ao compor `wbotMessageMenu.ts` à mão, o escape literal `‎` (usado em `formatBody` pra evitar preview de link no WhatsApp) virou acidentalmente o caractere invisível real (U+200E). Detectado antes do deploy comparando contagem de escape-literal vs caractere real (`grep -oP '\x{200E}'` vs `grep -o '\\u200e'`), corrigido com substituição via Python. O mesmo tipo de armadilha derrubou a primeira tentativa de `Edit` direto em `wbotMessageListener.ts` (o `old_string` tinha o caractere real em vez do escape) — resolvido cortando por número de linha (Python) em vez de match de texto, já que a remoção era puramente mecânica (sem mudança de lógica).
+
+Validado: build isolado antes de derrubar containers (tsc limpo, 12.5s; troca de containers ~20s; uma falha transitória de autenticação SSH no build, resolvida no retry). Health check 200, as 2 conexões WhatsApp reais mantidas (`Connection Update open`), sem erros novos nos logs. As 4 funções carregadas via `require` sem travar, reexport confirmado. Backup rodado antes (`dape_backup_20260708_072116.sql.gz`).
+
+Com isso fecham os 3 motores de bot (Fases 4-6: IA, Flow Builder, Menu/Chatbot). Resta em `wbotMessageListener.ts`: `handleMessage` (o orquestrador, ~250 linhas), `handleMsgAck`, `verifyCampaignMessageAndCloseTicket`, o bootstrap `wbotMessageListener`, e `Push` (função morta, nunca chamada, mantida por ora).
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- #031 wbotMessageListener.ts refactor — **Fases 1 a 5 concluídas** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder). Faltam: motor de menu (chatbot), `handleMessage` (orquestrador)
+- #031 wbotMessageListener.ts refactor — **Fases 1 a 6 concluídas** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). Falta avaliar: vale a pena quebrar `handleMessage` (o orquestrador, ~250 linhas) em partes menores, ou considerar 1023 linhas um ponto de parada razoável para este refactor?
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
-- ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achado um novo caso do mesmo bug dentro de `flowbuilderIntegration` (ver acima) pendente de correção
+- ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → ~~#031 Fase 2~~ ✅ → ~~#031 Fase 3~~ ✅ → ~~#031 Fase 4~~ ✅ → ~~#031 Fase 5~~ ✅ → #031 Fase 6+ (motor de menu, orquestrador — última fase).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → ~~#031 Fase 2~~ ✅ → ~~#031 Fase 3~~ ✅ → ~~#031 Fase 4~~ ✅ → ~~#031 Fase 5~~ ✅ → ~~#031 Fase 6~~ ✅ → decisão pendente: continuar quebrando `handleMessage` ou encerrar o #031 aqui.
 
-Restam **#009** (Sequelize) e o restante do **#031** (motor de menu/chatbot e o orquestrador `handleMessage` — a maior e mais arriscada função do arquivo).
+Restam **#009** (Sequelize) e a decisão sobre continuar ou não o **#031** com `handleMessage`.
 
 ---
 
