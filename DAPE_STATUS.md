@@ -469,17 +469,50 @@ Com isso fecham os 3 motores de bot (Fases 4-6: IA, Flow Builder, Menu/Chatbot).
 
 ---
 
+## 🔍 Investigação — bloqueio de números novos no WhatsApp + integração Meta Cloud API (2026-07-08)
+
+Investigado motivo de números novos (POP 1871, POP 4081) caírem repetidamente enquanto o Pub Plus Brasil (mais antigo) fica estável. Evidência no log bruto do protocolo: `stream:error code 401, conflict type device_removed` — o próprio WhatsApp derrubando a sessão, não um bug do Daple (processo nem chegou a reiniciar nos eventos analisados). Padrão consistente com detecção antifraude da Meta para número novo + cliente não-oficial (Baileys) + IP de datacenter, não com volume de disparo (volume real no período era baixo, campanhas zeradas há 30 dias).
+
+Decisão do usuário: migrar para a API oficial (Meta Cloud API) de forma híbrida — cada conexão escolhe entre Baileys (QR Code) ou Cloud API, com possibilidade de reverter sem perder histórico. Levantamento de custo (BSPs como 360dialog, Gupshup, Zenvia) mostrou que, dado o volume real do Daple hoje (~30-50 msgs/dia, quase tudo dentro da janela de 24h gratuita da Meta), o custo tende a ser dominado pela mensalidade fixa do BSP (~R$900/mês para 3 números via 360dialog), não pelo custo variável por mensagem.
+
+Descoberto que já existia uma tentativa anterior (parcial) de integração Meta Cloud API no código: schema do banco completo (`providerType`, `wabaId`, `phoneNumberId`, `metaAccessToken`, `migrationStatus`), fluxo OAuth do Embedded Signup funcional (`EmbeddedSignupController.ts`), botão de UI (`EmbeddedSignupButton`), e envio manual já roteado por `providerType` (`MessageController.ts`). Mas faltava: credenciais configuradas, SDK do Facebook no frontend, webhook de entrada funcional (só logava, não criava ticket/contato/mensagem), motor de chatbot/IA/Flow Builder sem suporte a `providerType` (só Baileys), download de mídia via Cloud API, e gestão de templates.
+
+Entregues 2 PDFs para o usuário com o passo a passo do lado da Meta: `1_Configuracao_Unica_Plataforma_Daple.pdf` (feito uma única vez pela Daple/Pub Plus — criação do App, App Review, modo Live) e `2_Checklist_Por_Empresa_Cliente.pdf` (repetido para cada empresa cliente que conectar seu próprio número — Business Manager, verificação, Embedded Signup).
+
+Plano de fases acordado (mais seguro → mais arriscado): Fase 1 (infra/credenciais, zero risco) → Fase 2 (webhook de entrada completo) → Fase 3 (download de mídia) → Fase 4 (unificar dispatcher `SendWhatsAppMessage` por `providerType` — única fase que toca código compartilhado com produção) → Fase 5 (templates) → Fase 6 (piloto com 1 número real + validar rollback).
+
+**Acordo de processo com o usuário:** antes de qualquer deploy que reinicie o backend durante este trabalho, avisar no chat com antecedência — o usuário desconecta manualmente os números (evitando ciclos de reconexão que possam prejudicar a reputação do Pub Plus Brasil) e reconecta depois de validado. Ver [[feedback_deploy_meta_cloud_alerta]] na memória.
+
+## ✅ Fix — Meta Cloud API Fase 1: infraestrutura e credenciais (2026-07-08)
+
+**Commit:** `edef113` — "feat: Meta Cloud API fase 1 - infraestrutura e credenciais"
+
+**Achado e corrigido antes de configurar as credenciais:** a verificação de assinatura do webhook (`MetaCloudWebhookController.receiveWebhook`) usava `JSON.stringify(req.body)` pra calcular o HMAC, mas a Meta assina os bytes brutos originais da requisição — qualquer diferença de espaçamento/ordem de chaves do parser do Express faria a assinatura nunca bater. Bug estava invisível porque a checagem só roda quando `META_APP_SECRET` existe; teria quebrado silenciosamente assim que a credencial fosse configurada. Corrigido adicionando `verify` callback ao `bodyParser.json()` em `app.ts` pra capturar `req.rawBody`, usado agora no cálculo do HMAC.
+
+- `frontend/public/index.html`: carrega o SDK do Facebook (`connect.facebook.net`) com `FB.init` usando `%REACT_APP_META_APP_ID%` (guard evita inicializar se vazio).
+- `frontend/Dockerfile` + `docker-compose.yml`: propagam `META_APP_ID` do `.env` raiz como `REACT_APP_META_APP_ID` no build do frontend.
+- `.env` (não versionado): placeholders para `META_APP_ID`/`META_APP_SECRET` (a preencher pelo usuário após o Passo 5 do documento de configuração única) e `META_WEBHOOK_VERIFY_TOKEN` já gerado (não depende da Meta).
+
+**Deploy em 2 etapas, aproveitando que frontend e backend são containers separados:** frontend rebuilded e reiniciado sozinho primeiro (zero risco às sessões WhatsApp, que rodam só no backend). Backend rebuilded e reiniciado depois — no momento do restart os 4 números já estavam `DISCONNECTED` no banco (usuário havia desconectado manualmente antes, conforme o acordo de processo), então não houve ciclo de reconexão de número ativo real.
+
+Validado: build isolado de ambos (frontend ~118s, backend/tsc ~13s), sem erro. Handshake do webhook testado com `curl`: token correto devolve o challenge (200), token errado devolve 403. `req.rawBody` confirmado presente no bundle compilado. Backup rodado antes (`dape_backup_20260708_213440.sql.gz`).
+
+**Pendente (fora do escopo desta fase):** preencher `META_APP_ID`/`META_APP_SECRET` reais assim que o usuário concluir o Passo 5 do documento de configuração da plataforma, e validar a assinatura HMAC ponta a ponta com um webhook real da Meta.
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
+- **Integração híbrida Meta Cloud API** — Fase 1 concluída (infra/credenciais). Faltam: Fase 2 (webhook de entrada completo), Fase 3 (mídia), Fase 4 (unificar dispatcher de envio), Fase 5 (templates), Fase 6 (piloto com número real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → Meta Cloud API Fase 2-6 (em andamento, paralelo aos passos manuais do usuário com a Meta).
 
-Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, e o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos).
+Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos), e a continuação das fases 2-6 da integração Meta Cloud API.
 
 ---
 
