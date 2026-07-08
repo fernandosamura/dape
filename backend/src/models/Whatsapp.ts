@@ -22,6 +22,7 @@ import Company from "./Company";
 import Prompt from "./Prompt";
 import QueueIntegrations from "./QueueIntegrations";
 import {FlowBuilderModel} from "./FlowBuilder";
+import { encryptSession, decryptSession } from "../utils/sessionCrypto";
 
 @Table
 class Whatsapp extends Model<Whatsapp> {
@@ -36,7 +37,12 @@ class Whatsapp extends Model<Whatsapp> {
   name: string;
 
   @Column(DataType.TEXT)
-  session: string;
+  get session(): string {
+    return decryptSession(this.getDataValue("session")) as string;
+  }
+  set session(value: string) {
+    this.setDataValue("session", encryptSession(value) as string);
+  }
 
   @Column(DataType.TEXT)
   qrcode: string;
