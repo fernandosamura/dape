@@ -411,17 +411,29 @@ Validado: as 2 conexões WhatsApp reais mantidas conectadas durante o deploy. Te
 
 ---
 
+## ✅ Fix — #031 Fase 3: extração de mídia/TTS (2026-07-08)
+
+**Commit:** `f6cf469` — "refactor: #031 fase 3 - extrai midia/TTS do wbotMessageListener"
+
+Terceiro grupo extraído: `sendMessageImage`, `sendMessageLink`, `downloadMedia`, `resolveLidToPhone`, `verifyContact`, `verifyQuotedMessage`, `convertToOggOpus`, `convertTextToSpeechAzure`, `convertTextToSpeechGoogle`, `convertTextToSpeechAndSaveToFile`, `deleteFileSync` → `wbotMessageMedia.ts` (novo). 3051 → 2610 linhas.
+
+**Diferente das fases 1 e 2:** apareceu uma dependência circular *real* (não só de tipo) — `sendMessageImage`/`sendMessageLink` chamam `verifyMessage`, que fica em `wbotMessageListener.ts` e é usada por 11+ outras funções que ficam lá. Mover só as funções de mídia criaria um `require` circular real entre os dois arquivos. Resolvido movendo `verifyMessage` e `verifyMediaMessage` também pra `wbotMessageMedia.ts` (fazem parte do mesmo domínio) — assim a dependência fica unidirecional: `wbotMessageListener.ts` só importa *de* `wbotMessageMedia.ts`, nunca o contrário.
+
+Validado: build isolado antes de derrubar containers (mesmo processo da Fase 2, sem incidente, ~18s de downtime). As 2 conexões WhatsApp reais mantidas conectadas. Todas as 13 funções carregadas via `require` direto no container sem travar (prova que não há deadlock de import circular), `deleteFileSync` executado de verdade contra um arquivo temporário real. Reexport confirmado funcional. Não testei `verifyMessage`/`verifyMediaMessage` com dado fake pra não poluir o banco de produção — build limpo + sistema saudável + automações rodando sem erro foram considerados evidência suficiente. Backup rodado antes (`dape_backup_20260708_050814.sql.gz`).
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- #031 wbotMessageListener.ts refactor — **Fase 1 e 2 concluídas** (utilidades genéricas + parsing de mensagem). Faltam: mídia/TTS, os 3 motores de bot, `handleMessage`
+- #031 wbotMessageListener.ts refactor — **Fases 1, 2 e 3 concluídas** (utilidades genéricas + parsing de mensagem + mídia/TTS). Faltam: os 3 motores de bot (menu, IA, Flow Builder), `handleMessage`
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → ~~#031 Fase 2~~ ✅ → #031 Fase 3+ (mídia/TTS, motores de bot, orquestrador).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → ~~#031 Fase 2~~ ✅ → ~~#031 Fase 3~~ ✅ → #031 Fase 4+ (os 3 motores de bot, orquestrador).
 
-Restam **#009** (Sequelize) e o restante do **#031** (mídia/TTS, os 3 motores de bot, `handleMessage`).
+Restam **#009** (Sequelize) e o restante do **#031** (os 3 motores de bot: menu, IA, Flow Builder — e o orquestrador `handleMessage`).
 
 ---
 
