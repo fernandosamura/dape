@@ -345,15 +345,31 @@ Backup manual rodado antes (`dape_backup_20260708_033635.sql.gz`), verificado co
 
 ---
 
+## ✅ Fix — #019 logout de todos os dispositivos via tokenVersion (2026-07-08)
+
+**Commit:** `dd1821a` — "feat: #019 - logout de todos os dispositivos via tokenVersion"
+
+A infraestrutura já existia quase pronta: `createRefreshToken` já embutia `tokenVersion` no payload, e `RefreshTokenService.ts` já rejeitava com `ERR_SESSION_EXPIRED` quando a versão não batia com a do banco — só faltava o gatilho pra incrementar.
+
+- `LogoutEverywhereService.ts` (novo): busca o usuário escopado por `companyId` e faz `user.increment("tokenVersion")` (atômico no banco).
+- `UserController.ts`: nova ação `logoutEverywhere`, mesma checagem de permissão do `update()` (`isSelf` ou `isAdmin`).
+- `userRoutes.ts`: `POST /users/:userId/logout-everywhere`.
+
+**Decisão de escopo (perguntei ao usuário antes):** versão "barata" — sem checar `tokenVersion` em toda requisição (`isAuth`). O access token dura até 1 dia e não é verificado contra `tokenVersion`, então o logout vira efetivo no próximo refresh (reload da página ou expiração natural do token), não instantaneamente. Zero custo de performance extra por requisição.
+
+Validado sem precisar de credenciais reais: chamei o service direto dentro do container contra um usuário de teste real (id=2, tokenVersion 0→1, persistido no banco), depois simulei um refresh token com a versão antiga usando o mesmo segredo JWT — `RefreshTokenService` rejeitou corretamente. tokenVersion do usuário revertido pra 0 depois do teste. Backup rodado antes (`dape_backup_20260708_034736.sql.gz`). Build sem erros, containers saudáveis, `/health` 200, rota nova confirmada registrada.
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
 - #031 wbotMessageListener.ts refactor (god-file 3388 linhas)
-- #019 tokenVersion / logout-everywhere
 - #024 Encrypt WA session no DB
+- ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → #019 (aditivo, coluna já existe no model) → #024 (precisa fallback de leitura + backfill) → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → #037 (rollout por tenant canário) → #031 (extração incremental, nunca reescrever o arquivo inteiro).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → #024 (precisa fallback de leitura + backfill) → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → #031 (extração incremental, nunca reescrever o arquivo inteiro).
 
 ---
 
