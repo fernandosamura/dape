@@ -397,17 +397,31 @@ Validado após a correção: build sem erros, containers saudáveis, `/health` 2
 
 ---
 
+## ✅ Fix — #031 Fase 2: extração do parsing de mensagem (2026-07-08)
+
+**Commit:** `abf3afb` — "refactor: #031 fase 2 - extrai parsing de mensagem do wbotMessageListener"
+
+Segundo grupo extraído: 12 funções puras de parsing/extração de dados da mensagem do Baileys (`getTypeMessage`, `hasCaption`, `getBodyButton`, `msgLocation`, `getBodyMessage`, `getQuotedMessage`, `getQuotedMessageId`, `getMeSocket`, `getSenderMessage`, `getContactMessage`, `isValidMsg`, `filterMessages`) → `wbotMessageParsers.ts` (novo, mesma pasta). Confirmado antes de mexer: só `getBodyMessage` tem consumidor externo real (`providers.ts`, `typebotListener.ts`, `OpenAiService.ts`) — as outras 11 já estavam sem uso fora do arquivo apesar de exportadas. 3258 → 3051 linhas.
+
+**Detalhe técnico:** o novo arquivo precisa dos tipos `Session`/`IMe` (antes privados a `wbotMessageListener.ts`) — usei `import type` para evitar dependência circular real em runtime (o tipo é apagado na compilação; só `wbotMessageListener.ts` importa valores de `wbotMessageParsers.ts` de verdade, nunca o contrário).
+
+**Mudança no processo de deploy** (lição da Fase 1): rodei `docker compose build backend` **antes** de derrubar os containers, pra pegar erro de compilação sem causar downtime. Compilou limpo de primeira — troca de containers levou ~20s, sem incidente desta vez.
+
+Validado: as 2 conexões WhatsApp reais mantidas conectadas durante o deploy. Testadas as funções extraídas com uma mensagem sintética direto no container (`getTypeMessage`, `getBodyMessage`, `isValidMsg` incluindo o caso `status@broadcast`, `filterMessages`) — todos corretos. Reexport de `wbotMessageListener.ts` confirmado funcional, sem problema de import circular. Backup rodado antes (`dape_backup_20260708_043506.sql.gz`).
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- #031 wbotMessageListener.ts refactor — **Fase 1 concluída** (utilidades genéricas). Faltam: parsing de mensagem, mídia/TTS, os 3 motores de bot, `handleMessage`
+- #031 wbotMessageListener.ts refactor — **Fase 1 e 2 concluídas** (utilidades genéricas + parsing de mensagem). Faltam: mídia/TTS, os 3 motores de bot, `handleMessage`
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → #031 Fase 2+ (parsing, mídia, motores de bot, orquestrador).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031 Fase 1~~ ✅ → ~~#031 Fase 2~~ ✅ → #031 Fase 3+ (mídia/TTS, motores de bot, orquestrador).
 
-Restam **#009** (Sequelize) e o restante do **#031** (5 fases de extração pela frente).
+Restam **#009** (Sequelize) e o restante do **#031** (mídia/TTS, os 3 motores de bot, `handleMessage`).
 
 ---
 
