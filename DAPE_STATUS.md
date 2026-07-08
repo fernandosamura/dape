@@ -323,13 +323,35 @@ Deploy: rebuild completo, `/health` 200, containers saudáveis.
 
 ---
 
+## ✅ Fix — #037 Fase 1: emits de socket em salas sem inquilinos (2026-07-08)
+
+**Commit:** `4ba80f6` — "fix: #037 fase 1 - corrige emits de socket para salas sem inquilinos (nao chegavam em tempo real)"
+
+Investigação completa do #037 (mapeados os ~85 pontos de `io.to()` do backend) mostrou que **não existe vazamento entre empresas hoje** — todo `socket.join()` já é escopado corretamente (por empresa/usuário/fila, ou por ID de ticket, que é global e único). O item do backlog partia de uma premissa que não se confirmou no código.
+
+O problema real encontrado foi o oposto: **6 emissões em 5 arquivos** usavam nomes de sala soltos (`io.to("open")`, `io.to(ticket.status)`, `io.to("notification")`, `io.to(String(companyId))`) que nenhum cliente jamais entra — atualização em tempo real se perdia silenciosamente até o usuário dar F5. Corrigido usando o padrão já correto existente em `TicketController.remove()`:
+
+| Arquivo | Evento afetado |
+|---|---|
+| `wbotClosedTickets.ts` | Fechamento automático de ticket por inatividade não sumia da tela ao vivo |
+| `TicketGroupService.ts` (join + leave) | Entrar/sair de grupo do WhatsApp não atualizava ninguém em tempo real |
+| `TicketController.ts` (`store`) | Criação de ticket |
+| `queues.ts` | Transferência de ticket via fila (2 salas soltas no mesmo emit) |
+| `wbotTransferTicketQueue.ts` | Transferência automática — corrigido pra usar o ticket pós-transferência (fila de destino correta) |
+
+Backup manual rodado antes (`dape_backup_20260708_033635.sql.gz`), verificado com restore de teste completo (75 tabelas, contagens batendo). Validado após deploy: build TypeScript sem erros, containers saudáveis, `/health` 200, confirmado no `dist/` compilado dentro do container que o padrão novo está presente nos 5 arquivos.
+
+**Fase 2** (helper central de emissão, tipo `emitToCompany()`) e a decisão sobre **Fase 3** (namespaces de verdade do Socket.IO — recomendação atual é não fazer, ver análise completa desta sessão) ficam pendentes, não fazem parte desta entrega.
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
 - #031 wbotMessageListener.ts refactor (god-file 3388 linhas)
 - #019 tokenVersion / logout-everywhere
 - #024 Encrypt WA session no DB
-- #037 Socket.IO namespaces por tenant
+- ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora
 
 **Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → #019 (aditivo, coluna já existe no model) → #024 (precisa fallback de leitura + backfill) → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → #037 (rollout por tenant canário) → #031 (extração incremental, nunca reescrever o arquivo inteiro).
 
