@@ -185,9 +185,11 @@ async function handleSendMessage(job) {
                   await ticket.reload();
 
                   const io = getIO();
-                  io.to(ticket.status)
-                    .to("notification")
-                    .to(ticket.id.toString())
+                  io.to(ticket.id.toString())
+                    .to(`company-${companyId}-${ticket.status}`)
+                    .to(`company-${companyId}-notification`)
+                    .to(`queue-${ticket.queueId}-${ticket.status}`)
+                    .to(`queue-${ticket.queueId}-notification`)
                     .emit(`company-${companyId}-ticket`, {
                       action: "update",
                       ticket,

@@ -16,10 +16,15 @@ export async function joinTicketGroup(ticketId: number, userId: number, companyI
   await TicketUser.findOrCreate({ where: { ticketId, userId } });
 
   const io = getIO();
-  io.to(String(companyId)).emit(`company-${companyId}-ticket`, {
-    action: "update",
-    ticket: { id: ticketId }
-  });
+  io.to(String(ticketId))
+    .to(`company-${companyId}-${ticket.status}`)
+    .to(`company-${companyId}-notification`)
+    .to(`queue-${ticket.queueId}-${ticket.status}`)
+    .to(`queue-${ticket.queueId}-notification`)
+    .emit(`company-${companyId}-ticket`, {
+      action: "update",
+      ticket: { id: ticketId }
+    });
 }
 
 /**
@@ -32,10 +37,15 @@ export async function leaveTicketGroup(ticketId: number, userId: number, company
   await TicketUser.destroy({ where: { ticketId, userId } });
 
   const io = getIO();
-  io.to(String(companyId)).emit(`company-${companyId}-ticket`, {
-    action: "update",
-    ticket: { id: ticketId }
-  });
+  io.to(String(ticketId))
+    .to(`company-${companyId}-${ticket.status}`)
+    .to(`company-${companyId}-notification`)
+    .to(`queue-${ticket.queueId}-${ticket.status}`)
+    .to(`queue-${ticket.queueId}-notification`)
+    .emit(`company-${companyId}-ticket`, {
+      action: "update",
+      ticket: { id: ticketId }
+    });
 }
 
 /**
