@@ -361,15 +361,31 @@ Validado sem precisar de credenciais reais: chamei o service direto dentro do co
 
 ---
 
+## ✅ Fix — #024 criptografia da sessão WhatsApp no banco (2026-07-08)
+
+**Commit:** `a2ac5e5` — "security: #024 - criptografa sessao do WhatsApp no banco (AES-256-GCM)"
+
+Escolha de abordagem (perguntei ao usuário antes, entre 3 opções): criptografia na aplicação via getter/setter do Sequelize, em vez de pgcrypto (quebraria a transparência do ORM em dezenas de call sites) ou criptografia de disco (não resolve o risco real — os próprios dumps `.sql.gz` que geramos hoje já continham a sessão em texto puro).
+
+- `sessionCrypto.ts` (novo): `encryptSession`/`decryptSession` com AES-256-GCM, chave em `SESSION_ENCRYPTION_KEY` (`.env`, não versionada). Formato: `enc:v1:` + base64(iv + authTag + ciphertext).
+- `Whatsapp.ts`: coluna `session` vira getter/setter — decripta na leitura, criptografa na escrita. Confirmei antes que `authState.ts` é o único ponto de leitura/escrita em todo o código (só ORM, nenhum SQL raw) — zero mudança necessária em qualquer outro lugar.
+- Fallback: dado legado sem o prefixo `enc:v1:` é devolvido como está (sem tentar decriptar); falha de decriptação devolve `null` em vez de lançar erro, pra não derrubar a inicialização do WhatsApp inteira — só força aquela conexão a pedir QR novo.
+
+**Validado com as 2 conexões reais que estavam ativas em produção** (Pub Plus Brasil, POP 4081): deploy com fallback → ambas reconectaram normal lendo sessão legada em texto puro, sem QR novo. Backfill rodado (script direto no container) → confirmado no banco que `session` virou `enc:v1:...`. Restart do backend depois do backfill → ambas reconectaram de novo, agora lendo a sessão já criptografada, sem erros — prova ponta a ponta com dado real de produção. Backup rodado antes (`dape_backup_20260708_035916.sql.gz`).
+
+---
+
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
 - #031 wbotMessageListener.ts refactor (god-file 3388 linhas)
-- #024 Encrypt WA session no DB
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
+- ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → #024 (precisa fallback de leitura + backfill) → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → #031 (extração incremental, nunca reescrever o arquivo inteiro).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → #031 (extração incremental, nunca reescrever o arquivo inteiro).
+
+Restam só **#009** (Sequelize) e **#031** (refactor do god-file) — os dois de maior esforço/preparo da lista original.
 
 ---
 
