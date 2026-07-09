@@ -19,6 +19,10 @@ interface SendMetaCloudMessageParams {
   source?: string;
 }
 
+interface SendMetaCloudMessageResult {
+  externalId: string;
+}
+
 const SendMetaCloudMessage = async ({
   body,
   ticket,
@@ -26,7 +30,7 @@ const SendMetaCloudMessage = async ({
   mediaUrl,
   mediaType,
   source = "manual",
-}: SendMetaCloudMessageParams): Promise<void> => {
+}: SendMetaCloudMessageParams): Promise<SendMetaCloudMessageResult> => {
   const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
 
   if (
@@ -83,7 +87,7 @@ const SendMetaCloudMessage = async ({
   }
 
   try {
-    await axios.post(
+    const response = await axios.post(
       `${GRAPH_API_URL}/${whatsapp.phoneNumberId}/messages`,
       payload,
       {
@@ -95,6 +99,12 @@ const SendMetaCloudMessage = async ({
     );
 
     await ticket.update({ lastMessage: body || `[${mediaType}]` });
+
+    const externalId = response.data?.messages?.[0]?.id;
+    if (!externalId) {
+      throw new AppError("ERR_META_CLOUD_SEND_NO_ID");
+    }
+    return { externalId };
   } catch (err: any) {
     await dapleShield.reportSendError(ticket.whatsappId, ticket.companyId, err?.message || "send_failed");
     logger.error({ err }, "[MetaCloud] Erro ao enviar mensagem");
