@@ -212,6 +212,29 @@ class Whatsapp extends Model<Whatsapp> {
   @AllowNull(true)
   @Column
   previousProviderType: string;
+
+  // Saude real do numero, sincronizada da Meta - #031 Fase F. GREEN | YELLOW
+  // | RED | UNKNOWN.
+  @AllowNull(true)
+  @Column
+  metaQualityRating: string;
+
+  // Nivel de limite de mensagens (ex: TIER_250, TIER_1K, TIER_10K,
+  // TIER_100K, TIER_UNLIMITED) - compartilhado entre os numeros do mesmo
+  // portfolio/WABA desde out/2025.
+  @AllowNull(true)
+  @Column
+  metaMessagingLimit: string;
+
+  // Status de aprovacao do nome de exibicao (ex: APPROVED, PENDING,
+  // REJECTED).
+  @AllowNull(true)
+  @Column
+  metaNameStatus: string;
+
+  @AllowNull(true)
+  @Column
+  metaHealthSyncedAt: Date;
 }
 
 export default Whatsapp;

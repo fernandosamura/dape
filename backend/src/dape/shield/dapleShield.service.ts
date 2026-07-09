@@ -283,7 +283,18 @@ export const dapleShield = {
     const config = await getConfig(companyId, whatsappId);
     const counters = await getCounters(whatsappId);
     const inQuarantine = await isInQuarantine(whatsappId);
-    return { config, counters, inQuarantine };
+
+    // #031 Fase F - saude real vinda da Meta, exibida junto do status
+    // interno do Shield (so preenchida pra conexoes Cloud API).
+    const healthRows = await sequelize.query<any>(
+      `SELECT "providerType", "metaQualityRating", "metaMessagingLimit",
+              "metaNameStatus", "metaHealthSyncedAt"
+       FROM "Whatsapps" WHERE id = :wid LIMIT 1`,
+      { replacements: { wid: whatsappId }, type: QueryTypes.SELECT }
+    );
+    const metaHealth = healthRows[0] ?? null;
+
+    return { config, counters, inQuarantine, metaHealth };
   },
 };
 
@@ -312,7 +323,7 @@ export async function calculateConnectionRisk(
   whatsappId: number
 ): Promise<{ level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"; score: number; reasons: string[] }> {
   try {
-    const [configRows, quarantineRows, countersRaw, recentBlocks] = await Promise.all([
+    const [configRows, quarantineRows, countersRaw, recentBlocks, whatsappRows] = await Promise.all([
       sequelize.query<any>(
         `SELECT * FROM daple_shield_config WHERE company_id = :cid AND whatsapp_id = :wid LIMIT 1`,
         { replacements: { cid: companyId, wid: whatsappId }, type: QueryTypes.SELECT }
@@ -330,15 +341,59 @@ export async function calculateConnectionRisk(
          WHERE whatsapp_id = :wid AND decision = 'BLOCK' AND created_at >= NOW() - INTERVAL '2 hours'`,
         { replacements: { wid: whatsappId }, type: QueryTypes.SELECT }
       ),
+      // #031 Fase F - sinais reais de saude vindos da propria Meta (so
+      // preenchidos pra conexoes Cloud API - ficam NULL pro Baileys)
+      sequelize.query<any>(
+        `SELECT "providerType", "metaQualityRating", "metaMessagingLimit"
+         FROM "Whatsapps" WHERE id = :wid LIMIT 1`,
+        { replacements: { wid: whatsappId }, type: QueryTypes.SELECT }
+      ),
     ]);
 
     if (quarantineRows.length > 0) {
       return { level: "CRITICAL", score: 100, reasons: ["Em quarentena ativa"] };
     }
 
+    const whatsappHealth = whatsappRows[0];
+
+    // Quality rating RED e o sinal mais forte que a propria Meta da de que
+    // o numero esta em risco real - mesmo que a Meta em 2026 nao mais
+    // derrube o tier automaticamente (existe uma janela de correcao),
+    // continuar mandando mensagem enquanto sinalizado RED tende a piorar a
+    // situacao, entao tratamos como critico pra fins de decisao de envio.
+    if (
+      whatsappHealth?.providerType === "meta_cloud" &&
+      whatsappHealth?.metaQualityRating === "RED"
+    ) {
+      return {
+        level: "CRITICAL",
+        score: 100,
+        reasons: [`Qualidade do número (Meta): RED`]
+      };
+    }
+
     const config = configRows[0];
     let score = 0;
     const reasons: string[] = [];
+
+    if (
+      whatsappHealth?.providerType === "meta_cloud" &&
+      whatsappHealth?.metaQualityRating === "YELLOW"
+    ) {
+      score += 40;
+      reasons.push("Qualidade do número (Meta): YELLOW");
+    }
+
+    if (
+      whatsappHealth?.providerType === "meta_cloud" &&
+      typeof whatsappHealth?.metaMessagingLimit === "string" &&
+      whatsappHealth.metaMessagingLimit.includes("250")
+    ) {
+      score += 15;
+      reasons.push(
+        `Limite de mensagens ainda no nível inicial (${whatsappHealth.metaMessagingLimit}) - número novo/pouco estabelecido`
+      );
+    }
 
     if (config) {
       const dayCounter = countersRaw.find((c: any) => c.window_type === "day");

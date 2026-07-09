@@ -9,6 +9,7 @@ import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketServi
 import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATicketTrakingService";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import { downloadAndStoreMetaCloudMedia } from "./DownloadMetaCloudMedia";
+import { resyncWabaHealth } from "./SyncWhatsappHealthService";
 import { CloudApiChannel } from "../MessageChannel/CloudApiChannel";
 import {
   verifyQueue,
@@ -364,6 +365,39 @@ export const processMetaCloudWebhook = async (body: {
               "[MetaCloud] Erro ao processar atualização de status de template"
             );
           }
+          continue;
+        }
+
+        // #031 Fase F - eventos de saude/conta. O formato exato desses
+        // payloads varia e nao e totalmente documentado pela Meta, entao em
+        // vez de tentar parsear campos especificos, usamos o evento so como
+        // gatilho pra buscar o estado atual de verdade direto na Graph API
+        // (mais confiavel). entry.id nesses eventos e o WABA ID.
+        if (
+          change.field === "phone_number_quality_update" ||
+          change.field === "business_capability_update" ||
+          change.field === "phone_number_name_update"
+        ) {
+          try {
+            logger.info(
+              `[MetaCloud] Evento de saúde recebido (${change.field}) para WABA ${entry.id} - re-sincronizando`
+            );
+            await resyncWabaHealth(entry.id);
+          } catch (healthErr) {
+            logger.error(
+              { healthErr },
+              `[MetaCloud] Erro ao re-sincronizar saúde após webhook ${change.field}`
+            );
+          }
+          continue;
+        }
+
+        if (change.field === "security") {
+          logger.warn(
+            `[MetaCloud] Alerta de segurança recebido para WABA ${entry.id}: ${JSON.stringify(
+              change.value
+            )}`
+          );
           continue;
         }
 
