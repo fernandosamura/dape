@@ -3,6 +3,7 @@ import Message from "../../models/Message";
 import Queue from "../../models/Queue";
 import User from "../../models/User";
 import Contact from "../../models/Contact";
+import WhatsappTemplate from "../../models/WhatsappTemplate";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
 import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATicketTrakingService";
@@ -46,8 +47,8 @@ interface MetaCloudWebhookEntry {
   id: string;
   changes: Array<{
     value: {
-      messaging_product: string;
-      metadata: { display_phone_number: string; phone_number_id: string };
+      messaging_product?: string;
+      metadata?: { display_phone_number: string; phone_number_id: string };
       contacts?: Array<{ profile: { name: string }; wa_id: string }>;
       messages?: MetaCloudMessage[];
       statuses?: Array<{
@@ -56,6 +57,12 @@ interface MetaCloudWebhookEntry {
         timestamp: string;
         recipient_id: string;
       }>;
+      // Campos do field "message_template_status_update" (Fase E)
+      event?: string;
+      message_template_id?: number;
+      message_template_name?: string;
+      message_template_language?: string;
+      reason?: string;
     };
     field: string;
   }>;
@@ -309,6 +316,37 @@ const processStatusUpdate = async (status: {
   );
 };
 
+// Mantem o WhatsappTemplate local sincronizado quando a Meta aprova/rejeita/
+// pausa um template - #031 Fase E. Sem isso, a aprovacao so seria refletida
+// na proxima sincronizacao manual.
+const processTemplateStatusUpdate = async (value: {
+  event?: string;
+  message_template_id?: number;
+  message_template_name?: string;
+  reason?: string;
+}): Promise<void> => {
+  if (!value.message_template_id || !value.event) return;
+
+  const metaTemplateId = String(value.message_template_id);
+  const template = await WhatsappTemplate.findOne({
+    where: { metaTemplateId }
+  });
+
+  if (!template) {
+    logger.warn(
+      `[MetaCloud] Webhook de status de template: template ${metaTemplateId} (${value.message_template_name}) não encontrado localmente`
+    );
+    return;
+  }
+
+  await template.update({ status: value.event });
+  logger.info(
+    `[MetaCloud] Template "${value.message_template_name}" atualizado para status ${value.event}${
+      value.reason ? ` (motivo: ${value.reason})` : ""
+    }`
+  );
+};
+
 export const processMetaCloudWebhook = async (body: {
   entry?: MetaCloudWebhookEntry[];
 }): Promise<void> => {
@@ -317,6 +355,18 @@ export const processMetaCloudWebhook = async (body: {
 
     for (const entry of body.entry) {
       for (const change of entry.changes || []) {
+        if (change.field === "message_template_status_update") {
+          try {
+            await processTemplateStatusUpdate(change.value);
+          } catch (templateErr) {
+            logger.error(
+              { templateErr },
+              "[MetaCloud] Erro ao processar atualização de status de template"
+            );
+          }
+          continue;
+        }
+
         if (change.field !== "messages") continue;
         const value = change.value;
         const phoneNumberId = value?.metadata?.phone_number_id;

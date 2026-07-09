@@ -30,6 +30,8 @@ import formatBody from "./helpers/Mustache";
 import { getWbot } from "./libs/wbot";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
 import { dapleShield, applySafeDelay } from "./dape/shield/dapleShield.service";
+import WhatsappTemplate from "./models/WhatsappTemplate";
+import SendMetaCloudTemplate from "./services/MetaCloudServices/SendMetaCloudTemplate";
 
 
 const nodemailer = require('nodemailer');
@@ -393,7 +395,18 @@ async function getCampaign(id) {
       {
         model: Whatsapp,
         as: "whatsapp",
-        attributes: ["id", "name"]
+        attributes: [
+          "id",
+          "name",
+          "providerType",
+          "phoneNumberId",
+          "metaAccessToken",
+          "companyId"
+        ]
+      },
+      {
+        model: WhatsappTemplate,
+        as: "template"
       },
       {
         model: CampaignShipping,
@@ -818,20 +831,8 @@ async function handleDispatchCampaign(job) {
       return;
     }
 
-    const wbot = await GetWhatsappWbot(campaign.whatsapp);
-
-    if (!wbot) {
-      logger.error(`[🚨] - Wbot não encontrado para campanha ${campaignId}`);
-      return;
-    }
-
     if (!campaign.whatsapp) {
       logger.error(`[🚨] - WhatsApp não encontrado para campanha ${campaignId}`);
-      return;
-    }
-
-    if (!wbot?.user?.id) {
-      logger.error(`[🚨] - Usuário do wbot não encontrado para campanha ${campaignId}`);
       return;
     }
 
@@ -863,9 +864,74 @@ async function handleDispatchCampaign(job) {
 
     await applySafeDelay("campaign", campaign.companyId, campaign.whatsappId);
 
-    const chatId = `${campaignShipping.number}@s.whatsapp.net`;
-
     let body = campaignShipping.message;
+
+    // #031 Fase E - Cloud API exige template pre-aprovado pra mensagem de
+    // negocio fora da janela de 24h (o caso normal de uma campanha). Nao e
+    // opcional - bloqueia com erro claro em vez de tentar enviar texto
+    // livre, que a Meta rejeitaria de qualquer forma.
+    if (campaign.whatsapp.providerType === "meta_cloud") {
+      if (!campaign.template) {
+        logger.error(
+          `[🚨] - Campanha ${campaignId} usa Cloud API mas não tem template aprovado configurado - disparo bloqueado`
+        );
+        return;
+      }
+      if (campaign.template.status !== "APPROVED") {
+        logger.error(
+          `[🚨] - Template "${campaign.template.name}" da campanha ${campaignId} não está aprovado (status: ${campaign.template.status}) - disparo bloqueado`
+        );
+        return;
+      }
+      if (!isNil(campaign.fileListId) || campaign.mediaPath) {
+        logger.warn(
+          `[MetaCloud] Campanha ${campaignId} tem mídia configurada, mas anexar mídia num template ainda não é suportado - enviando só o template`
+        );
+      }
+
+      try {
+        await SendMetaCloudTemplate({
+          whatsapp: campaign.whatsapp,
+          to: campaignShipping.number,
+          template: campaign.template
+        });
+      } catch (err: any) {
+        logger.error(
+          `[🚨] - Erro ao disparar template Cloud API | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}: ${err.message}`
+        );
+        return;
+      }
+
+      await campaignShipping.update({ deliveredAt: moment() });
+      await verifyAndFinalizeCampaign(campaign);
+
+      const ioCloud = getIO();
+      ioCloud
+        .to(`company-${campaign.companyId}-mainchannel`)
+        .emit(`company-${campaign.companyId}-campaign`, {
+          action: "update",
+          record: campaign
+        });
+
+      logger.info(
+        `[🏁] - Campanha (Cloud API) enviada para: Campanha=${campaignId};Contato=${campaignShipping.contact.name}`
+      );
+      return;
+    }
+
+    const wbot = await GetWhatsappWbot(campaign.whatsapp);
+
+    if (!wbot) {
+      logger.error(`[🚨] - Wbot não encontrado para campanha ${campaignId}`);
+      return;
+    }
+
+    if (!wbot?.user?.id) {
+      logger.error(`[🚨] - Usuário do wbot não encontrado para campanha ${campaignId}`);
+      return;
+    }
+
+    const chatId = `${campaignShipping.number}@s.whatsapp.net`;
 
     if (!isNil(campaign.fileListId)) {
       logger.info(`[🚩] - Recuperando a lista de arquivos | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);

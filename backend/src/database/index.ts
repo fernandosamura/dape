@@ -45,6 +45,7 @@ import { FlowImgModel } from "../models/FlowImg";
 import DapeLeadSource from "../models/DapeLeadSource";
 import DapeDeal from "../models/DapeDeal";
 import TicketUser from "../models/TicketUser";
+import WhatsappTemplate from "../models/WhatsappTemplate";
 
 // eslint-disable-next-line
 const dbConfig = require("../config/database");
@@ -99,6 +100,7 @@ const models = [
   DapeLeadSource,
   DapeDeal,
   TicketUser,
+  WhatsappTemplate,
 ];
 
 sequelize.addModels(models);

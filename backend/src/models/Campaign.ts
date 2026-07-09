@@ -16,6 +16,7 @@ import ContactList from "./ContactList";
 import Whatsapp from "./Whatsapp";
 import Files from "./Files";
 import Tag from "./Tag";
+import WhatsappTemplate from "./WhatsappTemplate";
 
 @Table({ tableName: "Campaigns" })
 class Campaign extends Model<Campaign> {
@@ -97,6 +98,16 @@ class Campaign extends Model<Campaign> {
 
   @BelongsTo(() => Files)
   fileList: Files;
+
+  // Template aprovado pela Meta a usar no disparo - obrigatorio quando o
+  // whatsapp da campanha e providerType meta_cloud (Fase E, mensagem de
+  // negocio fora da janela de 24h exige template pre-aprovado).
+  @ForeignKey(() => WhatsappTemplate)
+  @Column
+  templateId: number;
+
+  @BelongsTo(() => WhatsappTemplate)
+  template: WhatsappTemplate;
 
   @HasMany(() => CampaignShipping)
   shipping: CampaignShipping[];

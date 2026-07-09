@@ -105,6 +105,7 @@ const CampaignModal = ({
     whatsappId: "",
     contactListId: "",
     tagListId: "Nenhuma",
+    templateId: "",
     companyId,
   };
 
@@ -117,6 +118,56 @@ const CampaignModal = ({
   const [campaignEditable, setCampaignEditable] = useState(true);
   const attachmentFile = useRef(null);
   const [tagLists, setTagLists] = useState([]);
+
+  // #031 Fase E - templates da Meta Cloud API, so relevantes quando o
+  // WhatsApp selecionado for uma conexao Cloud API (campanha nesse caso
+  // exige template aprovado em vez de texto livre).
+  const [templates, setTemplates] = useState([]);
+  const [syncingTemplates, setSyncingTemplates] = useState(false);
+  const selectedWhatsapp = whatsapps.find(
+    (w) => String(w.id) === String(campaign.whatsappId)
+  );
+  const isCloudApiWhatsapp = selectedWhatsapp?.providerType === "meta_cloud";
+
+  const fetchTemplates = async (whatsappId) => {
+    if (!whatsappId) {
+      setTemplates([]);
+      return;
+    }
+    try {
+      const { data } = await api.get(`/meta-cloud/templates/${whatsappId}`, {
+        params: { status: "APPROVED" },
+      });
+      setTemplates(data);
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  useEffect(() => {
+    if (isCloudApiWhatsapp) {
+      fetchTemplates(campaign.whatsappId);
+    } else {
+      setTemplates([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign.whatsappId, isCloudApiWhatsapp]);
+
+  const handleSyncTemplates = async () => {
+    if (!campaign.whatsappId) return;
+    setSyncingTemplates(true);
+    try {
+      const { data } = await api.post(
+        `/meta-cloud/templates/${campaign.whatsappId}/sync`
+      );
+      setTemplates(data.filter((t) => t.status === "APPROVED"));
+      toast.success(i18n.t("campaigns.dialog.form.templatesSynced"));
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSyncingTemplates(false);
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -351,7 +402,7 @@ const CampaignModal = ({
             }, 400);
           }}
         >
-          {({ values, errors, touched, isSubmitting }) => (
+          {({ values, errors, touched, isSubmitting, setFieldValue }) => (
             <Form>
               <DialogContent dividers>
                 <Grid spacing={2} container>
@@ -455,17 +506,74 @@ const CampaignModal = ({
                         name="whatsappId"
                         error={touched.whatsappId && Boolean(errors.whatsappId)}
                         disabled={!campaignEditable}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFieldValue("whatsappId", value);
+                          setFieldValue("templateId", "");
+                          setCampaign((prev) => ({
+                            ...prev,
+                            whatsappId: value,
+                            templateId: "",
+                          }));
+                        }}
                       >
                         <MenuItem value="">Nenhuma</MenuItem>
                         {whatsapps &&
                           whatsapps.map((whatsapp) => (
                             <MenuItem key={whatsapp.id} value={whatsapp.id}>
                               {whatsapp.name}
+                              {whatsapp.providerType === "meta_cloud"
+                                ? " (API Oficial)"
+                                : ""}
                             </MenuItem>
                           ))}
                       </Field>
                     </FormControl>
                   </Grid>
+                  {isCloudApiWhatsapp && (
+                    <Grid xs={12} md={4} item>
+                      <FormControl
+                        variant="outlined"
+                        margin="dense"
+                        fullWidth
+                        className={classes.formControl}
+                      >
+                        <InputLabel id="template-selection-label">
+                          {i18n.t("campaigns.dialog.form.template")}
+                        </InputLabel>
+                        <Field
+                          as={Select}
+                          label={i18n.t("campaigns.dialog.form.template")}
+                          labelId="template-selection-label"
+                          id="templateId"
+                          name="templateId"
+                          error={
+                            touched.templateId && Boolean(errors.templateId)
+                          }
+                          disabled={!campaignEditable}
+                        >
+                          <MenuItem value="">
+                            {i18n.t("campaigns.dialog.form.templateNone")}
+                          </MenuItem>
+                          {templates.map((template) => (
+                            <MenuItem key={template.id} value={template.id}>
+                              {template.name} ({template.language})
+                            </MenuItem>
+                          ))}
+                        </Field>
+                        <Button
+                          size="small"
+                          onClick={handleSyncTemplates}
+                          disabled={syncingTemplates || !campaignEditable}
+                          style={{ marginTop: 4 }}
+                        >
+                          {syncingTemplates
+                            ? i18n.t("campaigns.dialog.form.templateSyncing")
+                            : i18n.t("campaigns.dialog.form.templateSync")}
+                        </Button>
+                      </FormControl>
+                    </Grid>
+                  )}
                   <Grid xs={12} md={4} item>
                     <Field
                       as={TextField}
@@ -510,43 +618,51 @@ const CampaignModal = ({
                       </Field>
                     </FormControl>
                   </Grid>
-                  <Grid xs={12} item>
-                    <Tabs
-                      value={messageTab}
-                      indicatorColor="primary"
-                      textColor="primary"
-                      className={classes.tabmsg}
-                      onChange={(e, v) => setMessageTab(v)}
-                      variant="fullWidth"
-                      centered
-                      style={{
-                        borderRadius: 2,
-                      }}
-                    >
-                      <Tab label="Msg. 1" index={0} />
-                      <Tab label="Msg. 2" index={1} />
-                      <Tab label="Msg. 3" index={2} />
-                      <Tab label="Msg. 4" index={3} />
-                      <Tab label="Msg. 5" index={4} />
-                    </Tabs>
-                    <Box style={{ paddingTop: 20, border: "none" }}>
-                      {messageTab === 0 && (
-                        <>{renderMessageField("message1")}</>
-                      )}
-                      {messageTab === 1 && (
-                        <>{renderMessageField("message2")}</>
-                      )}
-                      {messageTab === 2 && (
-                        <>{renderMessageField("message3")}</>
-                      )}
-                      {messageTab === 3 && (
-                        <>{renderMessageField("message4")}</>
-                      )}
-                      {messageTab === 4 && (
-                        <>{renderMessageField("message5")}</>
-                      )}
-                    </Box>
-                  </Grid>
+                  {isCloudApiWhatsapp ? (
+                    <Grid xs={12} item>
+                      <Box style={{ paddingTop: 12, paddingBottom: 12 }}>
+                        {i18n.t("campaigns.dialog.form.templateExplain")}
+                      </Box>
+                    </Grid>
+                  ) : (
+                    <Grid xs={12} item>
+                      <Tabs
+                        value={messageTab}
+                        indicatorColor="primary"
+                        textColor="primary"
+                        className={classes.tabmsg}
+                        onChange={(e, v) => setMessageTab(v)}
+                        variant="fullWidth"
+                        centered
+                        style={{
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Tab label="Msg. 1" index={0} />
+                        <Tab label="Msg. 2" index={1} />
+                        <Tab label="Msg. 3" index={2} />
+                        <Tab label="Msg. 4" index={3} />
+                        <Tab label="Msg. 5" index={4} />
+                      </Tabs>
+                      <Box style={{ paddingTop: 20, border: "none" }}>
+                        {messageTab === 0 && (
+                          <>{renderMessageField("message1")}</>
+                        )}
+                        {messageTab === 1 && (
+                          <>{renderMessageField("message2")}</>
+                        )}
+                        {messageTab === 2 && (
+                          <>{renderMessageField("message3")}</>
+                        )}
+                        {messageTab === 3 && (
+                          <>{renderMessageField("message4")}</>
+                        )}
+                        {messageTab === 4 && (
+                          <>{renderMessageField("message5")}</>
+                        )}
+                      </Box>
+                    </Grid>
+                  )}
                   {(campaign.mediaPath || attachment) && (
                     <Grid xs={12} item>
                       <Button startIcon={<AttachFileIcon />}>

@@ -1167,6 +1167,13 @@ const messages = {
             contactList: "Lista de Contato",
             tagList: "Lista de Tags",
             fileList: "Lista de Arquivos",
+            template: "Template aprovado (API Oficial)",
+            templateNone: "Nenhum",
+            templateSync: "Sincronizar templates",
+            templateSyncing: "Sincronizando...",
+            templatesSynced: "Templates sincronizados com sucesso",
+            templateExplain:
+              "Esta conexão usa a API Oficial do WhatsApp — campanhas exigem um template de mensagem previamente aprovado pela Meta em vez de texto livre. Escolha um template acima.",
           },
           buttons: {
             add: "Adicionar",
