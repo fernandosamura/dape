@@ -525,18 +525,32 @@ Validado com webhook sintético assinado (HMAC-SHA256 real, calculado com o App 
 
 Próximo passo: Fase 3 (download de mídia real via Cloud API).
 
+## ✅ Fix — Meta Cloud API Fase 3: download de mídia real (2026-07-09)
+
+**Commit:** `c7ddac6` — "feat: Meta Cloud API fase 3 - download de midia real"
+
+Antes, imagem/áudio/vídeo/documento/figurinha recebidos via Cloud API viravam só um corpo textual placeholder (`[imagem]` etc, deixado documentado como pendente na Fase 2). Agora baixa e armazena o arquivo de verdade, replicando exatamente a lógica já usada em `verifyMessage`/`verifyMediaMessage` (Baileys): `DownloadMetaCloudMedia.ts` (novo) faz `GET /{media-id}` na Graph API pra pegar a URL temporária + mime type, depois baixa os bytes dessa URL (que também exige o mesmo Bearer token — não é link público), e salva via `uploadToR2` (se habilitado) ou `public/` local, mesma convenção de nome de arquivo do Baileys. `MetaCloudWebhookService.ts` usa a legenda como corpo quando disponível (ou `"-"` sem legenda, mesma convenção do Baileys); se o download falhar por qualquer motivo (token ausente, erro de decriptação, erro da API da Meta), cai de volta no corpo placeholder da Fase 2 — mensagem nunca se perde.
+
+Validado com 2 cenários reais: (1) sem `metaAccessToken` configurado — download pulado, mensagem criada com `[imagem]`; (2) com token real mas ID de mídia inexistente — chamada HTTP de verdade pra Graph API, erro `GraphMethodException` retornado por ela, capturado e logado, mensagem ainda criada com o placeholder. Confirma que erro real de API externa não derruba o processamento.
+
+**Não testado nesta sessão:** o caminho de sucesso (download efetivo de um arquivo real), que exige uma mídia de verdade chegando pelo webhook real da Meta (depende do usuário concluir o Passo 6 — configuração do webhook no painel deles). Fica como validação pendente assim que houver tráfego real.
+
+Build isolado (tsc limpo, ~13s), backend reiniciado sem impacto real (números seguem `DISCONNECTED`). Dados de teste limpos depois. Backup rodado antes (`dape_backup_20260709_054737.sql.gz`).
+
+Próximo passo: Fase 4 (unificar o dispatcher `SendWhatsAppMessage` por `providerType` — única fase que toca código compartilhado com produção).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- **Integração híbrida Meta Cloud API** — Fases 1 (infra/credenciais) e 2 (webhook de entrada) concluídas. Faltam: Fase 3 (mídia), Fase 4 (unificar dispatcher de envio), Fase 5 (templates), Fase 6 (piloto com número real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
+- **Integração híbrida Meta Cloud API** — Fases 1 (infra/credenciais), 2 (webhook de entrada) e 3 (mídia) concluídas. Faltam: Fase 4 (unificar dispatcher de envio), Fase 5 (templates), Fase 6 (piloto com número real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → Meta Cloud API Fase 3-6 (em andamento, paralelo aos passos manuais do usuário com a Meta).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → Meta Cloud API Fase 4-6 (em andamento, paralelo aos passos manuais do usuário com a Meta).
 
 Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos), e a continuação das fases 2-6 da integração Meta Cloud API.
 
