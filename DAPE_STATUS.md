@@ -581,18 +581,35 @@ Migra `verifyQueue`/`handleChartbot`/`handleRating` (`wbotMessageMenu.ts`) pra u
 
 Próximo passo: Fase C (motor de IA sobre a abstração).
 
+## ✅ Fix — Meta Cloud API Fase C: motor de IA sobre a abstração (2026-07-09)
+
+**Commit:** `6a18ea2` — "feat: Meta Cloud API fase C - motor de IA sobre a abstracao"
+
+Migra `handleOpenAi` (transcrição de áudio, análise de imagem/vídeo, resposta em texto/voz, transferência de fila) pra usar `MessageChannel`, conectando os 5 pontos de chamada (2 em `wbotMessageMenu.ts`, 3 em `wbotMessageListener.ts`). Antes (Fase B), um ticket Cloud API com IA configurada na fila só gerava aviso de log "pendente Fase C" — agora funciona de verdade.
+
+- `handleOpenAi` troca `msg`/`wbot` por `channel: MessageChannel` + `messageBody`/`messageKind` (`"text"|"audio"|"image_video"|"other"`)/`caption` já extraídos pelo chamador, mais `baileysCtx?` usado só onde realmente precisa de Baileys: o indicador "digitando..." (presence — conceito exclusivo do protocolo WhatsApp Web, sem equivalente na Cloud API) e o guard de `messageStubType`. Transcrição (Whisper/Gemini) e visão (GPT-4V/Gemini Vision) já eram provider-agnósticas (só leem o arquivo do disco/R2) — não precisaram mudar.
+- `sendAudioReply` (novo): no Baileys continua enviando o buffer inline pelo socket; na Cloud API exige `CLOUDFLARE_R2_ENABLED=true` (já habilitado em produção) e envia via URL pública do R2 — sem R2, cai pra resposta em texto (API oficial não aceita buffer bruto).
+- `sendAndPersistMedia` (novo, `MessageChannel/sendAndPersist.ts`): calcula a URL pública completa pro envio (R2 ou `BACKEND_URL/public`, mesma lógica do getter `Message.mediaUrl`), guardando só o nome do arquivo no banco.
+- `classifyForAI`/`classifyBaileysMsgForAI` (novos, um em cada arquivo): derivam `messageKind`/`caption` a partir da `Message` já persistida (Cloud API) ou do `msg` bruto (Baileys) — mesma lógica de detecção de tipo que já existia, agora explícita pro chamador.
+
+**Fora do escopo desta fase (documentado):** os gatilhos "IA da conexão inteira" (`whatsapp.promptId`) e "fila com integração já ativa" (`ticket.promptId` + `ticket.useIntegration`) do `handleMessage` Baileys ainda não têm equivalente no webhook Cloud API — `MetaCloudWebhookService` aciona só `verifyQueue`/`handleChartbot`, que já cobre o caso mais comum (IA na primeira fila).
+
+Validado: build isolado (tsc limpo, ~12s) — a tipagem pegou qualquer incompatibilidade real entre os 5 call sites e a nova assinatura. Backend reiniciado, todos os módulos carregados via `require()` sem erro. Lógica de cálculo de URL pública testada isoladamente. Não foi feito teste de ponta a ponta com chamada real a provedor de IA (custo de API externa) — a mesma lógica de tratamento de erro já validada na Fase B se aplica identicamente aqui. Backup rodado antes (`dape_backup_20260709_074709.sql.gz`).
+
+Próximo passo: Fase D (Flow Builder sobre a abstração).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração) e B (motor de menu) concluídas. Faltam: Fase C (motor de IA), Fase D (Flow Builder), Fase E (templates/campanhas), Fase F (Shield com dados reais da Meta), Fase G (piloto real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
+- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração), B (motor de menu) e C (motor de IA) concluídas. Faltam: Fase D (Flow Builder), Fase E (templates/campanhas), Fase F (Shield com dados reais da Meta), Fase G (piloto real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → Meta Cloud API Fase C-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → ~~Meta Cloud API Fase C~~ ✅ → Meta Cloud API Fase D-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
 
 Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos), e a continuação das fases 2-6 da integração Meta Cloud API.
 
