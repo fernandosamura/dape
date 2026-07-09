@@ -499,6 +499,20 @@ Validado: build isolado de ambos (frontend ~118s, backend/tsc ~13s), sem erro. H
 
 **Pendente (fora do escopo desta fase):** preencher `META_APP_ID`/`META_APP_SECRET` reais assim que o usuário concluir o Passo 5 do documento de configuração da plataforma, e validar a assinatura HMAC ponta a ponta com um webhook real da Meta.
 
+## ✅ Fix — Meta Cloud API: credenciais reais + webhook bloqueado por CSRF/rate limit (2026-07-09)
+
+**Commit:** `29479dd` — "fix: Meta Cloud API - webhook bloqueado por CSRF e rate limit"
+
+Usuário concluiu o Passo 5 (App ID `1591177185743944` e App Secret, obtidos em `developers.facebook.com/apps/{id}/settings/basic`) e configurou no `.env` do servidor. Frontend rebuilded pra gravar o App ID real no `FB.init` (confirmado via HTML servido). Backend reiniciado com as credenciais reais carregadas (`printenv` confirmado no container).
+
+**Achado crítico ao validar a assinatura HMAC com o secret real:** a rota `POST /meta-cloud/webhook` estava sendo bloqueada pela proteção CSRF global (double-submit cookie) **antes** de chegar no controller — retornava 403 tanto pra assinatura correta quanto pra errada, sem nenhum log da checagem. Causa: a lista de exclusão do CSRF só tinha `/webhooks/` (plural, usado pelo Asaas), não `/meta-cloud/webhook` (singular). Sem essa correção, a Meta jamais conseguiria entregar nenhum webhook de produção — teria passado despercebido até o primeiro teste real com a Meta, bem mais tarde no processo. Corrigido adicionando `/meta-cloud/webhook` tanto ao `csrfExcludes` quanto ao `skipRateLimit` (a segurança dessa rota vem da assinatura HMAC, não de cookie de sessão — é uma chamada servidor-a-servidor da própria Meta).
+
+Validado com `curl` simulando uma chamada real: corpo JSON + HMAC-SHA256 calculado com o App Secret real via `openssl`. Assinatura correta → 200 (processa e loga). Assinatura incorreta → 401 com log de aviso (`[MetaCloud] Webhook signature inválida`). Confirma o pipeline completo funcional: `rawBody` (Fase 1) + App Secret real + exclusão de CSRF/rate-limit (esta correção).
+
+Backend reiniciado 2x nesta sessão (troca de env + esta correção) sem qualquer impacto real — os 4 números já estavam `DISCONNECTED` desde antes (usuário desconectou manualmente por segurança, planeja reconectar só ao final de todo o processo de integração). Backup rodado antes (`dape_backup_20260709_041322.sql.gz`).
+
+**Fase 1 do Meta Cloud API agora está completa de verdade** (antes só tinha a infraestrutura pronta, sem credenciais nem validação real). Próximo passo: Fase 2 (webhook de entrada completo — hoje só loga e emite evento raso, precisa criar contato/ticket/mensagem de verdade).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
