@@ -634,18 +634,35 @@ Validado: build isolado backend (tsc limpo) e frontend (CRA, sem warning nos arq
 
 Próximo passo: Fase F (DAPLE Shield com sinais reais da Meta).
 
+## ✅ Fix — Meta Cloud API Fase F: DAPLE Shield com saúde real da Meta (2026-07-09)
+
+**Commit:** `1d97508` — "feat: Meta Cloud API fase F - DAPLE Shield com saude real da Meta"
+
+Responde diretamente ao pedido original do usuário: o Shield só olhava heurísticas internas (contadores próprios, quarentena por erro de envio) — nunca tinha consultado a Meta.
+
+- **Campos novos no `Whatsapp`**: `metaQualityRating` (GREEN/YELLOW/RED), `metaMessagingLimit` (nível de limite, compartilhado entre números do mesmo WABA desde out/2025), `metaNameStatus`, `metaHealthSyncedAt`.
+- **`SyncWhatsappHealthService.ts`** (novo): `syncWhatsappHealth` consulta `GET /{phone-number-id}?fields=quality_rating,whatsapp_business_manager_messaging_limit,name_status` (nomes de campo confirmados na doc oficial — o antigo `messaging_limit_tier` foi descontinuado em 2026). Cron a cada 2h sincroniza todos os números Cloud API automaticamente (a Meta reavalia a cada 6h).
+- **Webhook**: passa a tratar `phone_number_quality_update`, `business_capability_update`, `phone_number_name_update`. Decisão de design: como o formato exato desses payloads não é totalmente documentado, o webhook é tratado só como *gatilho* — busca o estado real direto na Graph API via `resyncWabaHealth` em vez de parsear campos especulativos. `security` só gera log de alerta.
+- **`calculateConnectionRisk`** (o coração desta fase): `quality_rating` RED agora retorna CRITICAL imediatamente; YELLOW soma +40 ao score; limite ainda no patamar inicial (`TIER_250`) soma +15. Só se aplica a conexões `meta_cloud` — Baileys continua com as heurísticas de sempre. `getStatus` passa a expor `metaHealth` também.
+
+Validado com 5 testes funcionais reais: sync com token falso (erro real da Meta tratado), `RED` simulado → `CRITICAL/100`, `YELLOW`+`TIER_250` → `HIGH/55` com os motivos certos, `getStatus` retornando os dados corretos, e webhook sintético assinado disparando a re-sincronização (erro tratado nos dois níveis, sem quebrar a resposta). Build isolado (tsc limpo), migração rodou automaticamente. Backup rodado antes (`dape_backup_20260709_165317.sql.gz`).
+
+**Pendente:** usuário precisa habilitar os campos de webhook `phone_number_quality_update`, `business_capability_update`, `phone_number_name_update` e `security` no painel da Meta (mesma tela do Passo 6) — o cron periódico funciona independente disso.
+
+Próximo passo: Fase G (piloto real com número de produção).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração), B (motor de menu), C (motor de IA) e E (templates/campanhas) concluídas. **Fase D (Flow Builder) investigada e adiada por decisão** (escopo maior que o esperado — ver investigação acima; só o fix pontual do #037 foi aplicado). Faltam: Fase F (Shield com dados reais da Meta), Fase G (piloto real), validação visual do `CampaignModal` num navegador real, e — quando fizer sentido priorizar — o Flow Builder completo (ver mapeamento detalhado acima). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
+- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração), B (motor de menu), C (motor de IA), E (templates/campanhas) e F (Shield com dados reais da Meta) concluídas. **Fase D (Flow Builder) investigada e adiada por decisão** (escopo maior que o esperado — ver investigação acima; só o fix pontual do #037 foi aplicado). Faltam: Fase G (piloto real), validação visual do `CampaignModal` num navegador real, habilitar os campos de webhook de saúde no painel da Meta, e — quando fizer sentido priorizar — o Flow Builder completo (ver mapeamento detalhado acima). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → ~~Meta Cloud API Fase C~~ ✅ → Meta Cloud API Fase D (adiada, investigada) → ~~Meta Cloud API Fase E~~ ✅ → Meta Cloud API Fase F-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → ~~Meta Cloud API Fase C~~ ✅ → Meta Cloud API Fase D (adiada, investigada) → ~~Meta Cloud API Fase E~~ ✅ → ~~Meta Cloud API Fase F~~ ✅ → Meta Cloud API Fase G (última fase - piloto real).
 
 Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos), e a continuação das fases 2-6 da integração Meta Cloud API.
 
