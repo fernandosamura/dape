@@ -70,9 +70,11 @@ app.use(Sentry.Handlers.requestHandler());
 app.use("/public", express.static(uploadConfig.directory));
 
 // ── Rate limiting ──────────────────────────────────────────────────────────
-// Rotas excluídas: webhooks (Asaas não controla cadência), /health (monitoring)
+// Rotas excluídas: webhooks (Asaas e Meta Cloud API não controlam cadência), /health (monitoring)
 const skipRateLimit = (req: Request) =>
-  req.path.startsWith("/webhooks/") || req.path === "/health";
+  req.path.startsWith("/webhooks/") ||
+  req.path.startsWith("/meta-cloud/webhook") ||
+  req.path === "/health";
 
 // Global: 1000 req / 15 min por IP — protege toda a API
 app.use(
@@ -124,7 +126,9 @@ app.get("/csrf-token", (req: Request, res: Response) => {
 });
 
 // Rotas que NÃO precisam de CSRF
-const csrfExcludes = ["/auth/", "/webhooks/", "/forgetpassword", "/health", "/csrf-token"];
+// /meta-cloud/webhook: chamado direto pela Meta (server-to-server), sem cookie/sessao de navegador -
+// a seguranca dessa rota vem da assinatura HMAC (X-Hub-Signature-256), nao do CSRF.
+const csrfExcludes = ["/auth/", "/webhooks/", "/meta-cloud/webhook", "/forgetpassword", "/health", "/csrf-token"];
 const skipCsrf = (req: Request) =>
   req.method === "GET" ||
   req.method === "HEAD" ||
