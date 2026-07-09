@@ -8,7 +8,6 @@ import Ticket from "../../models/Ticket";
 import Message from "../../models/Message";
 import TicketTraking from "../../models/TicketTraking";
 import Queue from "../../models/Queue";
-import Whatsapp from "../../models/Whatsapp";
 
 import { logger } from "../../utils/logger";
 import { moduleAccessService as moduleAccess } from "../../dape/shared/moduleAccess.service";
@@ -18,14 +17,14 @@ import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import { uploadToR2, downloadFromR2 } from "../StorageServices/R2Service";
 import { callAIProvider, AIProvider, AIMessage } from "../AIProviderService/AIProviderRouter";
 import { sanitizeName, keepOnlySpecifiedChars } from "../../utils/generalHelpers";
-import { getBodyMessage } from "./wbotMessageParsers";
 import {
   convertTextToSpeechAndSaveToFile,
-  verifyMediaMessage,
   deleteFileSync,
-  verifyMessage
+  verifyMediaMessage
 } from "./wbotMessageMedia";
 import type { Session } from "./wbotMessageListener";
+import { MessageChannel } from "../MessageChannel/MessageChannelTypes";
+import { sendAndPersistText, sendAndPersistMedia } from "../MessageChannel/sendAndPersist";
 
 const fs = require("fs");
 
@@ -41,35 +40,98 @@ export const transferQueue = async (
   });
 };
 
+// Contexto so preenchido numa sessao Baileys - usado pro indicador de
+// "digitando..." (presence), que so existe no protocolo do WhatsApp Web/
+// Baileys e nao tem equivalente na Cloud API oficial da Meta. Sem isso
+// (ticket Cloud API), o delay humanizado ainda acontece, so sem a
+// simulacao visual de digitacao.
+interface BaileysTypingContext {
+  wbot: Session;
+  jid: string;
+}
+
 async function sendWithTypingDelay(
-  wbot: Session,
-  jid: string,
-  text: string,
+  channel: MessageChannel,
   ticket: Ticket,
-  contact: Contact
+  text: string,
+  baileysTyping?: BaileysTypingContext
 ): Promise<void> {
   const words = text.trim().split(/\s+/).length;
   const base = Math.min(words * 60, 3600);
   const jitter = Math.floor(Math.random() * 400);
   const delayMs = Math.max(800, Math.min(base + jitter, 4000));
 
-  await wbot.presenceSubscribe(jid);
-  await wbot.sendPresenceUpdate("composing", jid);
+  if (baileysTyping) {
+    await baileysTyping.wbot.presenceSubscribe(baileysTyping.jid);
+    await baileysTyping.wbot.sendPresenceUpdate("composing", baileysTyping.jid);
+  }
   await new Promise(resolve => setTimeout(resolve, delayMs));
-  await wbot.sendPresenceUpdate("paused", jid);
+  if (baileysTyping) {
+    await baileysTyping.wbot.sendPresenceUpdate("paused", baileysTyping.jid);
+  }
 
-  const sent = await wbot.sendMessage(jid, { text });
-  await verifyMessage(sent!, ticket, contact);
+  await sendAndPersistText(channel, ticket, text);
+}
+
+// Envia a resposta em audio (TTS). No Baileys, envia o buffer inline direto
+// pelo socket. Na Cloud API, precisa de uma URL publica - so funciona com
+// CLOUDFLARE_R2_ENABLED=true (o arquivo ja e enviado ao R2 de qualquer forma
+// quando essa opcao esta ativa). Sem R2 numa conexao Cloud API, cai pra
+// resposta em texto (nao ha como anexar um buffer bruto na API oficial).
+async function sendAudioReply(
+  channel: MessageChannel,
+  ticket: Ticket,
+  contact: Contact,
+  oggPath: string,
+  fallbackText: string,
+  ticketTraking: TicketTraking,
+  baileysCtx?: { wbot: Session; msg: proto.IWebMessageInfo }
+): Promise<void> {
+  if (baileysCtx) {
+    const audioBuffer = fs.readFileSync(oggPath);
+    const sendMessage = await baileysCtx.wbot.sendMessage(
+      baileysCtx.msg.key.remoteJid!,
+      {
+        audio: audioBuffer,
+        mimetype: "audio/ogg; codecs=opus",
+        ptt: true
+      }
+    );
+    await verifyMediaMessage(
+      sendMessage!,
+      ticket,
+      contact,
+      ticketTraking,
+      false,
+      false,
+      baileysCtx.wbot
+    );
+    return;
+  }
+
+  if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+    const filename = path.basename(oggPath);
+    await sendAndPersistMedia(channel, ticket, filename, "audio");
+    return;
+  }
+
+  logger.warn(
+    `[MetaCloud] Resposta em áudio (TTS) exige CLOUDFLARE_R2_ENABLED=true para tickets Cloud API — caindo para texto (ticket ${ticket.id})`
+  );
+  await sendAndPersistText(channel, ticket, fallbackText);
 }
 
 export const handleOpenAi = async (
-  msg: proto.IWebMessageInfo,
-  wbot: Session,
+  channel: MessageChannel,
   ticket: Ticket,
   contact: Contact,
   mediaSent: Message | undefined,
+  messageBody: string | null,
+  messageKind: "text" | "audio" | "image_video" | "other",
+  caption: string,
   ticketTraking: TicketTraking = null,
-  openAiSettings = null
+  openAiSettings = null,
+  baileysCtx?: { wbot: Session; msg: proto.IWebMessageInfo }
 ): Promise<void> => {
 
   // REGRA PARA DESABILITAR O BOT PARA ALGUM CONTATO
@@ -98,11 +160,9 @@ export const handleOpenAi = async (
     return;
   }
 
-  const bodyMessage = getBodyMessage(msg);
+  if (!messageBody) return;
 
-  if (!bodyMessage) return;
-
-  let { prompt } = await ShowWhatsAppService(wbot.id, ticket.companyId);
+  let { prompt } = await ShowWhatsAppService(ticket.whatsappId, ticket.companyId);
 
   if( openAiSettings )
     prompt = openAiSettings;
@@ -113,9 +173,9 @@ export const handleOpenAi = async (
 
   if (!prompt) return;
 
-  if (msg.messageStubType) return;
-
-  const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
+  // messageStubType e um conceito de protocolo do Baileys (ex: evento de
+  // sistema tipo "grupo criado") sem equivalente na Cloud API.
+  if (baileysCtx?.msg?.messageStubType) return;
 
   const publicFolder: string = path.resolve(
     __dirname,
@@ -145,16 +205,21 @@ export const handleOpenAi = async (
   } tokens e cuide para não truncar o final.\nSempre que possível, mencione o nome dele para ser mais personalizado o atendimento e mais educado. Filas disponíveis: ${queuesInfo}. Quando precisar transferir o cliente, inicie sua resposta com 'Ação: Transferir para [ID]' onde [ID] é o número da fila correta para o assunto.\n
   ${prompt.prompt}\n`;
 
+  const typingCtx: BaileysTypingContext | undefined = baileysCtx
+    ? { wbot: baileysCtx.wbot, jid: baileysCtx.msg.key.remoteJid! }
+    : undefined;
+
   let messagesAI: AIMessage[] = [];
 
-  if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+  if (messageKind === "text") {
     messagesAI = [];
     messagesAI.push({ role: "system", content: promptSystem });
     for (let i = 0; i < Math.min(maxMessages, messages.length); i++) {
       const message = messages[i];
       if (
         message.mediaType === "conversation" ||
-        message.mediaType === "extendedTextMessage"
+        message.mediaType === "extendedTextMessage" ||
+        message.mediaType === "text"
       ) {
         if (message.fromMe) {
           messagesAI.push({ role: "assistant", content: message.body });
@@ -163,7 +228,7 @@ export const handleOpenAi = async (
         }
       }
     }
-    messagesAI.push({ role: "user", content: bodyMessage! });
+    messagesAI.push({ role: "user", content: messageBody! });
 
     let response = await callAIProvider({
       provider: aiProvider,
@@ -185,10 +250,10 @@ export const handleOpenAi = async (
     }
 
     if (!prompt.voice || prompt.voice === "texto") {
-      // Resposta em texto com delay humanizado (typing indicator)
-      await sendWithTypingDelay(wbot, msg.key.remoteJid!, response!, ticket, contact);
+      // Resposta em texto com delay humanizado (typing indicator no Baileys)
+      await sendWithTypingDelay(channel, ticket, response!, typingCtx);
     } else {
-      // Resposta em áudio OGG/Opus (compatível com WhatsApp Web/Baileys)
+      // Resposta em áudio OGG/Opus
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
       try {
         await convertTextToSpeechAndSaveToFile(
@@ -200,29 +265,16 @@ export const handleOpenAi = async (
           prompt.ttsProvider || "azure"
         );
         const oggPath = `${publicFolder}/${fileNameWithOutExtension}.ogg`;
-        const audioBuffer = fs.readFileSync(oggPath);
-        const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-          audio: audioBuffer,
-          mimetype: "audio/ogg; codecs=opus",
-          ptt: true
-        });
-        await verifyMediaMessage(sendMessage!, ticket, contact, ticketTraking, false, false, wbot);
         if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
-          await uploadToR2(
-            `${publicFolder}/${fileNameWithOutExtension}.ogg`,
-            `${fileNameWithOutExtension}.ogg`,
-            "audio/ogg"
-          );
+          await uploadToR2(oggPath, `${fileNameWithOutExtension}.ogg`, "audio/ogg");
         }
+        await sendAudioReply(channel, ticket, contact, oggPath, response!, ticketTraking, baileysCtx);
         deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.ogg`);
         deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
       } catch (error) {
         logger.error(`[AI] Erro ao gerar resposta de áudio: ${error}`);
         // Fallback: envia como texto se TTS falhar
-        const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-          text: response!
-        });
-        await verifyMessage(sentMessage!, ticket, contact);
+        await sendAndPersistText(channel, ticket, response!);
       }
     }
 
@@ -231,7 +283,7 @@ export const handleOpenAi = async (
       await transferQueue(targetQueueId1, ticket, contact);
     }
 
-  } else if (msg.message?.audioMessage) {
+  } else if (messageKind === "audio") {
     // Transcrição de áudio: Whisper (OpenAI/Manus) ou Gemini Multimodal
     const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
     const audioFilePath = `${publicFolder}/${mediaUrl}`;
@@ -246,7 +298,7 @@ export const handleOpenAi = async (
       } catch (err) {
         logger.error(`[R2] Erro ao baixar áudio para transcrição: ${err}`);
         const fallbackMsg = "Desculpe, não consegui processar o áudio enviado. Poderia escrever sua mensagem em texto? 😊";
-        await sendWithTypingDelay(wbot, msg.key.remoteJid!, fallbackMsg, ticket, contact);
+        await sendWithTypingDelay(channel, ticket, fallbackMsg, typingCtx);
         return;
       }
     }
@@ -257,7 +309,7 @@ export const handleOpenAi = async (
         const { GoogleGenerativeAI } = require("@google/generative-ai");
         const audioBuffer = fs.readFileSync(audioFilePath);
         const audioBase64 = audioBuffer.toString("base64");
-        const mimeType = mediaSent!.mediaType === "audioMessage" ? "audio/ogg" : "audio/mpeg";
+        const mimeType = mediaSent!.mediaType === "audioMessage" || mediaSent!.mediaType === "audio" ? "audio/ogg" : "audio/mpeg";
 
         const genAI = new GoogleGenerativeAI(prompt.apiKey);
         const geminiModel = genAI.getGenerativeModel({ model: aiModel });
@@ -295,7 +347,7 @@ export const handleOpenAi = async (
     // Fallback: se transcrição falhou ou retornou vazio, avisar o usuário
     if (!transcribedText || transcribedText.trim() === "") {
       const fallbackMsg = "Desculpe, não consegui ouvir o áudio enviado. Poderia escrever sua mensagem em texto para que eu possa te ajudar? 😊";
-      await sendWithTypingDelay(wbot, msg.key.remoteJid!, fallbackMsg, ticket, contact);
+      await sendWithTypingDelay(channel, ticket, fallbackMsg, typingCtx);
       if (r2AudioDownloaded) deleteFileSync(audioFilePath);
       return;
     }
@@ -306,7 +358,8 @@ export const handleOpenAi = async (
       const message = messages[i];
       if (
         message.mediaType === "conversation" ||
-        message.mediaType === "extendedTextMessage"
+        message.mediaType === "extendedTextMessage" ||
+        message.mediaType === "text"
       ) {
         if (message.fromMe) {
           messagesAI.push({ role: "assistant", content: message.body });
@@ -342,8 +395,7 @@ export const handleOpenAi = async (
     }
 
     if (!prompt.voice || prompt.voice === "texto") {
-      // Resposta em texto com delay humanizado (typing indicator)
-      await sendWithTypingDelay(wbot, msg.key.remoteJid!, response!, ticket, contact);
+      await sendWithTypingDelay(channel, ticket, response!, typingCtx);
     } else {
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
       try {
@@ -356,28 +408,15 @@ export const handleOpenAi = async (
           prompt.ttsProvider || "azure"
         );
         const oggPath = `${publicFolder}/${fileNameWithOutExtension}.ogg`;
-        const audioBuffer = fs.readFileSync(oggPath);
-        const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-          audio: audioBuffer,
-          mimetype: "audio/ogg; codecs=opus",
-          ptt: true
-        });
-        await verifyMediaMessage(sendMessage!, ticket, contact, ticketTraking, false, false, wbot);
         if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
-          await uploadToR2(
-            `${publicFolder}/${fileNameWithOutExtension}.ogg`,
-            `${fileNameWithOutExtension}.ogg`,
-            "audio/ogg"
-          );
+          await uploadToR2(oggPath, `${fileNameWithOutExtension}.ogg`, "audio/ogg");
         }
+        await sendAudioReply(channel, ticket, contact, oggPath, response!, ticketTraking, baileysCtx);
         deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.ogg`);
         deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
       } catch (error) {
         logger.error(`[AI] Erro ao gerar resposta de áudio: ${error}`);
-        const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-          text: response!
-        });
-        await verifyMessage(sentMessage!, ticket, contact);
+        await sendAndPersistText(channel, ticket, response!);
       }
     }
 
@@ -385,7 +424,7 @@ export const handleOpenAi = async (
       await new Promise(resolve => setTimeout(resolve, 1000));
       await transferQueue(targetQueueId2!, ticket, contact);
     }
-  } else if (msg.message?.imageMessage || msg.message?.videoMessage) {
+  } else if (messageKind === "image_video") {
     // Análise de imagem/vídeo: Gemini (vision nativo) ou OpenAI GPT-4V
     const mediaUrl = mediaSent?.mediaUrl?.split("/").pop();
     const mediaFilePath = mediaUrl ? `${publicFolder}/${mediaUrl}` : null;
@@ -397,7 +436,7 @@ export const handleOpenAi = async (
           const { GoogleGenerativeAI } = require("@google/generative-ai");
           const fileBuffer = fs.readFileSync(mediaFilePath);
           const fileBase64 = fileBuffer.toString("base64");
-          const mimeType = msg.message?.imageMessage ? "image/jpeg" : "video/mp4";
+          const mimeType = mediaSent?.mediaType === "video" ? "video/mp4" : "image/jpeg";
           const genAI = new GoogleGenerativeAI(prompt.apiKey);
           const geminiModel = genAI.getGenerativeModel({ model: aiModel });
           const result = await geminiModel.generateContent([
@@ -438,14 +477,13 @@ export const handleOpenAi = async (
 
     // Fallback se análise falhou ou arquivo não existe
     if (!visionDescription) {
-      const mediaType = msg.message?.imageMessage ? "imagem" : "vídeo";
-      const fallbackMsg = `Desculpe, não consegui visualizar a ${mediaType} enviada. Poderia descrever o que precisa em texto para que eu possa te ajudar? 😊`;
-      await sendWithTypingDelay(wbot, msg.key.remoteJid!, fallbackMsg, ticket, contact);
+      const mediaTypeLabel = mediaSent?.mediaType === "video" ? "vídeo" : "imagem";
+      const fallbackMsg = `Desculpe, não consegui visualizar a ${mediaTypeLabel} enviada. Poderia descrever o que precisa em texto para que eu possa te ajudar? 😊`;
+      await sendWithTypingDelay(channel, ticket, fallbackMsg, typingCtx);
       return;
     }
 
     // Contexto com descrição da mídia + histórico de texto
-    const caption = msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || "";
     const userContent = caption
       ? `[Imagem/vídeo enviado — descrição: ${visionDescription}]\nLegenda do usuário: ${caption}`
       : `[Imagem/vídeo enviado — descrição: ${visionDescription}]`;
@@ -454,7 +492,11 @@ export const handleOpenAi = async (
     messagesAI.push({ role: "system", content: promptSystem });
     for (let i = 0; i < Math.min(maxMessages, messages.length); i++) {
       const message = messages[i];
-      if (message.mediaType === "conversation" || message.mediaType === "extendedTextMessage") {
+      if (
+        message.mediaType === "conversation" ||
+        message.mediaType === "extendedTextMessage" ||
+        message.mediaType === "text"
+      ) {
         messagesAI.push({ role: message.fromMe ? "assistant" : "user", content: message.body });
       }
     }
@@ -474,11 +516,11 @@ export const handleOpenAi = async (
     if (transferMatchImg) {
       const targetQueueIdImg = parseInt(transferMatchImg[1]);
       response = response.replace(/Ação: Transferir para \d+/, "").trim();
-      await sendWithTypingDelay(wbot, msg.key.remoteJid!, response!, ticket, contact);
+      await sendWithTypingDelay(channel, ticket, response!, typingCtx);
       await new Promise(resolve => setTimeout(resolve, 1000));
       await transferQueue(targetQueueIdImg, ticket, contact);
     } else {
-      await sendWithTypingDelay(wbot, msg.key.remoteJid!, response!, ticket, contact);
+      await sendWithTypingDelay(channel, ticket, response!, typingCtx);
     }
   }
   messagesAI = [];

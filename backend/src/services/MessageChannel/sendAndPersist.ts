@@ -26,3 +26,40 @@ export const sendAndPersistText = async (
     companyId: ticket.companyId
   });
 };
+
+// Mesma ideia de sendAndPersistText, mas pra midia (ex: resposta em audio da
+// IA). Recebe so o nome do arquivo ja salvo (R2 ou public/ local) - calcula a
+// URL publica completa pra envio (os dois canais exigem URL real, nao um
+// buffer bruto) e guarda so o nome do arquivo no banco, igual ao getter de
+// Message.mediaUrl ja faz pro resto do sistema.
+export const sendAndPersistMedia = async (
+  channel: MessageChannel,
+  ticket: Ticket,
+  filename: string,
+  mediaType: string,
+  caption?: string
+): Promise<Message> => {
+  const publicUrl =
+    process.env.CLOUDFLARE_R2_ENABLED === "true" && process.env.CLOUDFLARE_R2_PUBLIC_URL
+      ? `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${filename}`
+      : `${process.env.BACKEND_URL}/public/${filename}`;
+
+  const { externalId } = await channel.sendMedia(
+    ticket,
+    publicUrl,
+    mediaType,
+    caption
+  );
+  return CreateMessageService({
+    messageData: {
+      id: externalId,
+      ticketId: ticket.id,
+      body: caption || "-",
+      mediaUrl: filename,
+      mediaType,
+      fromMe: true,
+      read: true
+    },
+    companyId: ticket.companyId
+  });
+};

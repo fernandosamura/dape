@@ -35,6 +35,22 @@ export interface BaileysBotContext {
   msg: proto.IWebMessageInfo;
 }
 
+// Classifica a mensagem recebida pro motor de IA (handleOpenAi) a partir do
+// Message ja persistido pela Fase 2/3 (Cloud API) ou verifyMediaMessage
+// (Baileys) - funciona igual pros dois transportes, sem precisar checar o
+// tipo bruto do provedor aqui.
+const classifyForAI = (
+  mediaSent?: Message
+): { messageKind: "text" | "audio" | "image_video" | "other"; caption: string } => {
+  if (!mediaSent) return { messageKind: "text", caption: "" };
+  const t = mediaSent.mediaType;
+  if (t === "audioMessage" || t === "audio") return { messageKind: "audio", caption: "" };
+  if (t === "imageMessage" || t === "videoMessage" || t === "image" || t === "video") {
+    return { messageKind: "image_video", caption: mediaSent.body || "" };
+  }
+  return { messageKind: "other", caption: "" };
+};
+
 const verifyQueue = async (
   channel: MessageChannel,
   ticket: Ticket,
@@ -112,24 +128,27 @@ const verifyQueue = async (
     }
     //inicia integração openai
     if (!fromMe && !ticket.isGroup && !isNil(queues[0]?.promptId)) {
-      if (baileysCtx) {
-        await handleOpenAi(
-          baileysCtx.msg,
-          baileysCtx.wbot,
-          ticket,
-          contact,
-          mediaSent
-        );
+      const { messageKind, caption } = classifyForAI(mediaSent);
+      const aiMessageBody =
+        messageKind === "text" ? messageBody : messageKind === "audio" ? "Áudio" : caption;
 
-        await ticket.update({
-          useIntegration: true,
-          promptId: queues[0]?.promptId
-        });
-      } else {
-        logger.warn(
-          `[MetaCloud] IA ainda não suportada para tickets Cloud API — pendente Fase C (ticket ${ticket.id})`
-        );
-      }
+      await handleOpenAi(
+        channel,
+        ticket,
+        contact,
+        mediaSent,
+        aiMessageBody,
+        messageKind,
+        caption,
+        undefined,
+        undefined,
+        baileysCtx
+      );
+
+      await ticket.update({
+        useIntegration: true,
+        promptId: queues[0]?.promptId
+      });
       // return;
     }
 
@@ -246,24 +265,27 @@ const verifyQueue = async (
 
       //inicia integração openai
       if (!fromMe && !ticket.isGroup && !isNil(choosenQueue?.promptId)) {
-        if (baileysCtx) {
-          await handleOpenAi(
-            baileysCtx.msg,
-            baileysCtx.wbot,
-            ticket,
-            contact,
-            mediaSent
-          );
+        const { messageKind, caption } = classifyForAI(mediaSent);
+        const aiMessageBody =
+          messageKind === "text" ? messageBody : messageKind === "audio" ? "Áudio" : caption;
 
-          await ticket.update({
-            useIntegration: true,
-            promptId: choosenQueue?.promptId
-          });
-        } else {
-          logger.warn(
-            `[MetaCloud] IA ainda não suportada para tickets Cloud API — pendente Fase C (ticket ${ticket.id})`
-          );
-        }
+        await handleOpenAi(
+          channel,
+          ticket,
+          contact,
+          mediaSent,
+          aiMessageBody,
+          messageKind,
+          caption,
+          undefined,
+          undefined,
+          baileysCtx
+        );
+
+        await ticket.update({
+          useIntegration: true,
+          promptId: choosenQueue?.promptId
+        });
         // return;
       }
 

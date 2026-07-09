@@ -153,6 +153,29 @@ const Push = (msg: proto.IWebMessageInfo) => {
   return msg.pushName;
 };
 
+// Classifica a mensagem Baileys pro motor de IA (handleOpenAi, #031 Fase C) -
+// mesma logica de deteccao de tipo que a funcao ja fazia internamente antes
+// da extracao, agora explicita pro chamador poder passar pros dois
+// transportes (Baileys e Cloud API).
+const classifyBaileysMsgForAI = (
+  msg: proto.IWebMessageInfo
+): { messageKind: "text" | "audio" | "image_video" | "other"; caption: string } => {
+  if (msg.message?.audioMessage) return { messageKind: "audio", caption: "" };
+  if (msg.message?.imageMessage || msg.message?.videoMessage) {
+    return {
+      messageKind: "image_video",
+      caption:
+        msg.message?.imageMessage?.caption ||
+        msg.message?.videoMessage?.caption ||
+        ""
+    };
+  }
+  if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+    return { messageKind: "text", caption: "" };
+  }
+  return { messageKind: "other", caption: "" };
+};
+
 const handleMessage = async (
   msg: proto.IWebMessageInfo,
   wbot: Session,
@@ -580,15 +603,21 @@ const handleMessage = async (
         maxMessages: parseInt(maxMessages)
       };
 
-      await handleOpenAi(
-        msg,
-        wbot,
-        ticket,
-        contact,
-        mediaSent,
-        ticketTraking,
-        openAiSettings,
-      );
+      {
+        const { messageKind, caption } = classifyBaileysMsgForAI(msg);
+        await handleOpenAi(
+          channel,
+          ticket,
+          contact,
+          mediaSent,
+          bodyMessage,
+          messageKind,
+          caption,
+          ticketTraking,
+          openAiSettings,
+          { wbot, msg }
+        );
+      }
 
       return;
     }
@@ -601,7 +630,19 @@ const handleMessage = async (
       !ticket.userId &&
       !isNil(whatsapp.promptId)
     ) {
-      await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
+      const { messageKind, caption } = classifyBaileysMsgForAI(msg);
+      await handleOpenAi(
+        channel,
+        ticket,
+        contact,
+        mediaSent,
+        bodyMessage,
+        messageKind,
+        caption,
+        undefined,
+        undefined,
+        { wbot, msg }
+      );
     }
 
     //integraçao na conexao
@@ -641,7 +682,19 @@ const handleMessage = async (
       ticket.useIntegration &&
       ticket.queueId
     ) {
-      await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
+      const { messageKind, caption } = classifyBaileysMsgForAI(msg);
+      await handleOpenAi(
+        channel,
+        ticket,
+        contact,
+        mediaSent,
+        bodyMessage,
+        messageKind,
+        caption,
+        undefined,
+        undefined,
+        { wbot, msg }
+      );
     }
 
     if (
