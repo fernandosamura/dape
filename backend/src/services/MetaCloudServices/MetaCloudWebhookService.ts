@@ -1,6 +1,34 @@
 import Whatsapp from "../../models/Whatsapp";
-import { logger } from "../../utils/logger";
+import Message from "../../models/Message";
+import Queue from "../../models/Queue";
+import User from "../../models/User";
+import Contact from "../../models/Contact";
+import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
+import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
+import CreateMessageService from "../MessageServices/CreateMessageService";
 import { getIO } from "../../libs/socket";
+import { cacheLayer } from "../../libs/cache";
+import { logger } from "../../utils/logger";
+
+interface MetaCloudMessage {
+  from: string;
+  id: string;
+  timestamp: string;
+  type: string;
+  text?: { body: string };
+  image?: { id: string; mime_type: string; sha256: string; caption?: string };
+  audio?: { id: string; mime_type: string };
+  video?: { id: string; mime_type: string; caption?: string };
+  document?: { id: string; filename: string; mime_type: string; caption?: string };
+  sticker?: { id: string; mime_type: string };
+  location?: { latitude: number; longitude: number; name?: string; address?: string };
+  button?: { text: string; payload: string };
+  interactive?: {
+    type: string;
+    button_reply?: { id: string; title: string };
+    list_reply?: { id: string; title: string };
+  };
+}
 
 interface MetaCloudWebhookEntry {
   id: string;
@@ -9,16 +37,7 @@ interface MetaCloudWebhookEntry {
       messaging_product: string;
       metadata: { display_phone_number: string; phone_number_id: string };
       contacts?: Array<{ profile: { name: string }; wa_id: string }>;
-      messages?: Array<{
-        from: string;
-        id: string;
-        timestamp: string;
-        type: string;
-        text?: { body: string };
-        image?: { id: string; mime_type: string; sha256: string };
-        audio?: { id: string; mime_type: string };
-        document?: { id: string; filename: string; mime_type: string };
-      }>;
+      messages?: MetaCloudMessage[];
       statuses?: Array<{
         id: string;
         status: string;
@@ -29,6 +48,154 @@ interface MetaCloudWebhookEntry {
     field: string;
   }>;
 }
+
+// Mensagens fora do escopo da Fase 2 (mídia real) recebem um corpo textual
+// placeholder - o download/armazenamento do arquivo fica pra Fase 3.
+const getBodyFromMetaMessage = (msg: MetaCloudMessage): string => {
+  switch (msg.type) {
+    case "text":
+      return msg.text?.body || "";
+    case "image":
+      return msg.image?.caption || "[imagem]";
+    case "audio":
+      return "[áudio]";
+    case "video":
+      return msg.video?.caption || "[vídeo]";
+    case "document":
+      return msg.document?.caption || msg.document?.filename || "[documento]";
+    case "sticker":
+      return "[figurinha]";
+    case "location":
+      return "[localização]";
+    case "button":
+      return msg.button?.text || "";
+    case "interactive":
+      return (
+        msg.interactive?.button_reply?.title ||
+        msg.interactive?.list_reply?.title ||
+        "[interativo]"
+      );
+    default:
+      return `[${msg.type}]`;
+  }
+};
+
+const ackMap: Record<string, number> = {
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: -1
+};
+
+const processIncomingMessage = async (
+  msg: MetaCloudMessage,
+  contactsProfile: MetaCloudWebhookEntry["changes"][0]["value"]["contacts"],
+  whatsapp: Whatsapp
+): Promise<void> => {
+  const companyId = whatsapp.companyId;
+  const number = msg.from.replace(/\D/g, "");
+  const profile = contactsProfile?.find(c => c.wa_id === msg.from);
+  const name = profile?.profile?.name || number;
+
+  const contact = await CreateOrUpdateContactService({
+    name,
+    number,
+    isGroup: false,
+    companyId,
+    whatsappId: whatsapp.id
+  });
+
+  const unreads = await cacheLayer.get(`contacts:${contact.id}:unreads`);
+  const unreadMessages = +unreads + 1;
+  await cacheLayer.set(`contacts:${contact.id}:unreads`, `${unreadMessages}`);
+
+  const ticket = await FindOrCreateTicketService(
+    contact,
+    whatsapp.id,
+    unreadMessages,
+    companyId
+  );
+
+  const body = getBodyFromMetaMessage(msg);
+
+  await ticket.update({ lastMessage: body });
+
+  await CreateMessageService({
+    messageData: {
+      id: msg.id,
+      ticketId: ticket.id,
+      contactId: contact.id,
+      body,
+      fromMe: false,
+      mediaType: msg.type,
+      read: false
+    },
+    companyId
+  });
+
+  if (ticket.status === "closed") {
+    await ticket.update({ status: "pending" });
+    await ticket.reload({
+      include: [
+        { model: Queue, as: "queue" },
+        { model: User, as: "user" },
+        { model: Contact, as: "contact" }
+      ]
+    });
+
+    const io = getIO();
+    io.to(`company-${companyId}-closed`)
+      .to(`queue-${ticket.queueId}-closed`)
+      .emit(`company-${companyId}-ticket`, {
+        action: "delete",
+        ticket,
+        ticketId: ticket.id
+      });
+
+    io.to(`company-${companyId}-${ticket.status}`)
+      .to(`queue-${ticket.queueId}-${ticket.status}`)
+      .emit(`company-${companyId}-ticket`, {
+        action: "update",
+        ticket,
+        ticketId: ticket.id
+      });
+  }
+};
+
+const processStatusUpdate = async (status: {
+  id: string;
+  status: string;
+}): Promise<void> => {
+  const ack = ackMap[status.status];
+  if (ack === undefined) return;
+
+  const messageToUpdate = await Message.findByPk(status.id, {
+    include: [
+      "contact",
+      {
+        model: Message,
+        as: "quotedMsg",
+        include: ["contact"]
+      }
+    ]
+  });
+
+  if (!messageToUpdate) return;
+  // Nao regride o ack se chegar fora de ordem (ex: "delivered" apos "read"),
+  // exceto "failed" que deve sempre ser registrado independente do estado atual.
+  if (ack !== -1 && ack < messageToUpdate.ack) return;
+
+  await messageToUpdate.update({ ack });
+
+  const io = getIO();
+  io.to(messageToUpdate.ticketId.toString()).emit(
+    `company-${messageToUpdate.companyId}-appMessage`,
+    {
+      action: "update",
+      message: messageToUpdate
+    }
+  );
+};
 
 export const processMetaCloudWebhook = async (body: {
   entry?: MetaCloudWebhookEntry[];
@@ -51,25 +218,13 @@ export const processMetaCloudWebhook = async (body: {
           continue;
         }
 
-        // Process incoming messages
         if (value.messages) {
           for (const msg of value.messages) {
             try {
               logger.info(
                 `[MetaCloud] Mensagem recebida de ${msg.from} — tipo: ${msg.type}`
               );
-              // Emit socket event for real-time notification
-              const io = getIO();
-              io.to(`company-${whatsapp.companyId}-mainchannel`).emit(
-                `company-${whatsapp.companyId}-ticket`,
-                {
-                  action: "update",
-                  ticket: {
-                    whatsappId: whatsapp.id,
-                    lastMessage: msg.text?.body || `[${msg.type}]`,
-                  },
-                }
-              );
+              await processIncomingMessage(msg, value.contacts, whatsapp);
             } catch (msgErr) {
               logger.error(
                 { msgErr },
@@ -79,19 +234,14 @@ export const processMetaCloudWebhook = async (body: {
           }
         }
 
-        // Process status updates
         if (value.statuses) {
           for (const status of value.statuses) {
-            const ackMap: Record<string, number> = {
-              sent: 1,
-              delivered: 2,
-              read: 3,
-              failed: -1,
-            };
-            const ack = ackMap[status.status];
-            if (ack !== undefined) {
-              logger.info(
-                `[MetaCloud] Status ${status.status} para mensagem ${status.id}`
+            try {
+              await processStatusUpdate(status);
+            } catch (statusErr) {
+              logger.error(
+                { statusErr },
+                `[MetaCloud] Erro ao processar status ${status.id}`
               );
             }
           }
