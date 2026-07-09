@@ -11,7 +11,7 @@ export const embeddedSignup = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const { code, whatsappId } = req.body;
+  const { code, whatsappId, wabaId: wabaIdFromClient, phoneNumberId: phoneNumberIdFromClient } = req.body;
   const { companyId } = req.user;
 
   if (!code || !whatsappId) throw new AppError("ERR_MISSING_PARAMS");
@@ -32,27 +32,46 @@ export const embeddedSignup = async (
     const accessToken: string = tokenResponse.data.access_token;
     const expiresIn: number = tokenResponse.data.expires_in;
 
-    // Fetch WABA info
-    const wabaResponse = await axios.get(`${GRAPH_API_URL}/me/businesses`, {
-      params: { access_token: accessToken, fields: "id,name" },
-    });
-    const wabaId = wabaResponse.data?.data?.[0]?.id;
-    const businessName = wabaResponse.data?.data?.[0]?.name;
+    // O Embedded Signup (com config_id) envia o waba_id exato escolhido pelo
+    // usuario via postMessage no frontend. So caimos no /me/businesses (que
+    // pega so a primeira conta) se o frontend nao tiver enviado — ex: fluxo
+    // antigo sem config_id, ou usuario com uma unica conta.
+    let wabaId = wabaIdFromClient;
+    let businessName: string | undefined;
+    if (!wabaId) {
+      const wabaResponse = await axios.get(`${GRAPH_API_URL}/me/businesses`, {
+        params: { access_token: accessToken, fields: "id,name" },
+      });
+      wabaId = wabaResponse.data?.data?.[0]?.id;
+      businessName = wabaResponse.data?.data?.[0]?.name;
+    }
 
-    // Fetch phone number info
-    const phoneResponse = await axios.get(
-      `${GRAPH_API_URL}/${wabaId}/phone_numbers`,
-      {
-        params: {
-          access_token: accessToken,
-          fields: "id,display_phone_number,verified_name",
-        },
-      }
-    );
-    const phoneData = phoneResponse.data?.data?.[0];
-    const phoneNumberId = phoneData?.id;
-    const phoneNumber = phoneData?.display_phone_number;
-    const verifiedName = phoneData?.verified_name || businessName;
+    // Mesma logica pro numero: usa o phone_number_id exato do postMessage
+    // quando disponivel, senao cai no primeiro numero da WABA.
+    let phoneNumberId = phoneNumberIdFromClient;
+    let phoneNumber: string | undefined;
+    let verifiedName: string | undefined;
+    if (phoneNumberId) {
+      const phoneResponse = await axios.get(`${GRAPH_API_URL}/${phoneNumberId}`, {
+        params: { access_token: accessToken, fields: "display_phone_number,verified_name" },
+      });
+      phoneNumber = phoneResponse.data?.display_phone_number;
+      verifiedName = phoneResponse.data?.verified_name || businessName;
+    } else {
+      const phoneResponse = await axios.get(
+        `${GRAPH_API_URL}/${wabaId}/phone_numbers`,
+        {
+          params: {
+            access_token: accessToken,
+            fields: "id,display_phone_number,verified_name",
+          },
+        }
+      );
+      const phoneData = phoneResponse.data?.data?.[0];
+      phoneNumberId = phoneData?.id;
+      phoneNumber = phoneData?.display_phone_number;
+      verifiedName = phoneData?.verified_name || businessName;
+    }
 
     // Encrypt token before saving — NEVER store plaintext
     const encryptedToken = encrypt(accessToken);

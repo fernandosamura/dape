@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { toast } from "react-toastify";
@@ -7,12 +7,46 @@ const EmbeddedSignupButton = ({ whatsappId, companyId, onSuccess }) => {
 	const [open, setOpen] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [result, setResult] = useState(null);
+	const sessionInfoRef = useRef({ wabaId: null, phoneNumberId: null });
+
+	// A Meta envia o waba_id/phone_number_id exatos selecionados pelo usuario
+	// via postMessage durante o fluxo do Embedded Signup - mais confiavel do
+	// que o backend "adivinhar" pegando a primeira conta/numero via API.
+	useEffect(() => {
+		const handleMessage = (event) => {
+			if (
+				event.origin !== "https://www.facebook.com" &&
+				event.origin !== "https://web.facebook.com"
+			) {
+				return;
+			}
+			try {
+				const data = JSON.parse(event.data);
+				if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
+					sessionInfoRef.current = {
+						wabaId: data.data?.waba_id || null,
+						phoneNumberId: data.data?.phone_number_id || null,
+					};
+				}
+			} catch (e) {
+				// mensagens que nao sao JSON do embedded signup - ignorar
+			}
+		};
+		window.addEventListener("message", handleMessage);
+		return () => window.removeEventListener("message", handleMessage);
+	}, []);
 
 	const handleMetaLogin = () => {
 		if (!window.FB) {
 			toast.error("SDK do Facebook não carregado. Verifique as configurações.");
 			return;
 		}
+		const configId = process.env.REACT_APP_META_CONFIG_ID;
+		if (!configId) {
+			toast.error("Configuração de Embedded Signup (config_id) não definida.");
+			return;
+		}
+		sessionInfoRef.current = { wabaId: null, phoneNumberId: null };
 		setLoading(true);
 		window.FB.login(
 			async (response) => {
@@ -22,6 +56,8 @@ const EmbeddedSignupButton = ({ whatsappId, companyId, onSuccess }) => {
 							code: response.authResponse.code || response.authResponse.accessToken,
 							whatsappId,
 							companyId,
+							wabaId: sessionInfoRef.current.wabaId,
+							phoneNumberId: sessionInfoRef.current.phoneNumberId,
 						});
 						setResult(data);
 						toast.success(`WhatsApp Oficial conectado: ${data.phoneNumber}`);
@@ -35,8 +71,14 @@ const EmbeddedSignupButton = ({ whatsappId, companyId, onSuccess }) => {
 				setLoading(false);
 			},
 			{
-				scope: "whatsapp_business_management,whatsapp_business_messaging",
-				return_scopes: true,
+				config_id: configId,
+				response_type: "code",
+				override_default_response_type: true,
+				extras: {
+					setup: {},
+					featureType: "",
+					sessionInfoVersion: "3",
+				},
 			}
 		);
 	};

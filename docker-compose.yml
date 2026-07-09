@@ -52,6 +52,7 @@ services:
         - REACT_APP_COLOR=${COLOR}
         - REACT_APP_TAB_NAME=${TAB_NAME}
         - REACT_APP_META_APP_ID=${META_APP_ID}
+        - REACT_APP_META_CONFIG_ID=${META_CONFIG_ID}
     ports:
       - "${FRONTEND_PORT:-3001}:3001"
     depends_on:
