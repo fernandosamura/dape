@@ -566,18 +566,33 @@ Validado: build isolado (tsc limpo, ~13s), backend reiniciado, os 3 módulos car
 
 Próximo passo: Fase B (motor de menu/chatbot sobre a abstração).
 
+## ✅ Fix — Meta Cloud API Fase B: motor de menu/chatbot sobre a abstração (2026-07-09)
+
+**Commit:** `0f0b50f` — "feat: Meta Cloud API fase B - motor de menu/chatbot sobre a abstracao"
+
+Migra `verifyQueue`/`handleChartbot`/`handleRating` (`wbotMessageMenu.ts`) pra usar `MessageChannel` em vez de `wbot.sendMessage()` direto, e — pela primeira vez — conecta o webhook da Cloud API (Fase 2) a esse motor. Antes, mensagem recebida via Cloud API criava ticket/contato/mensagem mas nunca acionava resposta automática; agora aciona de verdade.
+
+- `sendAndPersistText(channel, ticket, body)` (novo, `MessageChannel/sendAndPersist.ts`): substitui os ~15 pares `wbot.sendMessage()` + `verifyMessage(sentMessage, ...)` espalhados no motor de menu por uma chamada genérica que funciona nos dois transportes.
+- `verifyQueue`/`handleChartbot` trocam `wbot`/`msg` (Baileys-específicos) por `channel: MessageChannel` + `messageBody`/`fromMe` já extraídos pelo chamador, mais um `baileysCtx?` opcional usado só pra repassar pros motores de IA/Flow Builder (ainda Baileys-only, pendentes Fases C/D) — sem `baileysCtx` (ticket Cloud API), essas chamadas são puladas com aviso claro em vez de quebrar.
+- `wbotMessageListener.ts`: os 3 pontos que chamam `verifyQueue`/`handleChartbot` dentro do `handleMessage` (orquestrador Baileys, 100% preservado) agora constroem um `BaileysChannel` e passam `{ wbot, msg }` como `baileysCtx`.
+- `MetaCloudWebhookService.ts`: `processIncomingMessage` aciona o motor após persistir a mensagem, replicando a decisão essencial do `handleMessage` simplificada pra menu/chatbot (reset "#", rating, atribuição de fila, chatbot de submenu) — grupos, agentes SDR/Pipeline e Flow Builder legado ficam de fora por ora (ticket segue disponível pro atendente humano normalmente).
+
+**Validado com teste funcional de ponta a ponta real:** PUB TEST temporariamente marcado `meta_cloud` (token/phoneNumberId falsos, revertido depois) — mensagem sintética assinada processada pelo webhook → Contact/Ticket/Message criados → motor de menu acionado de verdade → tentativa real de envio via `CloudApiChannel`/`SendMetaCloudMessage` → Meta respondeu `OAuthException` (token inválido, esperado) → erro capturado e logado, mensagem recebida permanece salva, webhook não quebra. Confirma degradação graciosa end-to-end. Build isolado (tsc limpo, ~12s), `getMessageChannel(ticket)` testado com ticket real (resolveu `BaileysChannel` corretamente). Dados de teste limpos depois. Backup rodado antes (`dape_backup_20260709_070653.sql.gz`).
+
+Próximo passo: Fase C (motor de IA sobre a abstração).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia) e A (camada de abstração de mensagens) concluídas. Faltam: Fase B (motor de menu), Fase C (motor de IA), Fase D (Flow Builder), Fase E (templates/campanhas), Fase F (Shield com dados reais da Meta), Fase G (piloto real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
+- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração) e B (motor de menu) concluídas. Faltam: Fase C (motor de IA), Fase D (Flow Builder), Fase E (templates/campanhas), Fase F (Shield com dados reais da Meta), Fase G (piloto real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → Meta Cloud API Fase B-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → Meta Cloud API Fase C-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
 
 Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos), e a continuação das fases 2-6 da integração Meta Cloud API.
 
