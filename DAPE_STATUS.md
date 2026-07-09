@@ -617,18 +617,35 @@ Só o subtipo `singleBlock` sozinho usa 3 desses mecanismos pros seus 5 subtipos
 
 Próximo passo: Fase E (templates/campanhas).
 
+## ✅ Fix — Meta Cloud API Fase E: templates e campanhas (2026-07-09)
+
+**Commit:** `f55491b` — "feat: Meta Cloud API fase E - templates e campanhas"
+
+Primeira fase desta integração que mexe em frontend. Sem templates, campanhas via Cloud API não funcionam — mensagem de negócio fora da janela de 24h (o caso normal de uma campanha) exige template pré-aprovado pela Meta, não é opcional.
+
+- **Modelo novo** `WhatsappTemplate` (nome, idioma, categoria, status, componentes em JSONB, `metaTemplateId`) + coluna `templateId` em `Campaigns`.
+- **Sincronização com a Meta**: `SyncWhatsappTemplatesService.ts` busca templates existentes (`GET /{waba-id}/message_templates` — normalmente criados direto no WhatsApp Manager) e faz upsert local. `MetaCloudWebhookService.ts` passa a processar o field `message_template_status_update` (antes só `"messages"` era tratado, qualquer outro field era ignorado) — mantém o status sincronizado em tempo real quando a Meta aprova/rejeita um template.
+- **Disparo de campanha** (`queues.ts`, `handleDispatchCampaign`): antes de resolver o wbot Baileys, checa `providerType`. Pra Cloud API, exige template aprovado (bloqueia com erro claro se faltar) e envia via `SendMetaCloudTemplate.ts` (novo — envio ticket-less, diferente de `SendMetaCloudMessage.ts` que é centrado em ticket). Caminho Baileys original 100% preservado abaixo do novo bloco.
+- **Frontend**: `CampaignModal` esconde as abas de mensagem livre e mostra seletor de template + botão "Sincronizar templates" quando o WhatsApp da campanha é Cloud API. Nenhuma mudança precisou em `CampaignController`/`CreateService`/`UpdateService` — Sequelize aceita `templateId` automaticamente por já ser coluna real do modelo.
+
+**Fora do escopo (documentado):** mídia anexada a template (exigiria header de mídia configurado no próprio template) e variáveis dinâmicas no corpo (função já aceita `bodyParams`, mas nada popula a partir do texto da campanha ainda — templates sem variável, um caso comum, funcionam integralmente).
+
+Validado: build isolado backend (tsc limpo) e frontend (CRA, sem warning nos arquivos alterados). Migração rodou automaticamente no boot. 5 testes funcionais reais contra o backend: sync com credenciais falsas (erro 401 real da Meta tratado), envio bloqueado corretamente quando template não aprovado, envio com erro real da Meta tratado, webhook de status atualizando o registro local (APPROVED→REJECTED confirmado no banco), e query com `include` de template confirmada. **Não foi possível validar a tela do `CampaignModal` num navegador real** (sem credenciais de login disponíveis nesta sessão) — recomendo validação visual manual antes de usar em produção. Backup rodado antes (`dape_backup_20260709_161027.sql.gz`).
+
+Próximo passo: Fase F (DAPLE Shield com sinais reais da Meta).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração), B (motor de menu) e C (motor de IA) concluídas. **Fase D (Flow Builder) investigada e adiada por decisão** (escopo maior que o esperado — ver investigação acima; só o fix pontual do #037 foi aplicado). Faltam: Fase E (templates/campanhas), Fase F (Shield com dados reais da Meta), Fase G (piloto real), e — quando fizer sentido priorizar — o Flow Builder completo (ver mapeamento detalhado acima). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
+- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração), B (motor de menu), C (motor de IA) e E (templates/campanhas) concluídas. **Fase D (Flow Builder) investigada e adiada por decisão** (escopo maior que o esperado — ver investigação acima; só o fix pontual do #037 foi aplicado). Faltam: Fase F (Shield com dados reais da Meta), Fase G (piloto real), validação visual do `CampaignModal` num navegador real, e — quando fizer sentido priorizar — o Flow Builder completo (ver mapeamento detalhado acima). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → ~~Meta Cloud API Fase C~~ ✅ → Meta Cloud API Fase D (adiada, investigada) → Meta Cloud API Fase E-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → ~~Meta Cloud API Fase C~~ ✅ → Meta Cloud API Fase D (adiada, investigada) → ~~Meta Cloud API Fase E~~ ✅ → Meta Cloud API Fase F-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
 
 Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos), e a continuação das fases 2-6 da integração Meta Cloud API.
 
