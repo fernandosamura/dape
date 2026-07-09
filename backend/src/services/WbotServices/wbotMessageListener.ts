@@ -119,6 +119,7 @@ import {
   handleRating,
   handleChartbot
 } from "./wbotMessageMenu";
+import { BaileysChannel } from "../MessageChannel/BaileysChannel";
 
 const request = require("request");
 
@@ -158,6 +159,7 @@ const handleMessage = async (
   companyId: number
 ): Promise<void> => {
   let mediaSent: Message | undefined;
+  const channel = new BaileysChannel();
 
   if (!isValidMsg(msg)) return;
 
@@ -261,7 +263,15 @@ const handleMessage = async (
         chatbot: false,
         queueId: null
       });
-      await verifyQueue(wbot, msg, ticket, ticket.contact);
+      await verifyQueue(
+        channel,
+        ticket,
+        ticket.contact,
+        bodyMessage,
+        msg.key.fromMe,
+        mediaSent,
+        { wbot, msg }
+      );
       return;
     }
 
@@ -678,7 +688,15 @@ const handleMessage = async (
       whatsapp.queues.length >= 1 &&
       !ticket.useIntegration
     ) {
-      await verifyQueue(wbot, msg, ticket, contact);
+      await verifyQueue(
+        channel,
+        ticket,
+        contact,
+        bodyMessage,
+        msg.key.fromMe,
+        mediaSent,
+        { wbot, msg }
+      );
 
       if (ticketTraking && ticketTraking.chatbotAt === null) {
         await ticketTraking.update({
@@ -827,13 +845,19 @@ const handleMessage = async (
 
     if (whatsapp.queues.length == 1 && ticket.queue) {
       if (ticket.chatbot && !msg.key.fromMe) {
-        await handleChartbot(ticket, msg, wbot);
+        await handleChartbot(ticket, bodyMessage, channel, false, { wbot, msg });
       }
     }
 
     if (whatsapp.queues.length > 1 && ticket.queue) {
       if (ticket.chatbot && !msg.key.fromMe) {
-        await handleChartbot(ticket, msg, wbot, dontReadTheFirstQuestion);
+        await handleChartbot(
+          ticket,
+          bodyMessage,
+          channel,
+          dontReadTheFirstQuestion,
+          { wbot, msg }
+        );
       }
     }
 

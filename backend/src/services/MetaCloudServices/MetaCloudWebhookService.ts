@@ -5,8 +5,16 @@ import User from "../../models/User";
 import Contact from "../../models/Contact";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
+import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATicketTrakingService";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import { downloadAndStoreMetaCloudMedia } from "./DownloadMetaCloudMedia";
+import { CloudApiChannel } from "../MessageChannel/CloudApiChannel";
+import {
+  verifyQueue,
+  verifyRating,
+  handleRating,
+  handleChartbot
+} from "../WbotServices/wbotMessageMenu";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { getIO } from "../../libs/socket";
 import { cacheLayer } from "../../libs/cache";
@@ -226,6 +234,43 @@ const processIncomingMessage = async (
         ticket,
         ticketId: ticket.id
       });
+  }
+
+  // Aciona o motor de menu/chatbot (Fase B) - mesma decisao usada pelo
+  // handleMessage do Baileys, simplificada aqui pra so cobrir menu/chatbot
+  // (grupos, agentes SDR/Pipeline e Flow Builder legado ficam de fora por
+  // enquanto - o ticket segue disponivel pro atendente humano normalmente).
+  const channel = new CloudApiChannel(whatsapp);
+
+  if (body === "#") {
+    await ticket.update({ queueOptionId: null, chatbot: false, queueId: null });
+    await verifyQueue(channel, ticket, contact, body, false);
+    return;
+  }
+
+  const ticketTraking = await FindOrCreateATicketTrakingService({
+    ticketId: ticket.id,
+    companyId
+  });
+
+  if (ticketTraking && verifyRating(ticketTraking)) {
+    await handleRating(parseFloat(body), ticket, ticketTraking);
+    return;
+  }
+
+  const dontReadTheFirstQuestion = ticket.queue === null;
+
+  if (!ticket.queue && !ticket.userId) {
+    await verifyQueue(channel, ticket, contact, body, false);
+    if (ticketTraking.chatbotAt === null) {
+      await ticketTraking.update({ chatbotAt: new Date() });
+    }
+  }
+
+  await ticket.reload();
+
+  if (ticket.queue && ticket.chatbot) {
+    await handleChartbot(ticket, body, channel, dontReadTheFirstQuestion);
   }
 };
 

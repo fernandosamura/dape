@@ -1,6 +1,6 @@
 import { head, isNil } from "lodash";
 import moment from "moment";
-import { proto, WAMessage } from "baileys";
+import { proto } from "baileys";
 
 import Ticket from "../../models/Ticket";
 import Contact from "../../models/Contact";
@@ -19,21 +19,31 @@ import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import ShowQueueIntegrationService from "../QueueIntegrationServices/ShowQueueIntegrationService";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATicketTrakingService";
-import SendWhatsAppMessage from "./SendWhatsAppMessage";
-import { getBodyMessage } from "./wbotMessageParsers";
-import { verifyMessage } from "./wbotMessageMedia";
 import { handleOpenAi } from "./wbotMessageAI";
 import { handleMessageIntegration } from "./wbotMessageFlowBuilder";
 import type { Session } from "./wbotMessageListener";
+import { MessageChannel } from "../MessageChannel/MessageChannelTypes";
+import { getMessageChannel } from "../MessageChannel/getMessageChannel";
+import { sendAndPersistText } from "../MessageChannel/sendAndPersist";
+
+// Contexto so preenchido quando a mensagem veio de uma sessao Baileys - usado
+// so pra repassar pros motores de IA/Flow Builder (ainda Baileys-only,
+// pendentes das Fases C/D). Numa conexao Cloud API isso fica undefined, e as
+// chamadas a esses motores sao puladas com um aviso claro em vez de quebrar.
+export interface BaileysBotContext {
+  wbot: Session;
+  msg: proto.IWebMessageInfo;
+}
 
 const verifyQueue = async (
-  wbot: Session,
-  msg: proto.IWebMessageInfo,
+  channel: MessageChannel,
   ticket: Ticket,
   contact: Contact,
-  mediaSent?: Message | undefined
+  messageBody: string,
+  fromMe: boolean,
+  mediaSent?: Message | undefined,
+  baileysCtx?: BaileysBotContext
 ) => {
-
   const companyId = ticket.companyId;
 
   // DAPLE Shield — automated queue/greeting messages are blocking
@@ -49,7 +59,7 @@ const verifyQueue = async (
   }
 
   const { queues, greetingMessage, maxUseBotQueues, timeUseBotQueues } =
-    await ShowWhatsAppService(wbot.id!, ticket.companyId);
+    await ShowWhatsAppService(ticket.whatsappId, ticket.companyId);
 
   if (queues.length === 1) {
     const sendGreetingMessageOneQueues = await Setting.findOne({
@@ -64,13 +74,7 @@ const verifyQueue = async (
       sendGreetingMessageOneQueues?.value === "enabled"
     ) {
       const body = formatBody(`${greetingMessage}`, contact);
-
-      await wbot.sendMessage(
-        `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-        {
-          text: body
-        }
-      );
+      await sendAndPersistText(channel, ticket, body);
     }
 
     const firstQueue = head(queues);
@@ -80,38 +84,52 @@ const verifyQueue = async (
     }
 
     //inicia integração dialogflow/n8n
-    if (
-      !msg.key.fromMe &&
-      !ticket.isGroup &&
-      !isNil(queues[0]?.integrationId)
-    ) {
-      const integrations = await ShowQueueIntegrationService(
-        queues[0].integrationId,
-        companyId
-      );
+    if (!fromMe && !ticket.isGroup && !isNil(queues[0]?.integrationId)) {
+      if (baileysCtx) {
+        const integrations = await ShowQueueIntegrationService(
+          queues[0].integrationId,
+          companyId
+        );
 
-      await handleMessageIntegration(
-        msg,
-        wbot,
-        integrations,
-        ticket,
-        companyId
-      );
+        await handleMessageIntegration(
+          baileysCtx.msg,
+          baileysCtx.wbot,
+          integrations,
+          ticket,
+          companyId
+        );
 
-      await ticket.update({
-        useIntegration: true,
-        integrationId: integrations.id
-      });
+        await ticket.update({
+          useIntegration: true,
+          integrationId: queues[0].integrationId
+        });
+      } else {
+        logger.warn(
+          `[MetaCloud] Integração de fila (n8n/webhook) ainda não suportada para tickets Cloud API — pendente Fase D (ticket ${ticket.id})`
+        );
+      }
       // return;
     }
     //inicia integração openai
-    if (!msg.key.fromMe && !ticket.isGroup && !isNil(queues[0]?.promptId)) {
-      await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
+    if (!fromMe && !ticket.isGroup && !isNil(queues[0]?.promptId)) {
+      if (baileysCtx) {
+        await handleOpenAi(
+          baileysCtx.msg,
+          baileysCtx.wbot,
+          ticket,
+          contact,
+          mediaSent
+        );
 
-      await ticket.update({
-        useIntegration: true,
-        promptId: queues[0]?.promptId
-      });
+        await ticket.update({
+          useIntegration: true,
+          promptId: queues[0]?.promptId
+        });
+      } else {
+        logger.warn(
+          `[MetaCloud] IA ainda não suportada para tickets Cloud API — pendente Fase C (ticket ${ticket.id})`
+        );
+      }
       // return;
     }
 
@@ -124,7 +142,7 @@ const verifyQueue = async (
     return;
   }
 
-  const selectedOption = getBodyMessage(msg);
+  const selectedOption = messageBody;
   const choosenQueue = queues[+selectedOption - 1];
 
   const buttonActive = await Setting.findOne({
@@ -141,16 +159,8 @@ const verifyQueue = async (
       options += `*[ ${index + 1} ]* - ${queue.name}\n`;
     });
 
-    const textMessage = {
-      text: formatBody(`\u200e${greetingMessage}\n\n${options}`, contact)
-    };
-
-    const sendMsg = await wbot.sendMessage(
-      `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-      textMessage
-    );
-
-    await verifyMessage(sendMsg, ticket, ticket.contact);
+    const body = formatBody(`\u200e${greetingMessage}\n\n${options}`, contact);
+    await sendAndPersistText(channel, ticket, body);
   };
 
   if (choosenQueue) {
@@ -196,13 +206,7 @@ const verifyQueue = async (
             `\u200e ${queue.outOfHoursMessage}\n\n*[ # ]* - Voltar ao Menu Principal`,
             ticket.contact
           );
-          const sentMessage = await wbot.sendMessage(
-            `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-            {
-              text: body
-            }
-          );
-          await verifyMessage(sentMessage, ticket, contact);
+          await sendAndPersistText(channel, ticket, body);
           await UpdateTicketService({
             ticketData: { queueId: null, chatbot },
             ticketId: ticket.id,
@@ -213,54 +217,62 @@ const verifyQueue = async (
       }
 
       //inicia integração dialogflow/n8n
-      if (!msg.key.fromMe && !ticket.isGroup && choosenQueue.integrationId) {
-        const integrations = await ShowQueueIntegrationService(
-          choosenQueue.integrationId,
-          companyId
-        );
+      if (!fromMe && !ticket.isGroup && choosenQueue.integrationId) {
+        if (baileysCtx) {
+          const integrations = await ShowQueueIntegrationService(
+            choosenQueue.integrationId,
+            companyId
+          );
 
-        await handleMessageIntegration(
-          msg,
-          wbot,
-          integrations,
-          ticket,
-          companyId
-        );
+          await handleMessageIntegration(
+            baileysCtx.msg,
+            baileysCtx.wbot,
+            integrations,
+            ticket,
+            companyId
+          );
 
-        await ticket.update({
-          useIntegration: true,
-          integrationId: integrations.id
-        });
+          await ticket.update({
+            useIntegration: true,
+            integrationId: choosenQueue.integrationId
+          });
+        } else {
+          logger.warn(
+            `[MetaCloud] Integração de fila (n8n/webhook) ainda não suportada para tickets Cloud API — pendente Fase D (ticket ${ticket.id})`
+          );
+        }
         // return;
       }
 
       //inicia integração openai
-      if (
-        !msg.key.fromMe &&
-        !ticket.isGroup &&
-        !isNil(choosenQueue?.promptId)
-      ) {
-        await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
+      if (!fromMe && !ticket.isGroup && !isNil(choosenQueue?.promptId)) {
+        if (baileysCtx) {
+          await handleOpenAi(
+            baileysCtx.msg,
+            baileysCtx.wbot,
+            ticket,
+            contact,
+            mediaSent
+          );
 
-        await ticket.update({
-          useIntegration: true,
-          promptId: choosenQueue?.promptId
-        });
+          await ticket.update({
+            useIntegration: true,
+            promptId: choosenQueue?.promptId
+          });
+        } else {
+          logger.warn(
+            `[MetaCloud] IA ainda não suportada para tickets Cloud API — pendente Fase C (ticket ${ticket.id})`
+          );
+        }
         // return;
       }
 
-      const body = formatBody(
-        `\u200e${choosenQueue.greetingMessage}`,
-        ticket.contact
-      );
       if (choosenQueue.greetingMessage) {
-        const sentMessage = await wbot.sendMessage(
-          `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-          {
-            text: body
-          }
+        const body = formatBody(
+          `\u200e${choosenQueue.greetingMessage}`,
+          ticket.contact
         );
-        await verifyMessage(sentMessage, ticket, contact);
+        await sendAndPersistText(channel, ticket, body);
       }
     }
   } else {
@@ -350,8 +362,9 @@ export const handleRating = async (
   });
 
   if (complationMessage) {
+    const channel = await getMessageChannel(ticket);
     const body = formatBody(`\u200e${complationMessage}`, ticket.contact);
-    await SendWhatsAppMessage({ body, ticket });
+    await sendAndPersistText(channel, ticket, body);
   }
 
   await ticketTraking.update({
@@ -387,9 +400,10 @@ export const handleRating = async (
 
 export const handleChartbot = async (
   ticket: Ticket,
-  msg: WAMessage,
-  wbot: Session,
-  dontReadTheFirstQuestion: boolean = false
+  messageBody: string,
+  channel: MessageChannel,
+  dontReadTheFirstQuestion: boolean = false,
+  baileysCtx?: BaileysBotContext
 ) => {
   // DAPLE Shield — chatbot responses are blocking
   const shieldResultBot = await dapleShield.evaluate({
@@ -417,12 +431,10 @@ export const handleChartbot = async (
     ]
   });
 
-  const messageBody = getBodyMessage(msg);
-
   if (messageBody == "#") {
     // voltar para o menu inicial
     await ticket.update({ queueOptionId: null, chatbot: false, queueId: null });
-    await verifyQueue(wbot, msg, ticket, ticket.contact);
+    await verifyQueue(channel, ticket, ticket.contact, messageBody, false, undefined, baileysCtx);
     return;
   }
 
@@ -485,36 +497,6 @@ export const handleChartbot = async (
       }
     });
 
-    // const botList = async () => {
-    // const sectionsRows = [];
-
-    // queues.forEach((queue, index) => {
-    //   sectionsRows.push({
-    //     title: queue.name,
-    //     rowId: `${index + 1}`
-    //   });
-    // });
-
-    // const sections = [
-    //   {
-    //     rows: sectionsRows
-    //   }
-    // ];
-
-    //   const listMessage = {
-    //     text: formatBody(`\u200e${queue.greetingMessage}`, ticket.contact),
-    //     buttonText: "Escolha uma opção",
-    //     sections
-    //   };
-
-    //   const sendMsg = await wbot.sendMessage(
-    //     `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-    //     listMessage
-    //   );
-
-    //   await verifyMessage(sendMsg, ticket, ticket.contact);
-    // }
-
     const botButton = async () => {
       const buttons = [];
       queueOptions.forEach((option, i) => {
@@ -530,20 +512,11 @@ export const handleChartbot = async (
         type: 4
       });
 
-      const buttonMessage = {
-        text: formatBody(`\u200e${queue.greetingMessage}`, ticket.contact),
-        buttons,
-        headerType: 4
-      };
-
-      const sendMsg = await wbot.sendMessage(
-        `${ticket.contact.number}@${
-          ticket.isGroup ? "g.us" : "s.whatsapp.net"
-        }`,
-        buttonMessage
-      );
-
-      await verifyMessage(sendMsg, ticket, ticket.contact);
+      // Botoes interativos so existem no Baileys - na Cloud API, cai pro
+      // texto simples (botText) ate a Fase E revisitar UI rica de campanha
+      // e templates. Fora isso, mesmo texto/legenda de sempre.
+      const body = formatBody(`\u200e${queue.greetingMessage}`, ticket.contact);
+      await sendAndPersistText(channel, ticket, body);
     };
 
     const botText = async () => {
@@ -555,26 +528,12 @@ export const handleChartbot = async (
       //options += `\n*[ 0 ]* - Menu anterior`;
       options += `\n*[ # ]* - Menu inicial`;
 
-      const textMessage = {
-        text: formatBody(
-          `\u200e${queue.greetingMessage}\n\n${options}`,
-          ticket.contact
-        )
-      };
-
-      const sendMsg = await wbot.sendMessage(
-        `${ticket.contact.number}@${
-          ticket.isGroup ? "g.us" : "s.whatsapp.net"
-        }`,
-        textMessage
+      const body = formatBody(
+        `\u200e${queue.greetingMessage}\n\n${options}`,
+        ticket.contact
       );
-
-      await verifyMessage(sendMsg, ticket, ticket.contact);
+      await sendAndPersistText(channel, ticket, body);
     };
-
-    // if (buttonActive.value === "list") {
-    //   return botList();
-    // };
 
     if (buttonActive.value === "button" && QueueOption.length <= 4) {
       return botButton();
@@ -607,69 +566,13 @@ export const handleChartbot = async (
       });
 
       const botList = async () => {
-        const sectionsRows = [];
-
-        queueOptions.forEach((option, i) => {
-          sectionsRows.push({
-            title: option.title,
-            rowId: `${option.option}`
-          });
-        });
-        sectionsRows.push({
-          title: "Menu inicial *[ 0 ]* Menu anterior",
-          rowId: `#`
-        });
-        const sections = [
-          {
-            rows: sectionsRows
-          }
-        ];
-
-        const listMessage = {
-          text: formatBody(`\u200e${currentOption.message}`, ticket.contact),
-          buttonText: "Escolha uma opção",
-          sections
-        };
-
-        const sendMsg = await wbot.sendMessage(
-          `${ticket.contact.number}@${
-            ticket.isGroup ? "g.us" : "s.whatsapp.net"
-          }`,
-          listMessage
-        );
-
-        await verifyMessage(sendMsg, ticket, ticket.contact);
+        const body = formatBody(`\u200e${currentOption.message}`, ticket.contact);
+        await sendAndPersistText(channel, ticket, body);
       };
 
       const botButton = async () => {
-        const buttons = [];
-        queueOptions.forEach((option, i) => {
-          buttons.push({
-            buttonId: `${option.option}`,
-            buttonText: { displayText: option.title },
-            type: 4
-          });
-        });
-        buttons.push({
-          buttonId: `#`,
-          buttonText: { displayText: "Menu inicial *[ 0 ]* Menu anterior" },
-          type: 4
-        });
-
-        const buttonMessage = {
-          text: formatBody(`\u200e${currentOption.message}`, ticket.contact),
-          buttons,
-          headerType: 4
-        };
-
-        const sendMsg = await wbot.sendMessage(
-          `${ticket.contact.number}@${
-            ticket.isGroup ? "g.us" : "s.whatsapp.net"
-          }`,
-          buttonMessage
-        );
-
-        await verifyMessage(sendMsg, ticket, ticket.contact);
+        const body = formatBody(`\u200e${currentOption.message}`, ticket.contact);
+        await sendAndPersistText(channel, ticket, body);
       };
 
       const botText = async () => {
@@ -680,21 +583,11 @@ export const handleChartbot = async (
         });
         options += `\n*[ 0 ]* - Menu anterior`;
         options += `\n*[ # ]* - Menu inicial`;
-        const textMessage = {
-          text: formatBody(
-            `\u200e${currentOption.message}\n\n${options}`,
-            ticket.contact
-          )
-        };
-
-        const sendMsg = await wbot.sendMessage(
-          `${ticket.contact.number}@${
-            ticket.isGroup ? "g.us" : "s.whatsapp.net"
-          }`,
-          textMessage
+        const body = formatBody(
+          `\u200e${currentOption.message}\n\n${options}`,
+          ticket.contact
         );
-
-        await verifyMessage(sendMsg, ticket, ticket.contact);
+        await sendAndPersistText(channel, ticket, body);
       };
 
       if (buttonActive.value === "list") {
