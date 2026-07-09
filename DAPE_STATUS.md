@@ -539,18 +539,45 @@ Build isolado (tsc limpo, ~13s), backend reiniciado sem impacto real (números s
 
 Próximo passo: Fase 4 (unificar o dispatcher `SendWhatsAppMessage` por `providerType` — única fase que toca código compartilhado com produção).
 
+## 🔄 Replanejamento — compromisso total com API oficial, sem duas frentes (2026-07-09)
+
+Usuário decidiu: em vez de manter Baileys e Cloud API como dois caminhos paralelos de lógica duplicada (a "Fase 4" original — espalhar `if providerType === 'meta_cloud'` pelo motor de menu/IA/Flow Builder), fazer um esforço único e bem estruturado, com paridade completa de funcionalidade e sem nada cosmético. Também pediu que o **DAPLE Shield passe a consultar a saúde real do número direto na Meta** (quality rating, limite de mensagens), não só heurísticas internas.
+
+Novo plano de fases (substitui a Fase 4 original em diante):
+- **Fase A** — camada de abstração de mensagens (`MessageChannel`) ✅ concluída (ver abaixo)
+- **Fase B** — motor de menu/chatbot sobre a abstração
+- **Fase C** — motor de IA sobre a abstração
+- **Fase D** — Flow Builder sobre a abstração
+- **Fase E** — campanhas com templates aprovados (obrigatório pra Cloud API)
+- **Fase F** — DAPLE Shield com sinais reais da Meta (`quality_rating`, `whatsapp_business_manager_messaging_limit` via Graph API + webhooks `phone_number_quality_update`/`business_capability_update`/`phone_number_name_update`/`security`)
+- **Fase G** — piloto real + validação de paridade completa
+
+## ✅ Fix — Meta Cloud API Fase A: camada de abstração de mensagens (2026-07-09)
+
+**Commit:** `e6dece6` — "feat: Meta Cloud API fase A - camada de abstracao de mensagens"
+
+Criada a interface comum `MessageChannel` (`sendText`, `sendMedia`, `downloadIncomingMedia`) que as próximas fases (motor de menu, IA, Flow Builder) vão consumir, em vez de checar `providerType` espalhado pelo código de negócio. Dois adaptadores: `BaileysChannel` (usa `GetTicketWbot` + `wbot.sendMessage`, reaproveitando `downloadMedia` de `wbotMessageMedia.ts`) e `CloudApiChannel` (usa `SendMetaCloudMessage` + `downloadAndStoreMetaCloudMedia`, já existentes desde as Fases 1-3). `getMessageChannel(ticket)` é o ponto único de decisão de qual adaptador usar.
+
+Ajuste retrocompatível em `SendMetaCloudMessage.ts`: passa a retornar `{ externalId }` (o wamid da mensagem) em vez de `void`, mesmo padrão que o Baileys já usa com `sentMessage.key.id` — necessário pra gravar a `Message` com o ID correto nas próximas fases.
+
+**Fase deliberadamente só aditiva:** nenhum dos 24+ pontos que chamam `wbot.sendMessage()` diretamente (`verifyQueue`, `handleChartbot`, `handleOpenAi`, `flowbuilderIntegration`, `queues.ts`) foi alterado ainda — isso é o trabalho das Fases B-D. Risco de produção zero: código novo, não referenciado por nenhum caminho já em execução.
+
+Validado: build isolado (tsc limpo, ~13s), backend reiniciado, os 3 módulos carregados via `require()` dentro do container sem erro, instância de `BaileysChannel` confirmada com os métodos do contrato presentes e `providerType` correto. Backup rodado antes (`dape_backup_20260709_063356.sql.gz`).
+
+Próximo passo: Fase B (motor de menu/chatbot sobre a abstração).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- **Integração híbrida Meta Cloud API** — Fases 1 (infra/credenciais), 2 (webhook de entrada) e 3 (mídia) concluídas. Faltam: Fase 4 (unificar dispatcher de envio), Fase 5 (templates), Fase 6 (piloto com número real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
+- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia) e A (camada de abstração de mensagens) concluídas. Faltam: Fase B (motor de menu), Fase C (motor de IA), Fase D (Flow Builder), Fase E (templates/campanhas), Fase F (Shield com dados reais da Meta), Fase G (piloto real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → Meta Cloud API Fase 4-6 (em andamento, paralelo aos passos manuais do usuário com a Meta).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → Meta Cloud API Fase B-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
 
 Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos), e a continuação das fases 2-6 da integração Meta Cloud API.
 
