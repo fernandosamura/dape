@@ -79,17 +79,21 @@ const flowbuilderIntegration = async (
       companyId
     });
 
-    io.of(String(companyId)).emit(`company-${companyId}-ticket`, {
-      action: "delete",
-      ticket,
-      ticketId: ticket.id
-    });
+    io.to(`company-${companyId}-closed`)
+      .to(`queue-${ticket.queueId}-closed`)
+      .emit(`company-${companyId}-ticket`, {
+        action: "delete",
+        ticket,
+        ticketId: ticket.id
+      });
 
-    io.to(ticket.status).emit(`company-${companyId}-ticket`, {
-      action: "update",
-      ticket,
-      ticketId: ticket.id
-    });
+    io.to(`company-${companyId}-${ticket.status}`)
+      .to(`queue-${ticket.queueId}-${ticket.status}`)
+      .emit(`company-${companyId}-ticket`, {
+        action: "update",
+        ticket,
+        ticketId: ticket.id
+      });
   }
 
   if (msg.key.fromMe) {
