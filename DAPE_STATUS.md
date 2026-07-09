@@ -598,18 +598,37 @@ Validado: build isolado (tsc limpo, ~12s) — a tipagem pegou qualquer incompati
 
 Próximo passo: Fase D (Flow Builder sobre a abstração).
 
+## 🔍 Investigação — Fase D (Flow Builder): escopo maior que o esperado, decisão de adiar (2026-07-09)
+
+**Commit do fix pontual:** `2325af8` — "fix: #037 - sala de socket sem prefixo de empresa no Flow Builder"
+
+Antes de portar o Flow Builder pra `MessageChannel`, mapeei `ActionsWebhookService.ts` (903 linhas — o processador de nós do flow) a fundo. Achado: o envio de mensagens do Flow Builder é bem mais espalhado que o motor de menu (Fase B) ou de IA (Fase C). 8 tipos de nó (`message`, `typebot`, `openai`, `question`, `ticket`, `singleBlock`, `randomizer`, `menu`), usando **pelo menos 4 mecanismos de envio diferentes**:
+
+- `SendMessage(whatsapp, {...})` — por número+whatsapp, **sem** `ticket` — não encaixa direto no `MessageChannel` (que é centrado em `ticket`) sem redesenho; usado pelo nó `message` e pela imagem dentro de `singleBlock`.
+- `SendWhatsAppMessage({body, ticket})` — centrado em `ticket`, portável com esforço razoável; usado pelo nó `question` e pelo texto dentro de `singleBlock`.
+- `SendWhatsAppMediaFlow({media, ticket})` — usado pelo áudio/vídeo dentro de `singleBlock`.
+- `getWbot(whatsapp.id)` direto — nós `typebot` e `openai` (este último chama um `handleOpenAi` de um módulo **diferente**, `OpenAiService.ts` — não o que foi portado na Fase C).
+
+Só o subtipo `singleBlock` sozinho usa 3 desses mecanismos pros seus 5 subtipos. O arquivo também tem bastante código legado (threads de worker comentadas, construção de caminho via `__dirname.split()`, checagem hardcoded de `localhost:8090`, nó `ticket` inteiro desativado/comentado).
+
+**Decisão (apresentei o mapeamento completo ao usuário antes de decidir):** não tentar portar tudo nesta sessão — o esforço é comparável às Fases B+C juntas, num arquivo desconhecido e com sinais de código legado frágil. Fica registrado aqui como ponto de partida pra um esforço futuro dedicado, quando fizer sentido priorizar.
+
+**O que saiu desta investigação:** achado e corrigido um bug real e contido — `flowbuilderIntegration` usava `io.of(String(companyId))` e `io.to(ticket.status)` (salas de socket sem prefixo de empresa, mesma classe do #037 Fase 1), que faziam o evento de "ticket fechado reaberto" vazar pra qualquer empresa com alguém ouvindo aquela sala de status. Corrigido pro mesmo padrão já usado em `verifyMessage`/`handleRating`/`MetaCloudWebhookService`.
+
+Próximo passo: Fase E (templates/campanhas).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
 
 - #009 Sequelize 5→6 (épico separado)
-- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração), B (motor de menu) e C (motor de IA) concluídas. Faltam: Fase D (Flow Builder), Fase E (templates/campanhas), Fase F (Shield com dados reais da Meta), Fase G (piloto real). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
+- **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração), B (motor de menu) e C (motor de IA) concluídas. **Fase D (Flow Builder) investigada e adiada por decisão** (escopo maior que o esperado — ver investigação acima; só o fix pontual do #037 foi aplicado). Faltam: Fase E (templates/campanhas), Fase F (Shield com dados reais da Meta), Fase G (piloto real), e — quando fizer sentido priorizar — o Flow Builder completo (ver mapeamento detalhado acima). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
 - ~~#019 tokenVersion / logout-everywhere~~ — concluído (ver acima)
 - ~~#024 Encrypt WA session no DB~~ — concluído (ver acima)
 - ~~#037 Socket.IO namespaces por tenant~~ — Fase 1 concluída (ver acima); Fase 2 opcional; Fase 3 não recomendada por ora; achados dois casos do mesmo bug pendentes de correção: um dentro de `flowbuilderIntegration` (Fase 5) e possivelmente outros ainda não auditados
 
-**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → ~~Meta Cloud API Fase C~~ ✅ → Meta Cloud API Fase D-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
+**Ordem recomendada de execução (mais seguro → mais arriscado):** ~~#015~~ ✅ → ~~#019~~ ✅ → ~~#024~~ ✅ → #009 (precisa ambiente isolado pra rodar os 11 testes antes) → ~~#037 Fase 1~~ ✅ → ~~#031~~ ✅ (Fases 1-6, encerrado) → ~~Meta Cloud API Fase 1~~ ✅ → ~~Meta Cloud API Fase 2~~ ✅ → ~~Meta Cloud API Fase 3~~ ✅ → ~~Meta Cloud API Fase A~~ ✅ → ~~Meta Cloud API Fase B~~ ✅ → ~~Meta Cloud API Fase C~~ ✅ → Meta Cloud API Fase D (adiada, investigada) → Meta Cloud API Fase E-G (em andamento, paralelo aos passos manuais do usuário com a Meta).
 
 Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3, o achado pendente do #037 (namespaces não auditados dentro de `flowbuilderIntegration` e possivelmente outros pontos), e a continuação das fases 2-6 da integração Meta Cloud API.
 
