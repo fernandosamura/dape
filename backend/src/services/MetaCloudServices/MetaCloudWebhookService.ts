@@ -6,9 +6,13 @@ import Contact from "../../models/Contact";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
 import CreateMessageService from "../MessageServices/CreateMessageService";
+import { downloadAndStoreMetaCloudMedia } from "./DownloadMetaCloudMedia";
+import { decrypt } from "../../helpers/cryptoHelper";
 import { getIO } from "../../libs/socket";
 import { cacheLayer } from "../../libs/cache";
 import { logger } from "../../utils/logger";
+
+const MEDIA_TYPES = ["image", "audio", "video", "document", "sticker"];
 
 interface MetaCloudMessage {
   from: string;
@@ -49,8 +53,8 @@ interface MetaCloudWebhookEntry {
   }>;
 }
 
-// Mensagens fora do escopo da Fase 2 (mídia real) recebem um corpo textual
-// placeholder - o download/armazenamento do arquivo fica pra Fase 3.
+// Corpo textual usado pra mensagens sem midia (texto/localizacao/botao) e
+// como fallback quando o download de midia real (Fase 3) falha.
 const getBodyFromMetaMessage = (msg: MetaCloudMessage): string => {
   switch (msg.type) {
     case "text":
@@ -87,6 +91,51 @@ const ackMap: Record<string, number> = {
   failed: -1
 };
 
+const getCaption = (msg: MetaCloudMessage): string => {
+  switch (msg.type) {
+    case "image":
+      return msg.image?.caption || "";
+    case "video":
+      return msg.video?.caption || "";
+    case "document":
+      return msg.document?.caption || "";
+    default:
+      return "";
+  }
+};
+
+// Baixa a midia real da Cloud API (Fase 3). Retorna null se o tipo nao tem
+// midia associada, se faltar o token da conexao, ou se o download falhar -
+// em qualquer um desses casos quem chama cai de volta no corpo textual
+// placeholder, sem quebrar o processamento da mensagem.
+const tryDownloadMedia = async (
+  msg: MetaCloudMessage,
+  whatsapp: Whatsapp
+): Promise<{ filename: string; mimetype: string } | null> => {
+  const mediaField = (msg as unknown as Record<string, { id?: string }>)[
+    msg.type
+  ];
+  const mediaId = mediaField?.id;
+  if (!mediaId || !whatsapp.metaAccessToken) return null;
+
+  let accessToken: string;
+  try {
+    accessToken = decrypt(whatsapp.metaAccessToken);
+  } catch (err) {
+    logger.error(
+      { err },
+      "[MetaCloud] Erro ao decriptar token para download de mídia"
+    );
+    return null;
+  }
+
+  return downloadAndStoreMetaCloudMedia(
+    mediaId,
+    accessToken,
+    msg.type === "document" ? msg.document?.filename : undefined
+  );
+};
+
 const processIncomingMessage = async (
   msg: MetaCloudMessage,
   contactsProfile: MetaCloudWebhookEntry["changes"][0]["value"]["contacts"],
@@ -116,7 +165,24 @@ const processIncomingMessage = async (
     companyId
   );
 
-  const body = getBodyFromMetaMessage(msg);
+  let body: string;
+  let mediaUrl: string | undefined;
+  let mediaType: string = msg.type;
+
+  if (MEDIA_TYPES.includes(msg.type)) {
+    const media = await tryDownloadMedia(msg, whatsapp);
+    if (media) {
+      mediaUrl = media.filename;
+      mediaType = media.mimetype.split("/")[0];
+      body = getCaption(msg) || "-";
+    } else {
+      // Download falhou (ou faltou token) - cai pro corpo textual placeholder,
+      // mensagem nao se perde mesmo sem a midia real.
+      body = getBodyFromMetaMessage(msg);
+    }
+  } else {
+    body = getBodyFromMetaMessage(msg);
+  }
 
   await ticket.update({ lastMessage: body });
 
@@ -127,7 +193,8 @@ const processIncomingMessage = async (
       contactId: contact.id,
       body,
       fromMe: false,
-      mediaType: msg.type,
+      mediaType,
+      mediaUrl,
       read: false
     },
     companyId
