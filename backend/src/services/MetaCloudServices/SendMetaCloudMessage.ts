@@ -7,6 +7,7 @@ import Contact from "../../models/Contact";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { dapleShield } from "../../dape/shield/dapleShield.service";
 import { logger } from "../../utils/logger";
+import CreateMessageService from "../MessageServices/CreateMessageService";
 
 const GRAPH_API_URL = "https://graph.facebook.com/v20.0";
 
@@ -104,6 +105,30 @@ const SendMetaCloudMessage = async ({
     if (!externalId) {
       throw new AppError("ERR_META_CLOUD_SEND_NO_ID");
     }
+
+    // Persiste e emite via socket - sem isso a mensagem chega no WhatsApp mas
+    // nunca aparece na tela do Daple (o envio Baileys ja faz isso, esse
+    // caminho da Cloud API estava faltando desde a implementacao original).
+    try {
+      await CreateMessageService({
+        messageData: {
+          id: externalId,
+          ticketId: ticket.id,
+          body: body || `[${mediaType}]`,
+          fromMe: true,
+          mediaType: mediaUrl && mediaType ? mediaType : "conversation",
+          mediaUrl: mediaUrl || undefined,
+          read: true,
+          ack: 1,
+        },
+        companyId: ticket.companyId,
+      });
+    } catch (persistErr) {
+      logger.warn(
+        `[MetaCloud] Falha ao persistir mensagem enviada (ticket ${ticket.id}): ${(persistErr as any)?.message}`
+      );
+    }
+
     return { externalId };
   } catch (err: any) {
     await dapleShield.reportSendError(ticket.whatsappId, ticket.companyId, err?.message || "send_failed");
