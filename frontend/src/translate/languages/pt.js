@@ -1609,6 +1609,23 @@ const messages = {
       backendErrors: {
         ERR_INTERNAL_SERVER_ERROR:
             "Ocorreu um erro inesperado. Por favor, tente novamente mais tarde",
+        ERR_META_CLOUD_NOT_CONFIGURED:
+            "Esta conexão não está configurada com a API Oficial (Meta Cloud).",
+        ERR_META_CLOUD_TOKEN_DECRYPT:
+            "Não foi possível ler o token da conexão. Reconfigure a API Oficial.",
+        ERR_META_CLOUD_TEMPLATE_SYNC_FAILED:
+            "Erro ao buscar os modelos na Meta. Verifique o token e o WABA ID.",
+        ERR_META_CLOUD_TEMPLATE_NOT_APPROVED:
+            "Este modelo ainda não foi aprovado pela Meta.",
+        ERR_META_CLOUD_TEMPLATE_MISSING_RECIPIENT:
+            "Informe o número de destino para enviar o modelo.",
+        ERR_META_CLOUD_SEND_NO_ID:
+            "A Meta não retornou confirmação do envio.",
+        ERR_META_CLOUD_TEMPLATE_SEND_FAILED:
+            "Erro ao enviar o modelo pela Meta. Tente novamente.",
+        ERR_META_CLOUD_NO_NUMBER:
+            "Este contato não tem um número de WhatsApp válido.",
+        ERR_TEMPLATE_NOT_FOUND: "Modelo não encontrado.",
         ERR_NO_OTHER_WHATSAPP: "Deve haver pelo menos um WhatsApp padrão.",
         ERR_NO_DEF_WAPP_FOUND:
             "Nenhum WhatsApp padrão encontrado. Verifique a página de conexões.",

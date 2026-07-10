@@ -26,6 +26,7 @@ import {
 	SignalCellular4Bar,
 	CropFree,
 	DeleteOutline,
+	Description,
 } from "@material-ui/icons";
 import { Facebook, Instagram, WhatsApp } from "@material-ui/icons";
 
@@ -47,6 +48,7 @@ import { AuthContext } from "../../context/Auth/AuthContext";
 import usePlans from "../../hooks/usePlans";
 import { Can } from "../../components/Can";
 import EmbeddedSignupButton from "../../components/EmbeddedSignupButton";
+import WhatsappTemplatesModal from "../../components/WhatsappTemplatesModal";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -188,6 +190,8 @@ const Connections = () => {
 	const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
 	const [qrModalOpen, setQrModalOpen] = useState(false);
 	const [selectedWhatsApp, setSelectedWhatsApp] = useState(null);
+	const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
+	const [templatesWhatsApp, setTemplatesWhatsApp] = useState(null);
 	const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 	const confirmationModalInitialState = {
 		action: "",
@@ -199,6 +203,11 @@ const Connections = () => {
 	const [confirmModalInfo, setConfirmModalInfo] = useState(
 		confirmationModalInitialState
 	);
+
+	const handleOpenTemplatesModal = whatsApp => {
+		setTemplatesWhatsApp(whatsApp);
+		setTemplatesModalOpen(true);
+	};
 
 	const handleStartWhatsAppSession = async whatsAppId => {
 		try {
@@ -443,6 +452,11 @@ const Connections = () => {
 				onClose={handleCloseQrModal}
 				whatsAppId={!whatsAppModalOpen && selectedWhatsApp?.id}
 			/>
+			<WhatsappTemplatesModal
+				open={templatesModalOpen}
+				onClose={() => setTemplatesModalOpen(false)}
+				whatsapp={templatesWhatsApp}
+			/>
 			<WhatsAppModal
 				open={whatsAppModalOpen}
 				onClose={handleCloseWhatsAppModal}
@@ -555,6 +569,16 @@ const Connections = () => {
 																companyId={whatsApp.companyId}
 																onSuccess={() => {}}
 															/>
+														)}
+														{whatsApp.providerType === "meta_cloud" && (
+															<Tooltip title="Modelos de mensagem">
+																<IconButton
+																	size="small"
+																	onClick={() => handleOpenTemplatesModal(whatsApp)}
+																>
+																	<Description />
+																</IconButton>
+															</Tooltip>
 														)}
 														<IconButton
 															size="small"

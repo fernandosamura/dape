@@ -2,8 +2,15 @@ import axios from "axios";
 import AppError from "../../errors/AppError";
 import Whatsapp from "../../models/Whatsapp";
 import WhatsappTemplate from "../../models/WhatsappTemplate";
+import Ticket from "../../models/Ticket";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { logger } from "../../utils/logger";
+import CreateMessageService from "../MessageServices/CreateMessageService";
+import {
+  extractTemplateVariables,
+  buildBodyComponent,
+  renderTemplateBody
+} from "../../helpers/whatsappTemplateVariables";
 
 const GRAPH_API_URL = "https://graph.facebook.com/v20.0";
 
@@ -11,10 +18,14 @@ interface SendMetaCloudTemplateParams {
   whatsapp: Whatsapp;
   to: string;
   template: WhatsappTemplate;
-  // Valores pra substituir as variaveis {{1}}, {{2}} etc do corpo do
-  // template, na ordem em que aparecem - opcional, so quando o template tem
-  // variaveis.
-  bodyParams?: string[];
+  // Valores pra substituir as variaveis do corpo do template ({{1}}/{{2}}
+  // posicional ou {{customer_name}} nomeado), indexados pela chave que
+  // aparece entre chaves - opcional, so quando o template tem variaveis.
+  bodyParams?: Record<string, string>;
+  // Quando informado, persiste a mensagem enviada no historico do ticket
+  // (usado pelo envio manual de template no atendimento) - o disparo de
+  // campanha (queues.ts) nao passa ticket, so numero direto.
+  ticket?: Ticket;
 }
 
 interface SendMetaCloudTemplateResult {
@@ -30,7 +41,8 @@ const SendMetaCloudTemplate = async ({
   whatsapp,
   to,
   template,
-  bodyParams
+  bodyParams,
+  ticket
 }: SendMetaCloudTemplateParams): Promise<SendMetaCloudTemplateResult> => {
   if (!whatsapp.metaAccessToken || !whatsapp.phoneNumberId) {
     throw new AppError("ERR_META_CLOUD_NOT_CONFIGURED");
@@ -46,15 +58,8 @@ const SendMetaCloudTemplate = async ({
     throw new AppError("ERR_META_CLOUD_TOKEN_DECRYPT");
   }
 
-  const components =
-    bodyParams && bodyParams.length > 0
-      ? [
-          {
-            type: "body",
-            parameters: bodyParams.map(text => ({ type: "text", text }))
-          }
-        ]
-      : undefined;
+  const variables = extractTemplateVariables(template.bodyText);
+  const components = buildBodyComponent(variables, bodyParams || {});
 
   const payload = {
     messaging_product: "whatsapp",
@@ -83,6 +88,33 @@ const SendMetaCloudTemplate = async ({
     if (!externalId) {
       throw new AppError("ERR_META_CLOUD_SEND_NO_ID");
     }
+
+    if (ticket) {
+      const renderedBody = renderTemplateBody(
+        template.bodyText,
+        bodyParams || {}
+      );
+      await ticket.update({ lastMessage: renderedBody });
+      try {
+        await CreateMessageService({
+          messageData: {
+            id: externalId,
+            ticketId: ticket.id,
+            body: renderedBody,
+            fromMe: true,
+            mediaType: "conversation",
+            read: true,
+            ack: 1
+          },
+          companyId: ticket.companyId
+        });
+      } catch (persistErr) {
+        logger.warn(
+          `[MetaCloud] Falha ao persistir template enviado (ticket ${ticket.id}): ${(persistErr as any)?.message}`
+        );
+      }
+    }
+
     return { externalId };
   } catch (err: unknown) {
     logger.error({ err }, "[MetaCloud] Erro ao enviar template");

@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { getIO } from "../libs/socket";
 import Ticket from "../models/Ticket";
+import Whatsapp from "../models/Whatsapp";
+import WhatsappTemplate from "../models/WhatsappTemplate";
+import AppError from "../errors/AppError";
+import SendMetaCloudTemplate from "../services/MetaCloudServices/SendMetaCloudTemplate";
 
 import CreateTicketService from "../services/TicketServices/CreateTicketService";
 import DeleteTicketService from "../services/TicketServices/DeleteTicketService";
@@ -232,4 +236,41 @@ export const remove = async (
     });
 
   return res.status(200).json({ message: "ticket deleted" });
+};
+
+// Envio de modelo (template) aprovado da Meta pelo atendimento individual -
+// persiste no historico do ticket via SendMetaCloudTemplate({ ticket }),
+// igual a uma mensagem manual normal.
+export const sendTemplate = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { ticketId } = req.params;
+  const { templateId, bodyParams } = req.body;
+  const { companyId } = req.user;
+
+  const ticket = await ShowTicketService(ticketId, companyId);
+
+  const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
+  if (!whatsapp || whatsapp.providerType !== "meta_cloud") {
+    throw new AppError("ERR_META_CLOUD_NOT_CONFIGURED");
+  }
+
+  const template = await WhatsappTemplate.findOne({
+    where: { id: templateId, whatsappId: ticket.whatsappId, companyId }
+  });
+  if (!template) throw new AppError("ERR_TEMPLATE_NOT_FOUND", 404);
+
+  const to = ticket.contact?.number;
+  if (!to) throw new AppError("ERR_META_CLOUD_NO_NUMBER");
+
+  const result = await SendMetaCloudTemplate({
+    whatsapp,
+    to,
+    template,
+    bodyParams,
+    ticket
+  });
+
+  return res.status(200).json(result);
 };

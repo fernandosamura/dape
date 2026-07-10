@@ -183,7 +183,7 @@ const Ticket = () => {
           ticketId={ticket.id}
           isGroup={ticket.isGroup}
         ></MessagesList>
-        <MessageInput ticketId={ticket.id} ticketStatus={ticket.status} />
+        <MessageInput ticketId={ticket.id} ticketStatus={ticket.status} ticket={ticket} />
       </>
     );
   };

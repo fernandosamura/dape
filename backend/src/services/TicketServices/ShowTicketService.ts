@@ -28,7 +28,7 @@ const INCLUDE_OPTIONS = [
   {
     model: Whatsapp,
     as: "whatsapp",
-    attributes: ["name"]
+    attributes: ["id", "name", "providerType"]
   },
   {
     model: Tag,

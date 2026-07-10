@@ -32,7 +32,7 @@ const ShowTicketUUIDService = async (uuid: string, companyId: number): Promise<T
       {
         model: Whatsapp,
         as: "whatsapp",
-        attributes: ["name"]
+        attributes: ["id", "name", "providerType"]
       },
       {
         model: Tag,

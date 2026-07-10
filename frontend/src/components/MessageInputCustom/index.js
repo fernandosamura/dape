@@ -36,6 +36,7 @@ import toastError from "../../errors/toastError";
 
 import useQuickMessages from "../../hooks/useQuickMessages";
 import DapeIAReplyModal from "../dape/DapeIAReplyModal";
+import SendTemplateModal from "../dape/SendTemplateModal";
 import { useDapeModules } from "../../hooks/useDapeModules";
 import useSettings from "../../hooks/useSettings";
 
@@ -476,7 +477,7 @@ const CustomInput = (props) => {
 };
 
 const MessageInputCustom = (props) => {
-  const { ticketStatus, ticketId } = props;
+  const { ticketStatus, ticketId, ticket } = props;
   const classes = useStyles();
 
   const [medias, setMedias] = useState([]);
@@ -491,6 +492,8 @@ const MessageInputCustom = (props) => {
 
   const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
   const [showIAModal, setShowIAModal] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const isMetaCloud = ticket?.whatsapp?.providerType === "meta_cloud";
   const { hasIA } = useDapeModules();
   const [iaAudioReplyEnabled, setIaAudioReplyEnabled] = React.useState(false);
   const { getAll: getAllSettings } = useSettings();
@@ -825,6 +828,26 @@ const MessageInputCustom = (props) => {
               handleSendAudio(audioUrl);
             }}
           />
+
+          {isMetaCloud && ticketId && ticketStatus === "open" && (
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              title="Enviar modelo aprovado"
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 20, padding: "4px 6px", opacity: 0.7,
+                lineHeight: 1,
+              }}
+            >📋</button>
+          )}
+          <SendTemplateModal
+            open={showTemplateModal}
+            onClose={() => setShowTemplateModal(false)}
+            ticketId={ticketId}
+            whatsappId={ticket?.whatsapp?.id}
+            onSent={() => setShowTemplateModal(false)}
+          />
+
           <ActionButtons
             inputMessage={inputMessage}
             loading={loading}
