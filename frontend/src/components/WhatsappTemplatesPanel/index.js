@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
 import {
+  Box,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -32,6 +33,8 @@ import {
   extractTemplateVariables,
   renderTemplateBody,
   getTemplateHeader,
+  getTemplateFooter,
+  getTemplateButtons,
 } from "../../utils/whatsappTemplateVariables";
 
 const STATUS_COLORS = {
@@ -51,6 +54,8 @@ const UseTemplateDialog = ({ open, onClose, template }) => {
   const variables = template ? extractTemplateVariables(template.bodyText || "") : [];
   const preview = template ? renderTemplateBody(template.bodyText || "", values) : "";
   const header = template ? getTemplateHeader(template.components) : null;
+  const footer = template ? getTemplateFooter(template.components) : null;
+  const previewButtons = template ? getTemplateButtons(template.components) : [];
   const needsHeaderMedia = header && header.format !== "TEXT";
 
   useEffect(() => {
@@ -127,21 +132,44 @@ const UseTemplateDialog = ({ open, onClose, template }) => {
         ))}
 
         <Typography variant="caption" style={{ display: "block", marginTop: 12 }}>
-          Prévia da mensagem:
+          Prévia da mensagem (o que o contato vai receber):
         </Typography>
-        <Typography
-          variant="body2"
+        <Box
           style={{
             background: "#F9FAFB",
             border: "1px solid #E5E7EB",
             borderRadius: 8,
             padding: 12,
             marginTop: 4,
-            whiteSpace: "pre-wrap",
           }}
         >
-          {preview}
-        </Typography>
+          {header?.format === "TEXT" && header.text && (
+            <Typography variant="body2" style={{ fontWeight: "bold", marginBottom: 6 }}>
+              {header.text}
+            </Typography>
+          )}
+          {needsHeaderMedia && (
+            <Typography variant="body2" style={{ fontWeight: "bold", marginBottom: 6 }}>
+              📎 {header.format} do cabeçalho
+            </Typography>
+          )}
+          <Typography variant="body2" style={{ whiteSpace: "pre-wrap" }}>
+            {preview}
+          </Typography>
+          {footer && (
+            <Typography variant="caption" style={{ display: "block", color: "#9CA3AF", marginTop: 6 }}>
+              {footer}
+            </Typography>
+          )}
+          {previewButtons.map((b, i) => (
+            <Chip
+              key={i}
+              size="small"
+              label={b.url ? `${b.text}: ${b.url}` : b.text}
+              style={{ marginTop: 6, marginRight: 6, background: "#E5F9EF", color: "#128C69" }}
+            />
+          ))}
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={sending}>
@@ -279,7 +307,17 @@ const WhatsappTemplatesPanel = () => {
                 </TableCell>
               </TableRow>
             )}
-            {templates.map((t) => (
+            {templates.map((t) => {
+              const tHeader = getTemplateHeader(t.components);
+              const tFooter = getTemplateFooter(t.components);
+              const tButtons = getTemplateButtons(t.components);
+              const fullText = [
+                tHeader?.format === "TEXT" ? tHeader.text : tHeader ? `[cabeçalho ${tHeader.format}]` : null,
+                t.bodyText,
+                tFooter,
+                ...tButtons.map((b) => `[botão: ${b.text}]`),
+              ].filter(Boolean).join("\n\n");
+              return (
               <TableRow key={t.id}>
                 <TableCell>{t.name}</TableCell>
                 <TableCell>{t.category}</TableCell>
@@ -288,10 +326,11 @@ const WhatsappTemplatesPanel = () => {
                   <Chip label={t.status} size="small" style={STATUS_COLORS[t.status] || {}} />
                 </TableCell>
                 <TableCell>
-                  <Tooltip title={t.bodyText || ""}>
+                  <Tooltip title={<span style={{ whiteSpace: "pre-wrap" }}>{fullText}</span>}>
                     <span>
                       {(t.bodyText || "").slice(0, 40)}
                       {(t.bodyText || "").length > 40 ? "..." : ""}
+                      {(tHeader || tFooter || tButtons.length > 0) && " 📎"}
                     </span>
                   </Tooltip>
                 </TableCell>
@@ -309,7 +348,8 @@ const WhatsappTemplatesPanel = () => {
                   </Button>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       )}

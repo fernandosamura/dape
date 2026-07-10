@@ -9,9 +9,9 @@ import CreateMessageService from "../MessageServices/CreateMessageService";
 import {
   extractTemplateVariables,
   buildBodyComponent,
-  renderTemplateBody,
   getTemplateHeader,
-  buildHeaderComponent
+  buildHeaderComponent,
+  renderFullTemplateMessage
 } from "../../helpers/whatsappTemplateVariables";
 
 const GRAPH_API_URL = "https://graph.facebook.com/v20.0";
@@ -107,7 +107,8 @@ const SendMetaCloudTemplate = async ({
     }
 
     if (ticket) {
-      const renderedBody = renderTemplateBody(
+      const renderedBody = renderFullTemplateMessage(
+        template.components,
         template.bodyText,
         bodyParams || {}
       );

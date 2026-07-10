@@ -26,3 +26,20 @@ export const getTemplateHeader = (components) => {
     variables: header.format === "TEXT" ? extractTemplateVariables(header.text || "") : [],
   };
 };
+
+// Le o footer estatico do template, pra exibir na prévia (a Meta sempre
+// envia o footer junto quando o template tem um, mesmo sem parâmetro).
+export const getTemplateFooter = (components) => {
+  if (!Array.isArray(components)) return null;
+  const footer = components.find((c) => c.type === "FOOTER");
+  return footer?.text || null;
+};
+
+// Le os botões do template (URL, telefone ou quick reply), pra exibir na
+// prévia - a Cloud API sempre inclui os botões do template aprovado no
+// envio.
+export const getTemplateButtons = (components) => {
+  if (!Array.isArray(components)) return [];
+  const buttonsComponent = components.find((c) => c.type === "BUTTONS");
+  return buttonsComponent?.buttons || [];
+};

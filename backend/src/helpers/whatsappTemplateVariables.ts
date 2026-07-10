@@ -1,8 +1,15 @@
+interface TemplateButton {
+  type: string;
+  text?: string;
+  url?: string;
+  phone_number?: string;
+}
+
 interface TemplateComponent {
   type: string;
   format?: string;
   text?: string;
-  buttons?: unknown[];
+  buttons?: TemplateButton[];
 }
 
 interface TemplateHeader {
@@ -103,4 +110,60 @@ export const buildHeaderComponent = (
     type: "header",
     parameters: [{ type: key, [key]: { link: headerMediaUrl } }]
   };
+};
+
+// Le o footer estatico do template (nunca tem variavel, a Meta nao permite).
+export const getTemplateFooter = (components: unknown): string | null => {
+  if (!Array.isArray(components)) return null;
+  const footer = (components as TemplateComponent[]).find(
+    c => c.type === "FOOTER"
+  );
+  return footer?.text || null;
+};
+
+// Le os botoes do template (URL, telefone ou quick reply) pra exibir na
+// previa - a Cloud API sempre inclui os botoes do template aprovado no
+// envio, independente dos parametros passados pelo DAPLE.
+export const getTemplateButtons = (
+  components: unknown
+): TemplateButton[] => {
+  if (!Array.isArray(components)) return [];
+  const buttonsComponent = (components as TemplateComponent[]).find(
+    c => c.type === "BUTTONS"
+  );
+  return buttonsComponent?.buttons || [];
+};
+
+// Monta o texto completo do template (header + body + footer + botoes) pra
+// persistir no historico do ticket - sem isso a conversa no DAPLE mostrava
+// so o corpo, enquanto o contato recebia o template inteiro (header,
+// rodape e link do botao) pela Cloud API.
+export const renderFullTemplateMessage = (
+  components: unknown,
+  bodyText: string,
+  bodyValues: Record<string, string>
+): string => {
+  const parts: string[] = [];
+
+  const header = getTemplateHeader(components);
+  if (header?.format === "TEXT" && header.text) {
+    parts.push(header.text);
+  }
+
+  if (bodyText) {
+    parts.push(renderTemplateBody(bodyText, bodyValues));
+  }
+
+  const footer = getTemplateFooter(components);
+  if (footer) parts.push(footer);
+
+  const buttons = getTemplateButtons(components);
+  buttons.forEach(b => {
+    if (b.type === "URL" && b.url) parts.push(`${b.text}: ${b.url}`);
+    else if (b.type === "PHONE_NUMBER" && b.phone_number) {
+      parts.push(`${b.text}: ${b.phone_number}`);
+    } else if (b.text) parts.push(b.text);
+  });
+
+  return parts.join("\n\n");
 };

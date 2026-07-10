@@ -5,6 +5,8 @@ import {
   extractTemplateVariables,
   renderTemplateBody,
   getTemplateHeader,
+  getTemplateFooter,
+  getTemplateButtons,
 } from "../../utils/whatsappTemplateVariables";
 
 const s = {
@@ -18,6 +20,9 @@ const s = {
   field: { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 6, border: "1px solid #D1D5DB", fontSize: 13, marginBottom: 10 },
   label: { fontSize: 12, color: "#374151", marginBottom: 4, display: "block", fontWeight: 600 },
   preview: { background: "#F9FAFB", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#374151", marginBottom: 16, borderLeft: "3px solid #25D366", whiteSpace: "pre-wrap" },
+  previewHeader: { fontWeight: "bold", marginBottom: 6 },
+  previewFooter: { color: "#9CA3AF", fontSize: 11, marginTop: 6 },
+  previewButton: { display: "inline-block", marginTop: 6, marginRight: 6, padding: "4px 10px", borderRadius: 6, background: "#E5F9EF", color: "#128C69", fontSize: 11, fontWeight: 600 },
   buttons: { display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end", flexWrap: "wrap" },
   btnCancel: { padding: "8px 16px", borderRadius: 6, border: "1px solid #D1D5DB", background: "#fff", cursor: "pointer", fontSize: 13 },
   btnUse: (disabled) => ({ padding: "8px 16px", borderRadius: 6, border: "none", background: disabled ? "#A7D8B5" : "#25D366", color: "#fff", cursor: disabled ? "not-allowed" : "pointer", fontSize: 13, fontWeight: "bold" }),
@@ -108,6 +113,8 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
   const preview = selected ? renderTemplateBody(selected.bodyText || "", values) : "";
   const approved = templates.filter((t) => t.status === "APPROVED");
   const header = selected ? getTemplateHeader(selected.components) : null;
+  const footer = selected ? getTemplateFooter(selected.components) : null;
+  const previewButtons = selected ? getTemplateButtons(selected.components) : [];
   const needsHeaderMedia = header && header.format !== "TEXT";
   const canSend = !needsHeaderMedia || headerMediaUrl.trim().length > 0;
 
@@ -129,12 +136,27 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
             )}
 
             {!loading &&
-              approved.map((t) => (
-                <div key={t.id} style={s.optionWrap} onClick={() => handleSelect(t)}>
-                  <div style={s.optionName}>{t.name} ({t.language})</div>
-                  <div style={s.optionText}>{t.bodyText}</div>
-                </div>
-              ))}
+              approved.map((t) => {
+                const tHeader = getTemplateHeader(t.components);
+                const tFooter = getTemplateFooter(t.components);
+                const tButtons = getTemplateButtons(t.components);
+                return (
+                  <div key={t.id} style={s.optionWrap} onClick={() => handleSelect(t)}>
+                    <div style={s.optionName}>{t.name} ({t.language})</div>
+                    {tHeader?.format === "TEXT" && tHeader.text && (
+                      <div style={{ ...s.optionText, fontWeight: "bold", marginTop: 6 }}>{tHeader.text}</div>
+                    )}
+                    {tHeader && tHeader.format !== "TEXT" && (
+                      <div style={s.optionText}>📎 Cabeçalho: {tHeader.format}</div>
+                    )}
+                    <div style={s.optionText}>{t.bodyText}</div>
+                    {tFooter && <div style={{ ...s.optionText, color: "#9CA3AF", fontSize: 11 }}>{tFooter}</div>}
+                    {tButtons.map((b, i) => (
+                      <span key={i} style={s.previewButton}>{b.text}</span>
+                    ))}
+                  </div>
+                );
+              })}
 
             <div style={s.buttons}>
               <button style={s.btnCancel} onClick={onClose}>Fechar</button>
@@ -175,8 +197,27 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
               </div>
             ))}
 
-            <label style={s.label}>Prévia</label>
-            <div style={s.preview}>{preview}</div>
+            <label style={s.label}>Prévia (o que o contato vai receber)</label>
+            <div style={s.preview}>
+              {header?.format === "TEXT" && header.text && (
+                <div style={s.previewHeader}>{header.text}</div>
+              )}
+              {needsHeaderMedia && (
+                <div style={s.previewHeader}>📎 {header.format} do cabeçalho</div>
+              )}
+              <div>{preview}</div>
+              {footer && <div style={s.previewFooter}>{footer}</div>}
+              {previewButtons.length > 0 && (
+                <div>
+                  {previewButtons.map((b, i) => (
+                    <span key={i} style={s.previewButton}>
+                      {b.text}
+                      {b.url ? `: ${b.url}` : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div style={s.buttons}>
               <button style={s.btnCancel} onClick={() => setSelected(null)} disabled={sending}>
