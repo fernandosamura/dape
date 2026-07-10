@@ -679,6 +679,19 @@ Todos os 5 fixes validados com teste real de ponta a ponta: envio confirmado che
 
 ## 🔜 Sprint 3 — pendente
 
+### 🚨 PRIORIDADE MÁXIMA — Instagram e Facebook (2026-07-10)
+
+Instagram e Facebook (mensagens diretas / Messenger) **já constam nos informativos e divulgações do Daple**, e existem **clientes que fecharam contrato especificamente por causa dessas funções** — não é um "nice to have" de roadmap, é compromisso comercial já assumido com clientes pagantes. Ver também `[[daple_roadmap_multicanal]]` na memória.
+
+**Sequência combinada com o usuário:**
+1. Concluir agora só a aprovação da Meta pro **WhatsApp** (App Review, vídeos de demonstração — em andamento, ver Fase G/App Review acima).
+2. **Assim que o WhatsApp for aprovado, Instagram e Facebook entram como prioridade máxima imediata** — não esperar terminar todo o resto do Sprint 3 antes de começar.
+3. O caso de uso "Conectar-se com clientes pelo WhatsApp" e o "Gerenciar mensagens e conteúdo no Instagram"/"Interagir com os clientes no Messenger from Meta" já foram adicionados ao app `DAPLE API OFICIAL` na Meta (ver Casos de Uso, sessão 2026-07-09) — falta a implementação de código em si (webhook de Instagram/Messenger, `SendInstagramMessage`/`SendFacebookMessage` já existem no código mas não foram auditados/testados de ponta a ponta como foi feito com o WhatsApp Cloud API nesta sessão).
+
+**Ação recomendada para a próxima sessão:** repetir para Instagram/Facebook o mesmo processo de auditoria de ponta a ponta que revelou os 5 bugs do WhatsApp Cloud API (persistência de mensagem enviada, assinatura de webhook na conta/página, status de conexão, etc.) — é provável que bugs da mesma classe existam também nesses canais, já que usam padrões de código similares.
+
+---
+
 - #009 Sequelize 5→6 (épico separado)
 - **Integração API oficial Meta (plano replanejado — ver acima)** — Fases 1 (infra/credenciais), 2 (webhook de entrada), 3 (mídia), A (camada de abstração), B (motor de menu), C (motor de IA), E (templates/campanhas) e F (Shield com dados reais da Meta) concluídas. **Fase D (Flow Builder) investigada e adiada por decisão** (escopo maior que o esperado — ver investigação acima; só o fix pontual do #037 foi aplicado). Faltam: Fase G (piloto real), validação visual do `CampaignModal` num navegador real, habilitar os campos de webhook de saúde no painel da Meta, e — quando fizer sentido priorizar — o Flow Builder completo (ver mapeamento detalhado acima). Aguardando usuário concluir os passos manuais do documento "Configuração Única da Plataforma" (App Review pode levar dias/semanas).
 - ~~#031 wbotMessageListener.ts refactor~~ — **encerrado nas Fases 1 a 6** (utilidades genéricas + parsing de mensagem + mídia/TTS + motor de IA + motor de Flow Builder + motor de Menu/Chatbot). 3389 → 1023 linhas. Decisão: não quebrar `handleMessage` (ver acima).
