@@ -19,6 +19,12 @@ const CheckContactNumber = async (
 ): Promise<IOnWhatsapp> => {
   const defaultWhatsapp = await GetDefaultWhatsApp(companyId);
 
+  // A Cloud API nao oferece um pre-check equivalente ao onWhatsApp do Baileys -
+  // a validacao real acontece no proprio envio da mensagem.
+  if (defaultWhatsapp.providerType === "meta_cloud") {
+    return { jid: `${number.replace(/\D/g, "")}@s.whatsapp.net`, exists: true };
+  }
+
   const wbot = getWbot(defaultWhatsapp.id);
   const isNumberExit = await checker(number, wbot);
 

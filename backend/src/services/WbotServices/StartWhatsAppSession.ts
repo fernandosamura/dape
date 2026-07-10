@@ -10,6 +10,13 @@ export const StartWhatsAppSession = async (
   whatsapp: Whatsapp,
   companyId: number
 ): Promise<void> => {
+  // Conexoes Meta Cloud API nao usam sessao Baileys/QR code - ficam
+  // "conectadas" so por terem credenciais validas, nao precisam (e nao
+  // devem) passar por initWASocket.
+  if (whatsapp.providerType === "meta_cloud") {
+    return;
+  }
+
   await whatsapp.update({ status: "OPENING" });
 
   const io = getIO();

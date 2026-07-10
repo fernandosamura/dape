@@ -87,6 +87,7 @@ export const embeddedSignup = async (
       tokenExpiresAt,
       migrationStatus: "completed",
       previousProviderType: whatsapp.providerType || "session",
+      status: "CONNECTED",
     });
 
     logger.info(
@@ -129,6 +130,7 @@ export const rollback = async (
     tokenExpiresAt: null,
     migrationStatus: "none",
     previousProviderType: null,
+    status: "DISCONNECTED",
   });
 
   logger.info(

@@ -48,9 +48,12 @@ const EmbeddedSignupButton = ({ whatsappId, companyId, onSuccess }) => {
 		}
 		sessionInfoRef.current = { wabaId: null, phoneNumberId: null };
 		setLoading(true);
-		window.FB.login(
-			async (response) => {
-				if (response.authResponse) {
+		// O FB.login rejeita callback async diretamente ("Expression is of type
+		// asyncfunction, not function") - por isso o callback e uma funcao comum
+		// que so dispara a logica assincrona internamente.
+		const onLoginResponse = (response) => {
+			if (response.authResponse) {
+				(async () => {
 					try {
 						const { data } = await api.post("/meta-cloud/embedded-signup", {
 							code: response.authResponse.code || response.authResponse.accessToken,
@@ -65,11 +68,15 @@ const EmbeddedSignupButton = ({ whatsappId, companyId, onSuccess }) => {
 					} catch (err) {
 						toastError(err);
 					}
-				} else {
-					toast.warn("Login cancelado ou sem permissão.");
-				}
+					setLoading(false);
+				})();
+			} else {
+				toast.warn("Login cancelado ou sem permissão.");
 				setLoading(false);
-			},
+			}
+		};
+		window.FB.login(
+			onLoginResponse,
 			{
 				config_id: configId,
 				response_type: "code",
