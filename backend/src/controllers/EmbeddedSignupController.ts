@@ -73,6 +73,22 @@ export const embeddedSignup = async (
       verifiedName = phoneData?.verified_name || businessName;
     }
 
+    // Assina o app DAPLE nos eventos de webhook dessa WABA - sem isso, o
+    // envio de mensagens funciona mas respostas do cliente nunca chegam
+    // (a WABA fica "conversando" só com quem estiver inscrito). Descoberto
+    // na pratica: a WABA de teste da Meta vem assinada por padrao em um app
+    // auxiliar interno da Meta, nao no nosso.
+    try {
+      await axios.post(`${GRAPH_API_URL}/${wabaId}/subscribed_apps`, null, {
+        params: { access_token: accessToken },
+      });
+    } catch (subErr: any) {
+      logger.error(
+        { subErr },
+        `[MetaCloud] Falha ao assinar webhook da WABA ${wabaId} — mensagens recebidas nao vao chegar ate isso ser corrigido manualmente`
+      );
+    }
+
     // Encrypt token before saving — NEVER store plaintext
     const encryptedToken = encrypt(accessToken);
     const tokenExpiresAt = expiresIn
