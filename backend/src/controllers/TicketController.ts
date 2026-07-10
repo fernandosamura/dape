@@ -246,7 +246,7 @@ export const sendTemplate = async (
   res: Response
 ): Promise<Response> => {
   const { ticketId } = req.params;
-  const { templateId, bodyParams } = req.body;
+  const { templateId, bodyParams, headerMediaUrl } = req.body;
   const { companyId } = req.user;
 
   const ticket = await ShowTicketService(ticketId, companyId);
@@ -269,6 +269,7 @@ export const sendTemplate = async (
     to,
     template,
     bodyParams,
+    headerMediaUrl,
     ticket
   });
 

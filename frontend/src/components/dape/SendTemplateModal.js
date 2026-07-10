@@ -4,6 +4,7 @@ import toastError from "../../errors/toastError";
 import {
   extractTemplateVariables,
   renderTemplateBody,
+  getTemplateHeader,
 } from "../../utils/whatsappTemplateVariables";
 
 const s = {
@@ -32,11 +33,13 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [values, setValues] = useState({});
+  const [headerMediaUrl, setHeaderMediaUrl] = useState("");
   const [sending, setSending] = useState(false);
 
   const reset = () => {
     setSelected(null);
     setValues({});
+    setHeaderMediaUrl("");
     setError(null);
   };
 
@@ -77,6 +80,7 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
   function handleSelect(template) {
     setSelected(template);
     setValues({});
+    setHeaderMediaUrl("");
   }
 
   async function handleSend() {
@@ -86,6 +90,7 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
       await api.post(`/tickets/${ticketId}/send-template`, {
         templateId: selected.id,
         bodyParams: values,
+        headerMediaUrl: headerMediaUrl || undefined,
       });
       onSent && onSent();
       onClose();
@@ -102,6 +107,9 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
   const variables = selected ? extractTemplateVariables(selected.bodyText || "") : [];
   const preview = selected ? renderTemplateBody(selected.bodyText || "", values) : "";
   const approved = templates.filter((t) => t.status === "APPROVED");
+  const header = selected ? getTemplateHeader(selected.components) : null;
+  const needsHeaderMedia = header && header.format !== "TEXT";
+  const canSend = !needsHeaderMedia || headerMediaUrl.trim().length > 0;
 
   return (
     <div style={s.overlay} onClick={onClose}>
@@ -142,6 +150,20 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
 
             {error && <div style={s.error}>{error}</div>}
 
+            {needsHeaderMedia && (
+              <div>
+                <label style={s.label}>
+                  URL da {header.format === "IMAGE" ? "imagem" : header.format === "VIDEO" ? "vídeo" : "documento"} do cabeçalho
+                </label>
+                <input
+                  style={s.field}
+                  placeholder="https://..."
+                  value={headerMediaUrl}
+                  onChange={(e) => setHeaderMediaUrl(e.target.value)}
+                />
+              </div>
+            )}
+
             {variables.map((v) => (
               <div key={v}>
                 <label style={s.label}>Variável {`{{${v}}}`}</label>
@@ -160,7 +182,7 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
               <button style={s.btnCancel} onClick={() => setSelected(null)} disabled={sending}>
                 Voltar
               </button>
-              <button style={s.btnUse(sending)} onClick={handleSend} disabled={sending}>
+              <button style={s.btnUse(sending || !canSend)} onClick={handleSend} disabled={sending || !canSend}>
                 {sending ? "Enviando..." : "Enviar ao contato"}
               </button>
             </div>

@@ -25,6 +25,7 @@ import toastError from "../../errors/toastError";
 import {
   extractTemplateVariables,
   renderTemplateBody,
+  getTemplateHeader,
 } from "../../utils/whatsappTemplateVariables";
 
 const STATUS_COLORS = {
@@ -38,15 +39,19 @@ const STATUS_COLORS = {
 const UseTemplateDialog = ({ open, onClose, template }) => {
   const [to, setTo] = useState("");
   const [values, setValues] = useState({});
+  const [headerMediaUrl, setHeaderMediaUrl] = useState("");
   const [sending, setSending] = useState(false);
 
   const variables = template ? extractTemplateVariables(template.bodyText || "") : [];
   const preview = template ? renderTemplateBody(template.bodyText || "", values) : "";
+  const header = template ? getTemplateHeader(template.components) : null;
+  const needsHeaderMedia = header && header.format !== "TEXT";
 
   useEffect(() => {
     if (open) {
       setTo("");
       setValues({});
+      setHeaderMediaUrl("");
     }
   }, [open, template]);
 
@@ -55,11 +60,16 @@ const UseTemplateDialog = ({ open, onClose, template }) => {
       toast.warn("Informe o número de destino.");
       return;
     }
+    if (needsHeaderMedia && !headerMediaUrl.trim()) {
+      toast.warn("Informe a URL da mídia do cabeçalho.");
+      return;
+    }
     setSending(true);
     try {
       await api.post(`/meta-cloud/templates/${template.id}/send`, {
         to,
         bodyParams: values,
+        headerMediaUrl: headerMediaUrl || undefined,
       });
       toast.success("Modelo enviado com sucesso!");
       onClose();
@@ -85,6 +95,18 @@ const UseTemplateDialog = ({ open, onClose, template }) => {
           value={to}
           onChange={(e) => setTo(e.target.value)}
         />
+
+        {needsHeaderMedia && (
+          <TextField
+            label={`URL da ${header.format === "IMAGE" ? "imagem" : header.format === "VIDEO" ? "vídeo" : "documento"} do cabeçalho`}
+            placeholder="https://..."
+            fullWidth
+            margin="dense"
+            variant="outlined"
+            value={headerMediaUrl}
+            onChange={(e) => setHeaderMediaUrl(e.target.value)}
+          />
+        )}
 
         {variables.map((v) => (
           <TextField

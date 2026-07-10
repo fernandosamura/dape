@@ -9,7 +9,9 @@ import CreateMessageService from "../MessageServices/CreateMessageService";
 import {
   extractTemplateVariables,
   buildBodyComponent,
-  renderTemplateBody
+  renderTemplateBody,
+  getTemplateHeader,
+  buildHeaderComponent
 } from "../../helpers/whatsappTemplateVariables";
 
 const GRAPH_API_URL = "https://graph.facebook.com/v20.0";
@@ -22,6 +24,10 @@ interface SendMetaCloudTemplateParams {
   // posicional ou {{customer_name}} nomeado), indexados pela chave que
   // aparece entre chaves - opcional, so quando o template tem variaveis.
   bodyParams?: Record<string, string>;
+  // URL da midia (imagem/video/documento) exigida quando o header do
+  // template nao e texto estatico - obrigatorio nesse caso, a Cloud API
+  // rejeita o envio sem isso (erro 132012).
+  headerMediaUrl?: string;
   // Quando informado, persiste a mensagem enviada no historico do ticket
   // (usado pelo envio manual de template no atendimento) - o disparo de
   // campanha (queues.ts) nao passa ticket, so numero direto.
@@ -42,6 +48,7 @@ const SendMetaCloudTemplate = async ({
   to,
   template,
   bodyParams,
+  headerMediaUrl,
   ticket
 }: SendMetaCloudTemplateParams): Promise<SendMetaCloudTemplateResult> => {
   if (!whatsapp.metaAccessToken || !whatsapp.phoneNumberId) {
@@ -49,6 +56,14 @@ const SendMetaCloudTemplate = async ({
   }
   if (template.status !== "APPROVED") {
     throw new AppError("ERR_META_CLOUD_TEMPLATE_NOT_APPROVED");
+  }
+
+  const header = getTemplateHeader(template.components);
+  if (header && header.format !== "TEXT" && !headerMediaUrl) {
+    throw new AppError("ERR_META_CLOUD_TEMPLATE_HEADER_MEDIA_REQUIRED");
+  }
+  if (header && header.format === "TEXT" && header.variables.length > 0) {
+    throw new AppError("ERR_META_CLOUD_TEMPLATE_HEADER_VARIABLE_UNSUPPORTED");
   }
 
   let token: string;
@@ -59,7 +74,9 @@ const SendMetaCloudTemplate = async ({
   }
 
   const variables = extractTemplateVariables(template.bodyText);
-  const components = buildBodyComponent(variables, bodyParams || {});
+  const bodyComponent = buildBodyComponent(variables, bodyParams || {});
+  const headerComponent = buildHeaderComponent(header, headerMediaUrl);
+  const components = [headerComponent, bodyComponent].filter(Boolean);
 
   const payload = {
     messaging_product: "whatsapp",
@@ -68,7 +85,7 @@ const SendMetaCloudTemplate = async ({
     template: {
       name: template.name,
       language: { code: template.language },
-      ...(components ? { components } : {})
+      ...(components.length > 0 ? { components } : {})
     }
   };
 

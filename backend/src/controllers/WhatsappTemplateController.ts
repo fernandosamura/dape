@@ -43,7 +43,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 // TicketController.sendTemplate e persiste no historico da conversa).
 export const send = async (req: Request, res: Response): Promise<Response> => {
   const { templateId } = req.params;
-  const { to, bodyParams } = req.body;
+  const { to, bodyParams, headerMediaUrl } = req.body;
   const { companyId } = req.user;
 
   if (!to) throw new AppError("ERR_META_CLOUD_TEMPLATE_MISSING_RECIPIENT");
@@ -65,7 +65,8 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
     whatsapp,
     to: String(to).replace(/\D/g, ""),
     template,
-    bodyParams
+    bodyParams,
+    headerMediaUrl
   });
 
   return res.json(result);

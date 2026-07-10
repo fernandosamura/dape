@@ -1,3 +1,16 @@
+interface TemplateComponent {
+  type: string;
+  format?: string;
+  text?: string;
+  buttons?: unknown[];
+}
+
+interface TemplateHeader {
+  format: string; // TEXT | IMAGE | VIDEO | DOCUMENT
+  text?: string;
+  variables: string[];
+}
+
 // Variaveis de template Meta aparecem como {{1}}, {{2}} (formato posicional,
 // a maioria dos templates existentes) ou {{customer_name}} (formato nomeado,
 // exigido em alguns fluxos novos do WhatsApp Manager). Extrai a lista unica
@@ -31,20 +44,63 @@ export const renderTemplateBody = (
 export const buildBodyComponent = (
   variables: string[],
   values: Record<string, string>
-): Array<{ type: string; parameters: unknown[] }> | undefined => {
+): { type: string; parameters: unknown[] } | undefined => {
   if (variables.length === 0) return undefined;
 
   const allNumeric = variables.every(v => /^\d+$/.test(v));
 
-  return [
-    {
-      type: "body",
-      parameters: variables.map(v => {
-        const text = values?.[v] ?? "";
-        return allNumeric
-          ? { type: "text", text }
-          : { type: "text", parameter_name: v, text };
-      })
-    }
-  ];
+  return {
+    type: "body",
+    parameters: variables.map(v => {
+      const text = values?.[v] ?? "";
+      return allNumeric
+        ? { type: "text", text }
+        : { type: "text", parameter_name: v, text };
+    })
+  };
+};
+
+// Le o componente HEADER a partir dos "components" salvos na sincronizacao
+// (JSONB vindo direto da Graph API) - necessario porque o header pode exigir
+// midia (IMAGE/VIDEO/DOCUMENT) ou ter uma variavel de texto, nenhum dos dois
+// aparece no bodyText.
+export const getTemplateHeader = (
+  components: unknown
+): TemplateHeader | null => {
+  if (!Array.isArray(components)) return null;
+  const header = (components as TemplateComponent[]).find(
+    c => c.type === "HEADER"
+  );
+  if (!header) return null;
+
+  return {
+    format: header.format || "TEXT",
+    text: header.text,
+    variables:
+      header.format === "TEXT" ? extractTemplateVariables(header.text || "") : []
+  };
+};
+
+// Monta o componente "header" quando o template exige - midia (link
+// obrigatorio, fornecido pelo usuario na tela) ou texto com variavel.
+// Templates com header de texto estatico (sem variavel) nao precisam de
+// componente nenhum - retorna undefined nesse caso.
+export const buildHeaderComponent = (
+  header: TemplateHeader | null,
+  headerMediaUrl?: string
+): { type: string; parameters: unknown[] } | undefined => {
+  if (!header) return undefined;
+
+  if (header.format === "TEXT") {
+    if (header.variables.length === 0) return undefined;
+    return undefined; // header de texto com variavel - nao suportado ainda, ver ERR_META_CLOUD_TEMPLATE_HEADER_VARIABLE_UNSUPPORTED no service
+  }
+
+  if (!headerMediaUrl) return undefined;
+
+  const key = header.format.toLowerCase();
+  return {
+    type: "header",
+    parameters: [{ type: key, [key]: { link: headerMediaUrl } }]
+  };
 };

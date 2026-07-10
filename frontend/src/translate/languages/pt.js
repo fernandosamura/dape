@@ -1625,6 +1625,10 @@ const messages = {
             "Erro ao enviar o modelo pela Meta. Tente novamente.",
         ERR_META_CLOUD_NO_NUMBER:
             "Este contato não tem um número de WhatsApp válido.",
+        ERR_META_CLOUD_TEMPLATE_HEADER_MEDIA_REQUIRED:
+            "Este modelo tem uma imagem/vídeo/documento no cabeçalho. Informe a URL da mídia para enviar.",
+        ERR_META_CLOUD_TEMPLATE_HEADER_VARIABLE_UNSUPPORTED:
+            "Este modelo tem uma variável no cabeçalho, ainda não suportado. Use um modelo sem variável no cabeçalho.",
         ERR_TEMPLATE_NOT_FOUND: "Modelo não encontrado.",
         ERR_NO_OTHER_WHATSAPP: "Deve haver pelo menos um WhatsApp padrão.",
         ERR_NO_DEF_WAPP_FOUND:
