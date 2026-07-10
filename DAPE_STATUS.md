@@ -651,6 +651,29 @@ Validado com 5 testes funcionais reais: sync com token falso (erro real da Meta 
 
 Próximo passo: Fase G (piloto real com número de produção).
 
+## ✅ Fix — Meta Cloud API: App Review (Provedor de Tecnologia) + 3 bugs reais de ponta a ponta (2026-07-10)
+
+**Commits:** `dae9d75`, `d9592ed`, `b3ddcfc`
+
+### App Review / Embedded Signup — progresso e achados de configuração na Meta
+- App só tinha o caso de uso "Messenger from Meta" configurado — sem caso de uso de WhatsApp formal, o "WhatsApp Embedded Signup" nem aparecia como variação de login disponível. Resolvido adicionando o caso de uso "Conectar-se com clientes pelo WhatsApp" (junto com Instagram/Messenger, que fazem parte do roadmap do Daple — ver `[[daple_roadmap_multicanal]]`).
+- Conectar o WhatsApp da própria Pub Plus a si mesma exige o caminho **"Torne-se um Provedor de Tecnologia"** → **"Independent Tech Provider"** (não "Working with a Solution Partner", que é pra quando se usa infraestrutura de terceiro). Verificação de Negócio já **Aprovada**; Análise do App (Advanced Access de `whatsapp_business_management`/`whatsapp_business_messaging`) pendente — falta ícone do app, URL de política de privacidade (já publicada: `https://daple.pubplus.com.br/politica-privacidade`, servida direto pelo nginx pra evitar o bug do `serve -s` do frontend com arquivos estáticos) e os vídeos de demonstração.
+- Configuração de login (`config_id`) inicial travava o OAuth com erro genérico "Sorry, something went wrong" — causa: permissões de Instagram/Ads (`ads_management`, `instagram_manage_events`, `pages_manage_ads`) empacotadas junto ficam **restritas** pela Meta sem aprovação própria, e isso quebra o handshake inteiro. Segunda configuração, só com WhatsApp Cloud API, resolveu — confirma que configs de login devem ser criadas por escopo mínimo necessário, não amplas "pra já deixar pronto".
+- `FB.login()` rejeita callback `async` direto ("Expression is of type asyncfunction, not function") — corrigido em `EmbeddedSignupButton/index.js` (callback comum por fora, lógica assíncrona disparada por dentro via IIFE).
+- Criado Usuário do Sistema ("Daple API Integration", role Employee) com token permanente (`expires_at: 0`, escopos `business_management`+`whatsapp_business_management`+`whatsapp_business_messaging`) — acesso de asset (WABA) precisa ser concedido explicitamente por WABA em Business Settings, não é automático nem para WABAs da mesma empresa dona do app.
+
+### Três bugs reais que impediam uma conexão Cloud API de funcionar de ponta a ponta
+Descobertos testando uma conexão direta (sem Embedded Signup) do número de teste da Meta numa conexão dedicada (`Whatsapps.providerType='meta_cloud'` configurado manualmente com o token do Usuário do Sistema, contornando o Embedded Signup pra WABAs que a própria Pub Plus já possui — não precisa do fluxo de "cliente externo compartilhando ativos" quando o dono do WABA é o mesmo dono do app):
+
+1. **`EmbeddedSignupController.ts`** nunca setava `status: "CONNECTED"` no banco após signup bem-sucedido (só retornava isso no JSON de resposta) — `GetDefaultWhatsApp` só considera conexões com `status === 'CONNECTED'`, então a empresa aparecia sem nenhum WhatsApp configurado. Corrigido no `embeddedSignup` (seta `CONNECTED`) e no `rollback` (seta `DISCONNECTED` de volta).
+2. **`CheckIsValidContact.ts`/`CheckNumber.ts`** chamavam `getWbot()` (Baileys) direto, sem checar `providerType` — gerava `ERR_WAPP_NOT_INITIALIZED` ("não existe conexão") ao iniciar uma conversa nova numa conexão Cloud API. Corrigido com bypass early-return quando `providerType === 'meta_cloud'` (a Cloud API não oferece um pré-check de número tipo `onWhatsApp` do Baileys — a validação real acontece no próprio envio).
+3. **`StartWhatsAppSession.ts`** (chamada no boot do backend via `StartAllWhatsAppsSessions` e nos botões de reconexão) tentava iniciar sessão Baileys pra qualquer conexão, inclusive Cloud API — derrubava o `status` de `CONNECTED` pra `qrcode` a cada restart do backend. Corrigido com early-return no topo da função.
+4. **`SendMetaCloudMessage.ts`** enviava a mensagem de verdade pra API da Meta (confirmado: chegava no destinatário) mas **nunca chamava `CreateMessageService`** — diferente de `SendWhatsAppMessage.ts` (Baileys), que sempre persiste e emite via socket após o envio. Resultado: mensagem saía mas nunca aparecia na tela do ticket, parecendo que o envio tinha falhado. Bug presente desde a implementação original (Fase 1/2), só descoberto agora ao testar envio real de ponta a ponta.
+
+Todos os 4 fixes validados com teste real (backend restart + envio de mensagem real, confirmado chegando no WhatsApp E aparecendo no ticket do Daple). Backup não rodado nesta sessão (mudanças são só em código, sem migração de schema).
+
+**Pendente:** finalizar Análise do App na Meta (ícone, política de privacidade — já pronta —, vídeos de demonstração), depois piloto real (Fase G).
+
 ---
 
 ## 🔜 Sprint 3 — pendente
