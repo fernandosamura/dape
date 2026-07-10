@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
 import {
@@ -17,11 +17,17 @@ import {
   CircularProgress,
   TextField,
   Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
 } from "@material-ui/core";
 import { Refresh } from "@material-ui/icons";
 
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
+import { AuthContext } from "../../context/Auth/AuthContext";
 import {
   extractTemplateVariables,
   renderTemplateBody,
@@ -149,17 +155,40 @@ const UseTemplateDialog = ({ open, onClose, template }) => {
   );
 };
 
-const WhatsappTemplatesModal = ({ open, onClose, whatsapp }) => {
+// Gestao de modelos de mensagem da Meta (WABA) - vive em Configuracoes de
+// Campanhas porque templates sao usados principalmente pra disparo de
+// campanhas via Cloud API (mensagem de negocio fora da janela de 24h exige
+// template aprovado). Nao fica em Conexoes pra nao poluir a tela de gestao
+// de sessoes/canais.
+const WhatsappTemplatesPanel = () => {
+  const { user } = useContext(AuthContext);
+  const { companyId } = user;
+
+  const [whatsapps, setWhatsapps] = useState([]);
+  const [whatsappId, setWhatsappId] = useState("");
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [useTemplate, setUseTemplate] = useState(null);
 
+  useEffect(() => {
+    api
+      .get("/whatsapp", { params: { companyId, session: 0 } })
+      .then(({ data }) => {
+        const cloudApiWhatsapps = (Array.isArray(data) ? data : []).filter(
+          (w) => w.providerType === "meta_cloud"
+        );
+        setWhatsapps(cloudApiWhatsapps);
+        if (cloudApiWhatsapps.length > 0) setWhatsappId(cloudApiWhatsapps[0].id);
+      })
+      .catch((err) => toastError(err));
+  }, [companyId]);
+
   const fetchTemplates = async () => {
-    if (!whatsapp) return;
+    if (!whatsappId) return;
     setLoading(true);
     try {
-      const { data } = await api.get(`/meta-cloud/templates/${whatsapp.id}`);
+      const { data } = await api.get(`/meta-cloud/templates/${whatsappId}`);
       setTemplates(data);
     } catch (err) {
       toastError(err);
@@ -169,10 +198,10 @@ const WhatsappTemplatesModal = ({ open, onClose, whatsapp }) => {
   };
 
   const handleSync = async () => {
-    if (!whatsapp) return;
+    if (!whatsappId) return;
     setSyncing(true);
     try {
-      const { data } = await api.post(`/meta-cloud/templates/${whatsapp.id}/sync`);
+      const { data } = await api.post(`/meta-cloud/templates/${whatsappId}/sync`);
       setTemplates(data);
       toast.success("Modelos atualizados com sucesso!");
     } catch (err) {
@@ -183,20 +212,35 @@ const WhatsappTemplatesModal = ({ open, onClose, whatsapp }) => {
   };
 
   useEffect(() => {
-    if (open) fetchTemplates();
+    if (whatsappId) fetchTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, whatsapp]);
+  }, [whatsappId]);
+
+  if (whatsapps.length === 0) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        Modelos de mensagem — {whatsapp?.name}
-      </DialogTitle>
-      <DialogContent dividers>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <Typography variant="body2" color="textSecondary">
-            Modelos sincronizados a partir do WhatsApp Manager (Meta).
-          </Typography>
+    <Grid xs={12} item style={{ marginTop: 24 }}>
+      <Typography component={"h3"}>Modelos de mensagem (WhatsApp Oficial)</Typography>
+
+      <Grid container spacing={2} style={{ marginTop: 4, marginBottom: 8 }}>
+        <Grid xs={12} md={4} item>
+          <FormControl variant="outlined" fullWidth>
+            <InputLabel id="templates-whatsapp-label">Conexão</InputLabel>
+            <Select
+              labelId="templates-whatsapp-label"
+              label="Conexão"
+              value={whatsappId}
+              onChange={(e) => setWhatsappId(e.target.value)}
+            >
+              {whatsapps.map((w) => (
+                <MenuItem key={w.id} value={w.id}>
+                  {w.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid xs={12} md={8} item style={{ display: "flex", alignItems: "center" }}>
           <Button
             size="small"
             variant="outlined"
@@ -207,83 +251,76 @@ const WhatsappTemplatesModal = ({ open, onClose, whatsapp }) => {
           >
             {syncing ? "Atualizando..." : "Atualizar modelos"}
           </Button>
-        </div>
+        </Grid>
+      </Grid>
 
-        {loading ? (
-          <div style={{ textAlign: "center", padding: 24 }}>
-            <CircularProgress size={24} />
-          </div>
-        ) : (
-          <Table size="small">
-            <TableHead>
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 24 }}>
+          <CircularProgress size={24} />
+        </div>
+      ) : (
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Nome</TableCell>
+              <TableCell>Categoria</TableCell>
+              <TableCell>Idioma</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Conteúdo</TableCell>
+              <TableCell>Última sincronização</TableCell>
+              <TableCell align="center">Ação</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {templates.length === 0 && (
               <TableRow>
-                <TableCell>Nome</TableCell>
-                <TableCell>Categoria</TableCell>
-                <TableCell>Idioma</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Conteúdo</TableCell>
-                <TableCell>Última sincronização</TableCell>
-                <TableCell align="center">Ação</TableCell>
+                <TableCell colSpan={7} align="center">
+                  Nenhum modelo sincronizado ainda. Clique em "Atualizar modelos".
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {templates.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    Nenhum modelo sincronizado ainda. Clique em "Atualizar modelos".
-                  </TableCell>
-                </TableRow>
-              )}
-              {templates.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell>{t.name}</TableCell>
-                  <TableCell>{t.category}</TableCell>
-                  <TableCell>{t.language}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={t.status}
-                      size="small"
-                      style={STATUS_COLORS[t.status] || {}}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title={t.bodyText || ""}>
-                      <span>
-                        {(t.bodyText || "").slice(0, 40)}
-                        {(t.bodyText || "").length > 40 ? "..." : ""}
-                      </span>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>
-                    {t.updatedAt ? new Date(t.updatedAt).toLocaleString("pt-BR") : "-"}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Button
-                      size="small"
-                      color="primary"
-                      disabled={t.status !== "APPROVED"}
-                      onClick={() => setUseTemplate(t)}
-                    >
-                      Usar modelo
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Fechar</Button>
-      </DialogActions>
+            )}
+            {templates.map((t) => (
+              <TableRow key={t.id}>
+                <TableCell>{t.name}</TableCell>
+                <TableCell>{t.category}</TableCell>
+                <TableCell>{t.language}</TableCell>
+                <TableCell>
+                  <Chip label={t.status} size="small" style={STATUS_COLORS[t.status] || {}} />
+                </TableCell>
+                <TableCell>
+                  <Tooltip title={t.bodyText || ""}>
+                    <span>
+                      {(t.bodyText || "").slice(0, 40)}
+                      {(t.bodyText || "").length > 40 ? "..." : ""}
+                    </span>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  {t.updatedAt ? new Date(t.updatedAt).toLocaleString("pt-BR") : "-"}
+                </TableCell>
+                <TableCell align="center">
+                  <Button
+                    size="small"
+                    color="primary"
+                    disabled={t.status !== "APPROVED"}
+                    onClick={() => setUseTemplate(t)}
+                  >
+                    Usar modelo
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       <UseTemplateDialog
         open={!!useTemplate}
         onClose={() => setUseTemplate(null)}
         template={useTemplate}
       />
-    </Dialog>
+    </Grid>
   );
 };
 
-export default WhatsappTemplatesModal;
+export default WhatsappTemplatesPanel;

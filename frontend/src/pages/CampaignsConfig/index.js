@@ -29,6 +29,7 @@ import {
   Typography,
 } from "@material-ui/core";
 import ConfirmationModal from "../../components/ConfirmationModal";
+import WhatsappTemplatesPanel from "../../components/WhatsappTemplatesPanel";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -315,6 +316,7 @@ const CampaignsConfig = () => {
                 </Table>
               </Grid>
             )}
+            <WhatsappTemplatesPanel />
           </Grid>
         </Box>
       </Paper>
