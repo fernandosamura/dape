@@ -37,7 +37,9 @@ import Files from "../pages/Files/";
 import Prompts from "../pages/Prompts";
 import QueueIntegration from "../pages/QueueIntegration";
 import ForgetPassword from "../pages/ForgetPassWord/"; // Reset PassWd
-import Landing from "../pages/Landing"; // eslint-disable-line no-unused-vars -- landing completa, volta a ser usada apos aprovacao da Meta
+// Landing completa - fora de uso enquanto a provisoria estiver ativa (volta apos aprovacao da Meta)
+// eslint-disable-next-line no-unused-vars
+import Landing from "../pages/Landing";
 import LandingProvisional from "../pages/LandingProvisional";
 import CampaignsPhrase from "../pages/CampaignsPhrase";
 import FlowBuilder from "../pages/FlowBuilder";
