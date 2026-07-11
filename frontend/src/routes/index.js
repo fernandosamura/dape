@@ -37,7 +37,8 @@ import Files from "../pages/Files/";
 import Prompts from "../pages/Prompts";
 import QueueIntegration from "../pages/QueueIntegration";
 import ForgetPassword from "../pages/ForgetPassWord/"; // Reset PassWd
-import Landing from "../pages/Landing";
+import Landing from "../pages/Landing"; // eslint-disable-line no-unused-vars -- landing completa, volta a ser usada apos aprovacao da Meta
+import LandingProvisional from "../pages/LandingProvisional";
 import CampaignsPhrase from "../pages/CampaignsPhrase";
 import FlowBuilder from "../pages/FlowBuilder";
 import FlowBuilderConfig from "../pages/FlowBuilderConfig";
@@ -66,7 +67,7 @@ const Routes = () => {
       <AuthProvider>
         <TicketsContextProvider>
           <Switch>
-            <Route exact path="/daple" component={Landing} />
+            <Route exact path="/daple" component={LandingProvisional} />
             <Route exact path="/login" component={Login} />
             <Route exact path="/signup" component={Signup} />
             <Route exact path="/forgetpsw" component={ForgetPassword} />
