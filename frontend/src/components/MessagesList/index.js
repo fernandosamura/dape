@@ -17,6 +17,7 @@ import {
   Block,
   Done,
   DoneAll,
+  ErrorOutline,
   ExpandMore,
   GetApp,
 } from "@material-ui/icons";
@@ -254,6 +255,13 @@ const useStyles = makeStyles((theme) => ({
 
   ackDoneAllIcon: {
     color: green[500],
+    fontSize: 18,
+    verticalAlign: "middle",
+    marginLeft: 4,
+  },
+
+  ackFailedIcon: {
+    color: "#f44336",
     fontSize: 18,
     verticalAlign: "middle",
     marginLeft: 4,
@@ -514,6 +522,9 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
   };
 
   const renderMessageAck = (message) => {
+    if (message.ack === -1) {
+      return <ErrorOutline fontSize="small" className={classes.ackFailedIcon} titleAccess="Falha no envio" />;
+    }
     if (message.ack === 1) {
       return <AccessTime fontSize="small" className={classes.ackIcons} />;
     }
