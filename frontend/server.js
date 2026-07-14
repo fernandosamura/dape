@@ -9,5 +9,6 @@ app.use(express.static(path.join(__dirname, "build"), { index: false }));
 app.get("/*", function (req, res) {
 	res.sendFile(path.join(__dirname, "build", "index.html"), { acceptRanges: false });
 });
-app.listen(3000);
+const port = process.env.PORT || 3001;
+app.listen(port);
 

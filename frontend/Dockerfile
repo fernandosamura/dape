@@ -3,7 +3,6 @@ FROM node:20-alpine
 WORKDIR /app
 
 RUN apk add --no-cache bash
-RUN npm install -g serve
 
 COPY frontend/package*.json ./
 COPY frontend/yarn.lock ./
@@ -53,4 +52,4 @@ EXPOSE 3001
 ENV HOST=0.0.0.0
 ENV PORT=3001
 
-CMD ["serve", "-s", "build", "-l", "3001"]
+CMD ["node", "server.js"]
