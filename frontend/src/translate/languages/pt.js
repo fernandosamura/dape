@@ -1611,6 +1611,8 @@ const messages = {
             "Ocorreu um erro inesperado. Por favor, tente novamente mais tarde",
         ERR_META_CLOUD_NOT_CONFIGURED:
             "Esta conexão não está configurada com a API Oficial (Meta Cloud).",
+        ERR_META_CLOUD_WINDOW_CLOSED:
+            "A janela de atendimento de 24h deste contato encerrou. Envie um modelo aprovado para continuar a conversa.",
         ERR_META_CLOUD_TOKEN_DECRYPT:
             "Não foi possível ler o token da conexão. Reconfigure a API Oficial.",
         ERR_META_CLOUD_TEMPLATE_SYNC_FAILED:

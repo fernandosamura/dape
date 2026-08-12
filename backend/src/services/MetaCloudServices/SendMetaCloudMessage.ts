@@ -17,6 +17,7 @@ interface SendMetaCloudMessageParams {
   quotedMsg?: Message;
   mediaUrl?: string;
   mediaType?: string;
+  mediaFilename?: string;
   source?: string;
 }
 
@@ -24,12 +25,17 @@ interface SendMetaCloudMessageResult {
   externalId: string;
 }
 
+// image/video/document aceitam legenda na propria mensagem de midia da Graph
+// API; audio e sticker nao tem esse campo (a API rejeita se enviado).
+const MEDIA_TYPES_WITH_CAPTION = ["image", "video", "document"];
+
 const SendMetaCloudMessage = async ({
   body,
   ticket,
   quotedMsg,
   mediaUrl,
   mediaType,
+  mediaFilename,
   source = "manual",
 }: SendMetaCloudMessageParams): Promise<SendMetaCloudMessageResult> => {
   const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
@@ -41,6 +47,18 @@ const SendMetaCloudMessage = async ({
     !whatsapp.phoneNumberId
   ) {
     throw new AppError("ERR_META_CLOUD_NOT_CONFIGURED");
+  }
+
+  // Janela de atendimento de 24h: mensagem livre so e permitida se o
+  // cliente mandou algo nas ultimas 24h. Fora da janela a Graph API rejeita
+  // (erro 131047) - bloqueamos antes pra dar erro claro em vez de falha
+  // generica; template continua liberado (SendMetaCloudTemplate.ts nao tem
+  // essa checagem).
+  if (
+    ticket.serviceWindowExpiresAt &&
+    ticket.serviceWindowExpiresAt.getTime() < Date.now()
+  ) {
+    throw new AppError("ERR_META_CLOUD_WINDOW_CLOSED");
   }
 
   // DAPLE Shield check
@@ -72,7 +90,11 @@ const SendMetaCloudMessage = async ({
       messaging_product: "whatsapp",
       to,
       type: mediaType,
-      [mediaType]: { link: mediaUrl },
+      [mediaType]: {
+        link: mediaUrl,
+        ...(MEDIA_TYPES_WITH_CAPTION.includes(mediaType) && body ? { caption: body } : {}),
+        ...(mediaType === "document" && mediaFilename ? { filename: mediaFilename } : {}),
+      },
     };
   } else {
     payload = {
