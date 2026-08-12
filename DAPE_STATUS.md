@@ -705,6 +705,33 @@ Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3
 
 ---
 
+---
+
+## ✅ Auditoria + Janela de atendimento 24h (Cloud API) (2026-08-12)
+
+**Auditoria completa da integração oficial (Embedded Signup, tokens, webhooks, templates, Coexistence, janela 24h)** feita antes de qualquer implementação — sem alterar Embedded Signup, produção ou configs Meta. Achado principal: DAPLE não implementava nenhum controle da janela de atendimento de 24h da Cloud API (mensagem livre fora da janela dependia só do erro 131047 da própria Meta, sem aviso prévio nem UX de contorno).
+
+**Commits:** cd7c244 · 4e2ffb9 · af7e230 · a4bb877 · a2bf31c · 99795d0 (branch `sprint2/seguranca-resiliencia`, ainda não pushados)
+
+| # | Fix | Commit |
+|---|-----|--------|
+| 1 | Schema: `Ticket.lastInboundMessageAt`/`serviceWindowExpiresAt` | cd7c244 |
+| 2 | Webhook grava janela em toda mensagem inbound (exceto `reaction`); corrigido emit de socket duplicado em `MetaCloudWebhookService.ts` | 4e2ffb9 |
+| 3 | `SendMetaCloudMessage.ts` bloqueia envio livre fora da janela (`ERR_META_CLOUD_WINDOW_CLOSED`); template continua liberado; adicionado suporte a legenda/nome de arquivo em mídia (faltava no payload) | af7e230 |
+| 4 | Indicador visual 🟢/🔒 + bloqueio de input em `MessageInputCustom/index.js`, sem polling (setTimeout único) | a4bb877 |
+| 5 | **Bug pré-existente corrigido:** `MessageController.store()` roteava toda mídia pro Baileys (`SendWhatsAppMedia`) mesmo em conexões `meta_cloud` — mídia nunca saía de fato pela Cloud API. Agora respeita `providerType` e passa pela checagem de janela também | a2bf31c |
+| 6 | **Drift de schema corrigido:** migration nova pra `Companies.approved` e `Contacts.isLid`, colunas usadas pelos models mas ausentes do histórico de migrations deste repo (existiam só em produção, criadas fora de uma migration em algum momento) | 99795d0 |
+
+**Testado localmente** (Postgres/Redis/backend/frontend rodando na máquina, banco separado `daple_dev`, sem tocar produção): banner aberto/fechado renderiza corretamente, input bloqueado de verdade (testado digitando), backend bloqueia via API direta, webhook assinado com HMAC recalcula a janela ponta a ponta. Não confirmado visualmente: atualização automática do banner via socket sem reload (validado só por código + estado no banco — sessão de teste ficou instável no navegador automatizado).
+
+**Pendente:**
+- Commits ainda não pushados pro remoto (aguardando aprovação do usuário)
+- `dape_plans`/`dape_tenant_plans` (módulo de billing) também não têm migration de criação neste repo — schema real não foi confirmado (evitado acesso SSH a produção sem autorização explícita), não reconstruído
+- Coexistence (segundo fluxo de conexão) — só desenhado na auditoria, não implementado
+- Job de renovação automática de token Meta — risco identificado, fora do escopo desta sessão
+
+---
+
 ## Issues conhecidos
 - git push configurado com PAT (token armazenado apenas no remote URL do servidor)
 
