@@ -39,6 +39,16 @@ type MessageData = {
   closeTicket?: true;
 };
 
+// Mapeia o mimetype do upload pro "type" que a Graph API da Meta espera
+// (image/video/audio/document) - qualquer coisa fora dos 3 primeiros vira
+// document, igual o WhatsApp trata anexos genericos.
+const mimeToMetaMediaType = (mimetype: string): string => {
+  if (mimetype?.startsWith("image/")) return "image";
+  if (mimetype?.startsWith("video/")) return "video";
+  if (mimetype?.startsWith("audio/")) return "audio";
+  return "document";
+};
+
 export const index = async (req: Request, res: Response): Promise<Response> => {
   const { ticketId } = req.params;
   const { pageNumber } = req.query as IndexQuery;
@@ -74,36 +84,72 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   const userId = Number(req.user.id);
 
   const ticket = await ShowTicketService(ticketId, companyId);
+  const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
 
   SetTicketMessagesAsRead(ticket);
 
   if (medias) {
-    await Promise.all(
-      medias.map(async (media: Express.Multer.File, index) => {
-        // Envia pelo WhatsApp primeiro (arquivo ainda existe localmente)
-        await SendWhatsAppMedia({
-          media,
-          ticket,
-          body: Array.isArray(body) ? body[index] : body
-        });
-
-        // Se R2 está ativo, faz upload e remove o arquivo local
-        if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
-          try {
+    if (whatsapp?.providerType === "meta_cloud") {
+      // Cloud API exige uma URL publica pra midia (envia por link, nao por
+      // buffer bruto como o Baileys) - por isso o upload pro R2 (quando
+      // ativo) precisa acontecer ANTES do envio aqui, ao contrario do fluxo
+      // Baileys logo abaixo.
+      await Promise.all(
+        medias.map(async (media: Express.Multer.File, index) => {
+          if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
             await uploadToR2(
               media.path,
               media.filename,
               media.mimetype || "application/octet-stream"
             );
-            if (fs.existsSync(media.path)) fs.unlinkSync(media.path);
-          } catch (err) {
-            console.error("[R2] Erro ao fazer upload após envio:", err);
           }
-        }
-      })
-    );
+
+          const mediaUrl =
+            process.env.CLOUDFLARE_R2_ENABLED === "true" && process.env.CLOUDFLARE_R2_PUBLIC_URL
+              ? `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${media.filename}`
+              : `${process.env.BACKEND_URL}/public/${media.filename}`;
+
+          await SendMetaCloudMessage({
+            body: Array.isArray(body) ? body[index] : body,
+            ticket,
+            mediaUrl,
+            mediaType: mimeToMetaMediaType(media.mimetype),
+            mediaFilename: media.originalname,
+            source: "manual"
+          });
+
+          if (process.env.CLOUDFLARE_R2_ENABLED === "true" && fs.existsSync(media.path)) {
+            fs.unlinkSync(media.path);
+          }
+        })
+      );
+    } else {
+      await Promise.all(
+        medias.map(async (media: Express.Multer.File, index) => {
+          // Envia pelo WhatsApp primeiro (arquivo ainda existe localmente)
+          await SendWhatsAppMedia({
+            media,
+            ticket,
+            body: Array.isArray(body) ? body[index] : body
+          });
+
+          // Se R2 está ativo, faz upload e remove o arquivo local
+          if (process.env.CLOUDFLARE_R2_ENABLED === "true") {
+            try {
+              await uploadToR2(
+                media.path,
+                media.filename,
+                media.mimetype || "application/octet-stream"
+              );
+              if (fs.existsSync(media.path)) fs.unlinkSync(media.path);
+            } catch (err) {
+              console.error("[R2] Erro ao fazer upload após envio:", err);
+            }
+          }
+        })
+      );
+    }
   } else {
-    const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
     if (whatsapp?.providerType === "meta_cloud") {
       await SendMetaCloudMessage({ body, ticket, quotedMsg, source: "manual" });
     } else if (whatsapp?.channel === "facebook") {
