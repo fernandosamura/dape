@@ -202,6 +202,17 @@ const processIncomingMessage = async (
 
   await ticket.update({ lastMessage: body });
 
+  // Janela de atendimento de 24h (Meta Cloud API): so mensagem do cliente
+  // abre/renova. Reacoes de emoji nao contam pra janela (politica da Meta),
+  // por isso ficam de fora do calculo.
+  if (msg.type !== "reaction") {
+    const now = new Date();
+    await ticket.update({
+      lastInboundMessageAt: now,
+      serviceWindowExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    });
+  }
+
   await CreateMessageService({
     messageData: {
       id: msg.id,
@@ -216,6 +227,8 @@ const processIncomingMessage = async (
     companyId
   });
 
+  const io = getIO();
+
   if (ticket.status === "closed") {
     await ticket.update({ status: "pending" });
     await ticket.reload({
@@ -226,7 +239,6 @@ const processIncomingMessage = async (
       ]
     });
 
-    const io = getIO();
     io.to(`company-${companyId}-closed`)
       .to(`queue-${ticket.queueId}-closed`)
       .emit(`company-${companyId}-ticket`, {
@@ -234,15 +246,19 @@ const processIncomingMessage = async (
         ticket,
         ticketId: ticket.id
       });
-
-    io.to(`company-${companyId}-${ticket.status}`)
-      .to(`queue-${ticket.queueId}-${ticket.status}`)
-      .emit(`company-${companyId}-ticket`, {
-        action: "update",
-        ticket,
-        ticketId: ticket.id
-      });
   }
+
+  // Emit unico de "update" cobre tanto o caso acima (closed -> pending)
+  // quanto ticket ja aberto/pending recebendo nova mensagem - e o que faz o
+  // indicador de janela atualizar sozinho na tela do atendente sem duplicar
+  // o evento quando o ticket estava fechado.
+  io.to(`company-${companyId}-${ticket.status}`)
+    .to(`queue-${ticket.queueId}-${ticket.status}`)
+    .emit(`company-${companyId}-ticket`, {
+      action: "update",
+      ticket,
+      ticketId: ticket.id
+    });
 
   // Aciona o motor de menu/chatbot (Fase B) - mesma decisao usada pelo
   // handleMessage do Baileys, simplificada aqui pra so cobrir menu/chatbot
