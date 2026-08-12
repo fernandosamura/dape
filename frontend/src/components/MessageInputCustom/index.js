@@ -273,6 +273,7 @@ const ActionButtons = (props) => {
     handleCancelAudio,
     handleUploadAudio,
     handleStartRecording,
+    disabled,
   } = props;
   const classes = useStyles();
   if (inputMessage) {
@@ -321,7 +322,7 @@ const ActionButtons = (props) => {
       <IconButton
         aria-label="showRecorder"
         component="span"
-        disabled={loading}
+        disabled={loading || disabled}
         onClick={handleStartRecording}
       >
         <MicIcon className={classes.sendMessageIcons} />
@@ -494,6 +495,8 @@ const MessageInputCustom = (props) => {
   const [showIAModal, setShowIAModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const isMetaCloud = ticket?.whatsapp?.providerType === "meta_cloud";
+  const [windowClosed, setWindowClosed] = useState(false);
+  const [windowRemainingLabel, setWindowRemainingLabel] = useState("");
   const { hasIA } = useDapeModules();
   const [iaAudioReplyEnabled, setIaAudioReplyEnabled] = React.useState(false);
   const { getAll: getAllSettings } = useSettings();
@@ -519,6 +522,66 @@ const MessageInputCustom = (props) => {
       setReplyingMessage(null);
     };
   }, [ticketId, setReplyingMessage]);
+
+  // Janela de atendimento de 24h (Meta Cloud API) - so relevante pra
+  // conexoes oficiais; Baileys/QR code nao tem essa restricao da Meta.
+  // Transicao aberta->fechada e um unico evento, por isso setTimeout em vez
+  // de polling; o label de tempo restante e refeito a cada 60s so enquanto
+  // a aba estiver em foco, pra nao gastar ciclo em background.
+  const serviceWindowExpiresAt = ticket?.serviceWindowExpiresAt;
+
+  useEffect(() => {
+    if (!isMetaCloud) {
+      setWindowClosed(false);
+      setWindowRemainingLabel("");
+      return;
+    }
+
+    const expiresAt = serviceWindowExpiresAt
+      ? new Date(serviceWindowExpiresAt).getTime()
+      : null;
+
+    if (!expiresAt) {
+      setWindowClosed(false);
+      setWindowRemainingLabel("");
+      return;
+    }
+
+    const formatRemaining = (ms) => {
+      const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return `${hours}h ${minutes}min restantes`;
+    };
+
+    const update = () => {
+      const msRestante = expiresAt - Date.now();
+      if (msRestante <= 0) {
+        setWindowClosed(true);
+        setWindowRemainingLabel("");
+        return false;
+      }
+      setWindowClosed(false);
+      setWindowRemainingLabel(formatRemaining(msRestante));
+      return true;
+    };
+
+    if (!update()) return undefined;
+
+    const closeTimeout = setTimeout(() => {
+      setWindowClosed(true);
+      setWindowRemainingLabel("");
+    }, expiresAt - Date.now());
+
+    const tickInterval = setInterval(() => {
+      if (document.visibilityState === "visible") update();
+    }, 60000);
+
+    return () => {
+      clearTimeout(closeTimeout);
+      clearInterval(tickInterval);
+    };
+  }, [isMetaCloud, serviceWindowExpiresAt]);
 
   // const handleChangeInput = e => {
   // 	if (isObject(e) && has(e, 'value')) {
@@ -701,7 +764,7 @@ const MessageInputCustom = (props) => {
   };
 
   const disableOption = () => {
-    return loading || recording;
+    return loading || recording || windowClosed;
   };
 
   const renderReplyingMessage = (message) => {
@@ -768,6 +831,35 @@ const MessageInputCustom = (props) => {
   else {
     return (
       <Paper square elevation={0} className={classes.mainWrapper}>
+        {isMetaCloud && windowClosed && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 12px",
+              fontSize: 13,
+              color: "#b71c1c",
+              backgroundColor: "#fdecea",
+            }}
+          >
+            🔒 Janela de atendimento encerrada — envie um modelo aprovado (📋) para continuar a conversa.
+          </div>
+        )}
+        {isMetaCloud && !windowClosed && windowRemainingLabel && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "4px 12px",
+              fontSize: 12,
+              color: "#2e7d32",
+            }}
+          >
+            🟢 Janela de atendimento aberta — {windowRemainingLabel}
+          </div>
+        )}
         {replyingMessage && renderReplyingMessage(replyingMessage)}
         <div className={classes.newMessageBox}>
           <span className={classes.hideMobile} style={{ display: "flex" }}>
@@ -857,6 +949,7 @@ const MessageInputCustom = (props) => {
             handleCancelAudio={handleCancelAudio}
             handleUploadAudio={handleUploadAudio}
             handleStartRecording={handleStartRecording}
+            disabled={windowClosed}
           />
         </div>
       </Paper>
