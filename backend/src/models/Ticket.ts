@@ -45,6 +45,12 @@ class Ticket extends Model<Ticket> {
   @Column
   lastMessage: string;
 
+  @Column
+  lastInboundMessageAt: Date;
+
+  @Column
+  serviceWindowExpiresAt: Date;
+
   @Default(false)
   @Column
   isGroup: boolean;
