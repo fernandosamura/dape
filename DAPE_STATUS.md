@@ -711,7 +711,7 @@ Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3
 
 **Auditoria completa da integração oficial (Embedded Signup, tokens, webhooks, templates, Coexistence, janela 24h)** feita antes de qualquer implementação — sem alterar Embedded Signup, produção ou configs Meta. Achado principal: DAPLE não implementava nenhum controle da janela de atendimento de 24h da Cloud API (mensagem livre fora da janela dependia só do erro 131047 da própria Meta, sem aviso prévio nem UX de contorno).
 
-**Commits:** cd7c244 · 4e2ffb9 · af7e230 · a4bb877 · a2bf31c · 99795d0 (branch `sprint2/seguranca-resiliencia`, ainda não pushados)
+**Commits:** cd7c244 · 4e2ffb9 · af7e230 · a4bb877 · a2bf31c · 99795d0 · 9b378f4 · a7f44be (branch `sprint2/seguranca-resiliencia`, **pushados pro remoto**)
 
 | # | Fix | Commit |
 |---|-----|--------|
@@ -721,12 +721,12 @@ Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3
 | 4 | Indicador visual 🟢/🔒 + bloqueio de input em `MessageInputCustom/index.js`, sem polling (setTimeout único) | a4bb877 |
 | 5 | **Bug pré-existente corrigido:** `MessageController.store()` roteava toda mídia pro Baileys (`SendWhatsAppMedia`) mesmo em conexões `meta_cloud` — mídia nunca saía de fato pela Cloud API. Agora respeita `providerType` e passa pela checagem de janela também | a2bf31c |
 | 6 | **Drift de schema corrigido:** migration nova pra `Companies.approved` e `Contacts.isLid`, colunas usadas pelos models mas ausentes do histórico de migrations deste repo (existiam só em produção, criadas fora de uma migration em algum momento) | 99795d0 |
+| 7 | Docs: atualização deste arquivo | 9b378f4 |
+| 8 | **Drift de schema resolvido por completo:** migration nova reconstruindo `dape_plans`, `dape_tenant_plans`, `dape_plan_modules`, `dape_available_modules` e `dape_tenant_module_overrides` — schema conferido direto em produção via SSH somente-leitura (autorizado explicitamente pelo usuário), sequenciada antes de `20260623000001-add-billing-tables` que já dependia dessas tabelas | a7f44be |
 
-**Testado localmente** (Postgres/Redis/backend/frontend rodando na máquina, banco separado `daple_dev`, sem tocar produção): banner aberto/fechado renderiza corretamente, input bloqueado de verdade (testado digitando), backend bloqueia via API direta, webhook assinado com HMAC recalcula a janela ponta a ponta. Não confirmado visualmente: atualização automática do banner via socket sem reload (validado só por código + estado no banco — sessão de teste ficou instável no navegador automatizado).
+**Testado localmente end-to-end**, incluindo cadeia completa de migrations do zero (sem nenhum patch manual, confirmando que o gap de schema foi fechado de vez): banner aberto/fechado renderiza corretamente, input bloqueado de verdade (testado digitando), backend bloqueia via API direta, webhook assinado com HMAC recalcula a janela ponta a ponta. **Atualização automática do banner via socket sem reload confirmada visualmente**: com o ticket já aberto na tela, disparado um segundo webhook simulando nova mensagem do cliente — banner recalculou de "22h56min" (valor antigo em cache) pra "23h59min restantes" sozinho, junto com mensagem e badge de não-lida aparecendo em tempo real, sem nenhuma navegação/reload.
 
-**Pendente:**
-- Commits ainda não pushados pro remoto (aguardando aprovação do usuário)
-- `dape_plans`/`dape_tenant_plans` (módulo de billing) também não têm migration de criação neste repo — schema real não foi confirmado (evitado acesso SSH a produção sem autorização explícita), não reconstruído
+**Pendente:** nenhuma das pendências desta sessão — Coexistence (fluxo novo de conexão) e job de renovação automática de token Meta continuam fora do escopo, registrados como próximos itens do roadmap (ver Sprint 3 acima).
 - Coexistence (segundo fluxo de conexão) — só desenhado na auditoria, não implementado
 - Job de renovação automática de token Meta — risco identificado, fora do escopo desta sessão
 
