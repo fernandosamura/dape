@@ -32,6 +32,7 @@ import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets"
 import { dapleShield, applySafeDelay } from "./dape/shield/dapleShield.service";
 import WhatsappTemplate from "./models/WhatsappTemplate";
 import SendMetaCloudTemplate from "./services/MetaCloudServices/SendMetaCloudTemplate";
+import { isMetaCloudProvider } from "./helpers/isMetaCloudProvider";
 
 
 const nodemailer = require('nodemailer');
@@ -870,7 +871,7 @@ async function handleDispatchCampaign(job) {
     // negocio fora da janela de 24h (o caso normal de uma campanha). Nao e
     // opcional - bloqueia com erro claro em vez de tentar enviar texto
     // livre, que a Meta rejeitaria de qualquer forma.
-    if (campaign.whatsapp.providerType === "meta_cloud") {
+    if (isMetaCloudProvider(campaign.whatsapp.providerType)) {
       if (!campaign.template) {
         logger.error(
           `[🚨] - Campanha ${campaignId} usa Cloud API mas não tem template aprovado configurado - disparo bloqueado`

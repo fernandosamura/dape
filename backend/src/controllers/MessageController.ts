@@ -25,6 +25,7 @@ import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
 import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
 import { uploadToR2 } from "../services/StorageServices/R2Service";
+import { isMetaCloudProvider } from "../helpers/isMetaCloudProvider";
 
 type IndexQuery = {
   pageNumber: string;
@@ -89,7 +90,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   SetTicketMessagesAsRead(ticket);
 
   if (medias) {
-    if (whatsapp?.providerType === "meta_cloud") {
+    if (isMetaCloudProvider(whatsapp?.providerType)) {
       // Cloud API exige uma URL publica pra midia (envia por link, nao por
       // buffer bruto como o Baileys) - por isso o upload pro R2 (quando
       // ativo) precisa acontecer ANTES do envio aqui, ao contrario do fluxo
@@ -150,7 +151,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       );
     }
   } else {
-    if (whatsapp?.providerType === "meta_cloud") {
+    if (isMetaCloudProvider(whatsapp?.providerType)) {
       await SendMetaCloudMessage({ body, ticket, quotedMsg, source: "manual" });
     } else if (whatsapp?.channel === "facebook") {
       await SendFacebookMessage({ body, ticket, quotedMsg });

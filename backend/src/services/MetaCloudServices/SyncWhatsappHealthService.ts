@@ -1,9 +1,14 @@
 import axios from "axios";
 import cron from "node-cron";
+import { Op } from "sequelize";
 import Whatsapp from "../../models/Whatsapp";
 import AppError from "../../errors/AppError";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { logger } from "../../utils/logger";
+import {
+  isMetaCloudProvider,
+  META_CLOUD_PROVIDER_TYPES
+} from "../../helpers/isMetaCloudProvider";
 
 const GRAPH_API_URL = "https://graph.facebook.com/v20.0";
 
@@ -18,7 +23,7 @@ export const syncWhatsappHealth = async (
   const whatsapp = await Whatsapp.findByPk(whatsappId);
   if (!whatsapp) throw new AppError("ERR_WHATSAPP_NOT_FOUND", 404);
   if (
-    whatsapp.providerType !== "meta_cloud" ||
+    !isMetaCloudProvider(whatsapp.providerType) ||
     !whatsapp.metaAccessToken ||
     !whatsapp.phoneNumberId
   ) {
@@ -79,7 +84,7 @@ export const syncWhatsappHealth = async (
 // atual direto na Meta - fonte da verdade mais confiavel.
 export const resyncWabaHealth = async (wabaId: string): Promise<void> => {
   const whatsapps = await Whatsapp.findAll({
-    where: { wabaId, providerType: "meta_cloud" }
+    where: { wabaId, providerType: { [Op.in]: META_CLOUD_PROVIDER_TYPES } }
   });
 
   for (const wa of whatsapps) {
@@ -99,7 +104,7 @@ export const resyncWabaHealth = async (wabaId: string): Promise<void> => {
 // cada poucas horas e suficiente pra nao perder mudancas por muito tempo).
 export const syncAllWhatsappsHealth = async (): Promise<void> => {
   const whatsapps = await Whatsapp.findAll({
-    where: { providerType: "meta_cloud" }
+    where: { providerType: { [Op.in]: META_CLOUD_PROVIDER_TYPES } }
   });
 
   for (const wa of whatsapps) {

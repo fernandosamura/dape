@@ -8,6 +8,7 @@ import { decrypt } from "../../helpers/cryptoHelper";
 import { dapleShield } from "../../dape/shield/dapleShield.service";
 import { logger } from "../../utils/logger";
 import CreateMessageService from "../MessageServices/CreateMessageService";
+import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 
 const GRAPH_API_URL = "https://graph.facebook.com/v20.0";
 
@@ -42,7 +43,7 @@ const SendMetaCloudMessage = async ({
 
   if (
     !whatsapp ||
-    whatsapp.providerType !== "meta_cloud" ||
+    !isMetaCloudProvider(whatsapp.providerType) ||
     !whatsapp.metaAccessToken ||
     !whatsapp.phoneNumberId
   ) {

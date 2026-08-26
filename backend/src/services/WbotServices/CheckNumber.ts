@@ -2,6 +2,7 @@ import AppError from "../../errors/AppError";
 import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
 import { getWbot } from "../../libs/wbot";
 import { logger } from "../../utils/logger";
+import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 
 interface IOnWhatsapp {
   jid: string;
@@ -21,7 +22,7 @@ const CheckContactNumber = async (
 
   // A Cloud API nao oferece um pre-check equivalente ao onWhatsApp do Baileys -
   // a validacao real acontece no proprio envio da mensagem.
-  if (defaultWhatsapp.providerType === "meta_cloud") {
+  if (isMetaCloudProvider(defaultWhatsapp.providerType)) {
     return { jid: `${number.replace(/\D/g, "")}@s.whatsapp.net`, exists: true };
   }
 

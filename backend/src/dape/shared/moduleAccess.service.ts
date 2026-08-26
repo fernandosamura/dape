@@ -19,6 +19,7 @@ const ALL_DAPE_MODULES = [
   'dape_intelligence',
   'dape_radar',
   'dape_shield',
+  'whatsapp_coexistence',
 ];
 
 const MODULE_NAMES: Record<string, string> = {
@@ -29,6 +30,7 @@ const MODULE_NAMES: Record<string, string> = {
   dape_intelligence: 'DAPE Intelligence',
   dape_radar:        'DAPE Radar',
   dape_shield:       'DAPLE Shield',
+  whatsapp_coexistence: 'WhatsApp Business + DAPLE',
 };
 
 // Simple in-memory cache with TTL

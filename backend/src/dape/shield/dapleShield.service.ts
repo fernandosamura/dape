@@ -2,6 +2,7 @@ import { QueryTypes } from "sequelize";
 import cron from "node-cron";
 import sequelize from "../../database";
 import { logger } from "../../utils/logger";
+import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 
 // Cleanup diário: remove contadores antigos e audit_log com mais de 90 dias
 cron.schedule("0 2 * * *", async () => {
@@ -362,7 +363,7 @@ export async function calculateConnectionRisk(
     // continuar mandando mensagem enquanto sinalizado RED tende a piorar a
     // situacao, entao tratamos como critico pra fins de decisao de envio.
     if (
-      whatsappHealth?.providerType === "meta_cloud" &&
+      isMetaCloudProvider(whatsappHealth?.providerType) &&
       whatsappHealth?.metaQualityRating === "RED"
     ) {
       return {
@@ -377,7 +378,7 @@ export async function calculateConnectionRisk(
     const reasons: string[] = [];
 
     if (
-      whatsappHealth?.providerType === "meta_cloud" &&
+      isMetaCloudProvider(whatsappHealth?.providerType) &&
       whatsappHealth?.metaQualityRating === "YELLOW"
     ) {
       score += 40;
@@ -385,7 +386,7 @@ export async function calculateConnectionRisk(
     }
 
     if (
-      whatsappHealth?.providerType === "meta_cloud" &&
+      isMetaCloudProvider(whatsappHealth?.providerType) &&
       typeof whatsappHealth?.metaMessagingLimit === "string" &&
       whatsappHealth.metaMessagingLimit.includes("250")
     ) {

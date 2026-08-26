@@ -235,6 +235,18 @@ class Whatsapp extends Model<Whatsapp> {
   @AllowNull(true)
   @Column
   metaHealthSyncedAt: Date;
+
+  // Campos exclusivos de Coexistence (WhatsApp Business App + Cloud API
+  // simultaneos) - preenchidos so quando providerType = "meta_cloud_coexistence".
+  // is_on_biz_app/platform_type sao os campos que a propria Meta retorna
+  // pra confirmar o vinculo (ver documentacao de onboarding de Business App).
+  @AllowNull(true)
+  @Column
+  isOnBizApp: boolean;
+
+  @AllowNull(true)
+  @Column
+  platformType: string;
 }
 
 export default Whatsapp;

@@ -5,6 +5,7 @@ import Whatsapp from "../models/Whatsapp";
 import WhatsappTemplate from "../models/WhatsappTemplate";
 import AppError from "../errors/AppError";
 import SendMetaCloudTemplate from "../services/MetaCloudServices/SendMetaCloudTemplate";
+import { isMetaCloudProvider } from "../helpers/isMetaCloudProvider";
 
 import CreateTicketService from "../services/TicketServices/CreateTicketService";
 import DeleteTicketService from "../services/TicketServices/DeleteTicketService";
@@ -252,7 +253,7 @@ export const sendTemplate = async (
   const ticket = await ShowTicketService(ticketId, companyId);
 
   const whatsapp = await Whatsapp.findByPk(ticket.whatsappId);
-  if (!whatsapp || whatsapp.providerType !== "meta_cloud") {
+  if (!whatsapp || !isMetaCloudProvider(whatsapp.providerType)) {
     throw new AppError("ERR_META_CLOUD_NOT_CONFIGURED");
   }
 

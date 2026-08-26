@@ -47,7 +47,7 @@ export interface SendResult {
 // depender so desta interface, nunca de `wbot`/Baileys ou da Graph API
 // diretamente.
 export interface MessageChannel {
-  readonly providerType: "session" | "meta_cloud";
+  readonly providerType: "session" | "meta_cloud" | "meta_cloud_coexistence";
   sendText(ticket: Ticket, body: string): Promise<SendResult>;
   sendMedia(
     ticket: Ticket,

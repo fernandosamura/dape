@@ -5,15 +5,16 @@ import { getIO } from "../../libs/socket";
 import wbotMonitor from "./wbotMonitor";
 import { logger } from "../../utils/logger";
 import * as Sentry from "@sentry/node";
+import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 
 export const StartWhatsAppSession = async (
   whatsapp: Whatsapp,
   companyId: number
 ): Promise<void> => {
-  // Conexoes Meta Cloud API nao usam sessao Baileys/QR code - ficam
-  // "conectadas" so por terem credenciais validas, nao precisam (e nao
-  // devem) passar por initWASocket.
-  if (whatsapp.providerType === "meta_cloud") {
+  // Conexoes Meta Cloud API (tradicional ou Coexistence) nao usam sessao
+  // Baileys/QR code - ficam "conectadas" so por terem credenciais validas,
+  // nao precisam (e nao devem) passar por initWASocket.
+  if (isMetaCloudProvider(whatsapp.providerType)) {
     return;
   }
 

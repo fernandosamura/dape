@@ -39,6 +39,7 @@ import DapeIAReplyModal from "../dape/DapeIAReplyModal";
 import SendTemplateModal from "../dape/SendTemplateModal";
 import { useDapeModules } from "../../hooks/useDapeModules";
 import useSettings from "../../hooks/useSettings";
+import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 
 const Mp3Recorder = new MicRecorder({ bitRate: 128 });
 
@@ -494,7 +495,7 @@ const MessageInputCustom = (props) => {
   const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
   const [showIAModal, setShowIAModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const isMetaCloud = ticket?.whatsapp?.providerType === "meta_cloud";
+  const isMetaCloud = isMetaCloudProvider(ticket?.whatsapp?.providerType);
   const [windowClosed, setWindowClosed] = useState(false);
   const [windowRemainingLabel, setWindowRemainingLabel] = useState("");
   const { hasIA } = useDapeModules();

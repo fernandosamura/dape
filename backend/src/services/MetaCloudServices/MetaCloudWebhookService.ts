@@ -10,6 +10,7 @@ import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATi
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import { downloadAndStoreMetaCloudMedia } from "./DownloadMetaCloudMedia";
 import { resyncWabaHealth } from "./SyncWhatsappHealthService";
+import { observeCoexistenceEvent } from "./CoexistenceObservationService";
 import { CloudApiChannel } from "../MessageChannel/CloudApiChannel";
 import {
   verifyQueue,
@@ -414,6 +415,30 @@ export const processMetaCloudWebhook = async (body: {
               change.value
             )}`
           );
+          continue;
+        }
+
+        // Coexistence - fase de observacao apenas (nao ativado no painel da
+        // Meta ainda). Nao cria Message/Ticket, nao dispara automacao, nao
+        // renova janela de 24h - so reconhece, deduplica e registra
+        // metadata tecnica minima. Ver CoexistenceObservationService.ts.
+        if (
+          change.field === "history" ||
+          change.field === "smb_app_state_sync" ||
+          change.field === "smb_message_echoes"
+        ) {
+          try {
+            await observeCoexistenceEvent({
+              wabaId: entry.id,
+              eventType: change.field,
+              rawValue: change.value
+            });
+          } catch (coexErr) {
+            logger.error(
+              { coexErr },
+              `[Coexistence] Erro ao observar evento ${change.field}`
+            );
+          }
           continue;
         }
 

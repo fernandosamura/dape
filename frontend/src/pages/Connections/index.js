@@ -47,6 +47,8 @@ import { AuthContext } from "../../context/Auth/AuthContext";
 import usePlans from "../../hooks/usePlans";
 import { Can } from "../../components/Can";
 import EmbeddedSignupButton from "../../components/EmbeddedSignupButton";
+import CoexistenceSignupButton from "../../components/CoexistenceSignupButton";
+import { useDapeModules } from "../../hooks/useDapeModules";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -170,6 +172,7 @@ const Connections = () => {
 	const { whatsApps, loading } = useContext(WhatsAppsContext);
 	const { getPlanCompany } = usePlans();
 	const [planChannels, setPlanChannels] = React.useState({ useFacebook: true, useInstagram: true });
+	const { hasModule } = useDapeModules();
 
 	React.useEffect(() => {
 		if (user?.companyId) {
@@ -283,6 +286,7 @@ const Connections = () => {
 	const renderActionButtons = whatsApp => {
 		const isMeta = whatsApp.channel === "facebook" || whatsApp.channel === "instagram";
 		const isMetaCloud = whatsApp.providerType === "meta_cloud";
+		const isCoexistence = whatsApp.providerType === "meta_cloud_coexistence";
 
 		if (isMetaCloud) {
 			return (
@@ -290,6 +294,16 @@ const Connections = () => {
 					label="Meta Cloud Ativo"
 					size="small"
 					style={{ background: "#DBEAFE", color: "#1E40AF", fontWeight: 700 }}
+				/>
+			);
+		}
+
+		if (isCoexistence) {
+			return (
+				<Chip
+					label="WhatsApp Business + DAPLE Ativo"
+					size="small"
+					style={{ background: "#D1FAE5", color: "#065F46", fontWeight: 700 }}
 				/>
 			);
 		}
@@ -551,6 +565,13 @@ const Connections = () => {
 													<TableCell align="center">
 														{(!whatsApp.providerType || whatsApp.providerType === "session") && whatsApp.channel === "whatsapp" && (
 															<EmbeddedSignupButton
+																whatsappId={whatsApp.id}
+																companyId={whatsApp.companyId}
+																onSuccess={() => {}}
+															/>
+														)}
+														{(!whatsApp.providerType || whatsApp.providerType === "session") && whatsApp.channel === "whatsapp" && hasModule("whatsapp_coexistence") && (
+															<CoexistenceSignupButton
 																whatsappId={whatsApp.id}
 																companyId={whatsApp.companyId}
 																onSuccess={() => {}}

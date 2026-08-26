@@ -1,6 +1,7 @@
 import AppError from "../../errors/AppError";
 import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
 import { getWbot } from "../../libs/wbot";
+import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 
 const CheckIsValidContact = async (
   number: string,
@@ -10,7 +11,7 @@ const CheckIsValidContact = async (
 
   // A Cloud API nao oferece um pre-check equivalente ao onWhatsApp do Baileys -
   // a validacao real acontece no proprio envio da mensagem.
-  if (defaultWhatsapp.providerType === "meta_cloud") {
+  if (isMetaCloudProvider(defaultWhatsapp.providerType)) {
     return;
   }
 
