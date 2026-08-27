@@ -35,6 +35,7 @@ import {
 } from "@material-ui/core";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import ConfirmationModal from "../ConfirmationModal";
+import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -127,7 +128,7 @@ const CampaignModal = ({
   const selectedWhatsapp = whatsapps.find(
     (w) => String(w.id) === String(campaign.whatsappId)
   );
-  const isCloudApiWhatsapp = selectedWhatsapp?.providerType === "meta_cloud";
+  const isCloudApiWhatsapp = isMetaCloudProvider(selectedWhatsapp?.providerType);
 
   const fetchTemplates = async (whatsappId) => {
     if (!whatsappId) {
@@ -522,7 +523,7 @@ const CampaignModal = ({
                           whatsapps.map((whatsapp) => (
                             <MenuItem key={whatsapp.id} value={whatsapp.id}>
                               {whatsapp.name}
-                              {whatsapp.providerType === "meta_cloud"
+                              {isMetaCloudProvider(whatsapp.providerType)
                                 ? " (API Oficial)"
                                 : ""}
                             </MenuItem>

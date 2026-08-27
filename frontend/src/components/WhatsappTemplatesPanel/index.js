@@ -29,6 +29,7 @@ import { Refresh } from "@material-ui/icons";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 import {
   extractTemplateVariables,
   renderTemplateBody,
@@ -204,7 +205,7 @@ const WhatsappTemplatesPanel = () => {
       .get("/whatsapp", { params: { companyId, session: 0 } })
       .then(({ data }) => {
         const cloudApiWhatsapps = (Array.isArray(data) ? data : []).filter(
-          (w) => w.providerType === "meta_cloud"
+          (w) => isMetaCloudProvider(w.providerType)
         );
         setWhatsapps(cloudApiWhatsapps);
         if (cloudApiWhatsapps.length > 0) setWhatsappId(cloudApiWhatsapps[0].id);
