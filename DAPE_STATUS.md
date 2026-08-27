@@ -755,6 +755,19 @@ Terceira modalidade de conexão, isolada das outras duas (nenhuma alterada):
 
 **Pendente (parado por decisão do usuário até nova autorização):** clicar em "Conectar WhatsApp Business + DAPLE" na DAPLE TEST e completar o Embedded Signup real com número já ativo no WhatsApp Business App (id 12, "Atendente 02"). Ver plano de teste E2E completo na conversa da sessão.
 
+### ✅ Validação end-to-end real (2026-08-27, tarde)
+
+DAPLE TEST não tinha número validado no WhatsApp Business App — teste real feito em **Pop Photos Studio (companyId=2)** e módulo também habilitado pra ela via override oficial (`dape_tenant_module_overrides`). Pub Plus Brasil (companyId=1) já tinha acesso via bypass master, sem ação extra.
+
+- **Whatsapp id=13 "Atendimento Pop"** — conexão nova criada via "ADICIONAR WHATSAPP" e migrada com sucesso: `providerType=meta_cloud_coexistence`, `status=CONNECTED`, `isOnBizApp=true`, `platformType=CLOUD_API`, `migrationStatus=completed`. Log: `[Coexistence] Signup OK — empresa 2, whatsapp 13, isOnBizApp=true, platformType=CLOUD_API`.
+- **Recebimento confirmado**: mensagem real do celular ("Olá, teste de retorno") criou ticket 54 normalmente, indicador de janela de 24h exibido corretamente no chat (fix do `isMetaCloudProvider` no frontend funcionando).
+- **Envio confirmado**: resposta enviada pelo painel, `wamid` real da Meta, `ack=2` (entregue), **confirmado recebido no celular pelo usuário**.
+- **Achado, não é bug do Coexistence**: 2 mensagens automáticas com corpo vazio (`mediaType=conversation`) saíram logo após a primeira mensagem recebida — `greetingMessage`/`promptId` da conexão 13 estavam em branco, então o fluxo padrão de saudação/bot (pré-existente, não específico de Coexistence) disparou com texto vazio. Não corrigido nesta sessão — considerar preencher `greetingMessage` ou revisar o fluxo de saudação com corpo vazio como possível bug pré-existente a investigar depois.
+- **Pub Plus Brasil id=10 "Atendimento"**: `migrationStatus=failed`, mas `updatedAt` de 03:03 (horário do restart do deploy) — resquício antigo, não relacionado a esta sessão.
+- `dape_coexistence_events`: ainda 0 linhas — nenhum evento `history`/`smb_app_state_sync`/`smb_message_echoes` observado ainda; aguardar atividade orgânica no WhatsApp Business App.
+
+**Status: fluxo Coexistence validado ponta a ponta em produção com número real.** Módulo habilitado pra Pop Photos Studio, DAPLE TEST e (via master) Pub Plus Brasil.
+
 ---
 
 ## Issues conhecidos
