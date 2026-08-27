@@ -732,8 +732,34 @@ Resta **#009** (Sequelize) como próximo item de maior risco/impacto do Sprint 3
 
 ---
 
+## ✅ Deploy controlado — WhatsApp Business + DAPLE (Coexistence) (2026-08-26/27)
+
+**Commits:** `26d3613` (feature completa) + `95faddb` (plumbing docker-compose/Dockerfile) — produção em `fc7c5a1`/`64e94ac`
+
+Terceira modalidade de conexão, isolada das outras duas (nenhuma alterada):
+1. **Legacy/session** (Baileys QR) — intocado
+2. **Cloud API tradicional** (`meta_cloud`, config_id `917113721410373`, `EmbeddedSignupButton`/`EmbeddedSignupController`) — **intocado, validado com smoke test real pós-deploy** (quality_rating=GREEN, TIER_2K, APPROVED)
+3. **Coexistence** (`meta_cloud_coexistence`, config_id `2305329230296796`, `CoexistenceSignupButton`/`CoexistenceSignupController`) — novo
+
+**Arquitetura:** `isMetaCloudProvider()` (backend `helpers/isMetaCloudProvider.ts` + frontend espelho `helpers/isMetaCloudProvider.js`) trata `meta_cloud`+`meta_cloud_coexistence` como Cloud API em todos os pontos de roteamento. `CoexistenceChannel` delega por composição pra `CloudApiChannel` (mesmo transporte Graph API). `CoexistenceObservationService` só observa webhooks `history`/`smb_app_state_sync`/`smb_message_echoes` (tabela `dape_coexistence_events`, allowlist de campos técnicos, nunca conteúdo/PII) — sem side-effect em Message/Ticket ainda (fase 1).
+
+**Feature flag:** módulo `whatsapp_coexistence` no catálogo (`dape_available_modules`), sem concessão automática por plano. Habilitado via override oficial (`dape_tenant_module_overrides`) **só pra `companyId=3` (DAPLE TEST)**.
+
+**⚠️ Caveat conhecido, aceito por ora:** `moduleAccess.service.ts` tem bypass pré-existente pra empresas `is_master=true` (só `companyId=1`, Pub Plus Brasil) — recebem qualquer módulo automaticamente, ignorando overrides. O botão Coexistence aparece nela também, não só na DAPLE TEST. Nada é executado só por o botão aparecer; avaliar depois se a regra precisa de exceção.
+
+**Migrations aplicadas em produção** (via entrypoint automático, todas idempotentes/guardadas): `20260622000008` (billing/planos, reconstrução de drift), `20260812000001`/`20260812000002` (janela 24h + drift Companies/Contacts), `20260824000001/2/3` (campos Coexistence, tabela `dape_coexistence_events`, registro do módulo).
+
+**Deploy feito via rsync + git commit direto no servidor** (não `git pull`) — o PAT salvo no remote `origin` expirou (401 na API do GitHub), ver Issues conhecidos abaixo.
+
+**Backup pré-deploy:** `/root/pre_coexistence_backup_20260826.dump` (pg_dump -F c, 554KB) · `.env` original em `/root/dape/.env.bak-pre-coexistence-20260826`.
+
+**Pendente (parado por decisão do usuário até nova autorização):** clicar em "Conectar WhatsApp Business + DAPLE" na DAPLE TEST e completar o Embedded Signup real com número já ativo no WhatsApp Business App (id 12, "Atendente 02"). Ver plano de teste E2E completo na conversa da sessão.
+
+---
+
 ## Issues conhecidos
-- git push configurado com PAT (token armazenado apenas no remote URL do servidor)
+- **PAT do git remote (`origin`) expirou** (401 Unauthorized na API do GitHub, confirmado em 2026-08-26) — `git push`/`pull` não funcionam mais nem local nem em produção. Deploy desta sessão feito via `rsync` direto + commit local no servidor. Necessário gerar um novo PAT e reconfigurar o remote antes do próximo deploy baseado em git.
+- SSH pro servidor Daple (`root@187.127.25.246`) às vezes tenta autenticar por chave pública antes da senha e trava esperando passphrase (nunca recebe). Forçar `-o PreferredAuthentications=password -o PubkeyAuthentication=no` no comando ssh/sshpass evita o travamento.
 
 ## Documentos no repositório
 - BACKUP_RUNBOOK.md · DEPLOY_SPRINT1.md · SPRINT1_VALIDATION.md
