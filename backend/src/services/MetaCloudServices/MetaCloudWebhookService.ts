@@ -1,3 +1,4 @@
+import { isNil } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
 import Message from "../../models/Message";
 import Queue from "../../models/Queue";
@@ -18,6 +19,7 @@ import {
   handleRating,
   handleChartbot
 } from "../WbotServices/wbotMessageMenu";
+import { handleOpenAi } from "../WbotServices/wbotMessageAI";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { getIO } from "../../libs/socket";
 import { cacheLayer } from "../../libs/cache";
@@ -285,11 +287,38 @@ const processIncomingMessage = async (
 
   const dontReadTheFirstQuestion = ticket.queue === null;
 
-  if (!ticket.queue && !ticket.userId) {
+  // "openai na fila" - equivalente ao mesmo bloco em wbotMessageListener.ts
+  // (Baileys). !ticket.useIntegration garante exclusividade com o bloco
+  // acima: a PRIMEIRA mensagem do ticket (sem fila/useIntegration ainda)
+  // cai no verifyQueue, que ja aciona a IA internamente e marca
+  // useIntegration=true; da segunda mensagem em diante ticket.queue ja
+  // esta preenchido (verifyQueue nao roda mais) e e este bloco quem
+  // mantem a conversa de IA respondendo. Sem ele, a conversa respondia
+  // so a primeira mensagem e ficava muda dali em diante.
+  if (!ticket.queue && !ticket.userId && !ticket.useIntegration) {
     await verifyQueue(channel, ticket, contact, body, false);
     if (ticketTraking.chatbotAt === null) {
       await ticketTraking.update({ chatbotAt: new Date() });
     }
+  } else if (
+    !ticket.isGroup &&
+    !ticket.userId &&
+    !isNil(ticket.promptId) &&
+    ticket.useIntegration &&
+    ticket.queueId
+  ) {
+    await handleOpenAi(
+      channel,
+      ticket,
+      contact,
+      undefined,
+      body,
+      "text",
+      "",
+      undefined,
+      undefined,
+      undefined
+    );
   }
 
   await ticket.reload();
