@@ -287,15 +287,30 @@ const processIncomingMessage = async (
 
   const dontReadTheFirstQuestion = ticket.queue === null;
 
-  // "openai na fila" - equivalente ao mesmo bloco em wbotMessageListener.ts
-  // (Baileys). !ticket.useIntegration garante exclusividade com o bloco
-  // acima: a PRIMEIRA mensagem do ticket (sem fila/useIntegration ainda)
-  // cai no verifyQueue, que ja aciona a IA internamente e marca
-  // useIntegration=true; da segunda mensagem em diante ticket.queue ja
-  // esta preenchido (verifyQueue nao roda mais) e e este bloco quem
-  // mantem a conversa de IA respondendo. Sem ele, a conversa respondia
-  // so a primeira mensagem e ficava muda dali em diante.
-  if (!ticket.queue && !ticket.userId && !ticket.useIntegration) {
+  // "openai na conexao" - equivalente ao mesmo bloco em
+  // wbotMessageListener.ts (Baileys). Modo mais simples de IA: prompt
+  // vinculado direto na conexao (Whatsapp.promptId), sem fila nenhuma.
+  // handleOpenAi resolve o prompt via ShowWhatsAppService(whatsapp) nesse
+  // caso - funciona de primeira, sem depender de nenhuma associacao
+  // (ticket.queue.prompt) carregada. Como nao seta useIntegration nem
+  // queueId, ticket.queue continua null pra sempre - a mesma condicao
+  // "!ticket.queue" ja garante que TODA mensagem da conversa (nao so a
+  // primeira) volte a cair aqui, mantendo a IA respondendo sem precisar
+  // de bloco de continuacao separado.
+  if (!ticket.queue && !ticket.userId && !isNil(whatsapp.promptId)) {
+    await handleOpenAi(
+      channel,
+      ticket,
+      contact,
+      undefined,
+      body,
+      "text",
+      "",
+      undefined,
+      undefined,
+      undefined
+    );
+  } else if (!ticket.queue && !ticket.userId && !ticket.useIntegration) {
     await verifyQueue(channel, ticket, contact, body, false);
     if (ticketTraking.chatbotAt === null) {
       await ticketTraking.update({ chatbotAt: new Date() });
