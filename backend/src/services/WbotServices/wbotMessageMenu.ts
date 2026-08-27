@@ -178,6 +178,17 @@ const verifyQueue = async (
       options += `*[ ${index + 1} ]* - ${queue.name}\n`;
     });
 
+    // Sem greetingMessage e sem filas pra listar, o corpo fica so o marcador
+    // invisivel \u200e - nunca mandar isso (era enviado como mensagem "vazia"
+    // de verdade pro cliente). Conexao provavelmente ainda nao foi
+    // configurada (sem fila/prompt vinculado).
+    if (!greetingMessage?.trim() && queues.length === 0) {
+      logger.warn(
+        `[verifyQueue] Conexao ${ticket.whatsappId} sem greetingMessage e sem filas - menu do bot pulado pro ticket ${ticket.id}`
+      );
+      return;
+    }
+
     const body = formatBody(`\u200e${greetingMessage}\n\n${options}`, contact);
     await sendAndPersistText(channel, ticket, body);
   };
