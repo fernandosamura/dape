@@ -762,11 +762,28 @@ DAPLE TEST não tinha número validado no WhatsApp Business App — teste real f
 - **Whatsapp id=13 "Atendimento Pop"** — conexão nova criada via "ADICIONAR WHATSAPP" e migrada com sucesso: `providerType=meta_cloud_coexistence`, `status=CONNECTED`, `isOnBizApp=true`, `platformType=CLOUD_API`, `migrationStatus=completed`. Log: `[Coexistence] Signup OK — empresa 2, whatsapp 13, isOnBizApp=true, platformType=CLOUD_API`.
 - **Recebimento confirmado**: mensagem real do celular ("Olá, teste de retorno") criou ticket 54 normalmente, indicador de janela de 24h exibido corretamente no chat (fix do `isMetaCloudProvider` no frontend funcionando).
 - **Envio confirmado**: resposta enviada pelo painel, `wamid` real da Meta, `ack=2` (entregue), **confirmado recebido no celular pelo usuário**.
-- **Achado, não é bug do Coexistence**: 2 mensagens automáticas com corpo vazio (`mediaType=conversation`) saíram logo após a primeira mensagem recebida — `greetingMessage`/`promptId` da conexão 13 estavam em branco, então o fluxo padrão de saudação/bot (pré-existente, não específico de Coexistence) disparou com texto vazio. Não corrigido nesta sessão — considerar preencher `greetingMessage` ou revisar o fluxo de saudação com corpo vazio como possível bug pré-existente a investigar depois.
+- **Achado, não é bug do Coexistence**: 2 mensagens automáticas com corpo vazio (`mediaType=conversation`) saíram logo após a primeira mensagem recebida — `greetingMessage`/`promptId` da conexão 13 estavam em branco, então o fluxo padrão de saudação/bot (pré-existente, não específico de Coexistence) disparou com texto vazio. **Corrigido, ver sessão seguinte abaixo.**
 - **Pub Plus Brasil id=10 "Atendimento"**: `migrationStatus=failed`, mas `updatedAt` de 03:03 (horário do restart do deploy) — resquício antigo, não relacionado a esta sessão.
 - `dape_coexistence_events`: ainda 0 linhas — nenhum evento `history`/`smb_app_state_sync`/`smb_message_echoes` observado ainda; aguardar atividade orgânica no WhatsApp Business App.
 
 **Status: fluxo Coexistence validado ponta a ponta em produção com número real.** Módulo habilitado pra Pop Photos Studio, DAPLE TEST e (via master) Pub Plus Brasil.
+
+### ✅ Correções pós-validação — bot/IA silenciosos no Cloud API/Coexistence (2026-08-27, noite)
+
+4 fixes, todos aplicados igualmente a `meta_cloud` tradicional e `meta_cloud_coexistence` (mesmo código compartilhado, `MetaCloudWebhookService.ts`), sem tocar `EmbeddedSignupButton`/`EmbeddedSignupController`.
+
+| # | Fix | Commit | Arquivo |
+|---|-----|--------|---------|
+| 1 | Menu de bot mandava só o marcador invisível `‎` quando `greetingMessage` e filas estavam vazios (conexão nova sem configuração) — agora pula o envio e loga aviso | `3d6d6ad` | `wbotMessageMenu.ts` |
+| 2 | IA só respondia a **primeira** mensagem de um ticket roteado por fila — depois que `ticket.queue` ficava preenchido, nada mais reacionava `handleOpenAi`. Portado o bloco "openai na fila" do Baileys (`ticket.promptId`+`useIntegration`+`queueId`), mutuamente exclusivo com o bloco de primeira mensagem via `!ticket.useIntegration` | `437a2ae` | `MetaCloudWebhookService.ts` |
+| 3 | **Causa raiz real do silêncio da IA**: `handleOpenAi` resolve o prompt via `whatsapp.promptId` (direto) OU `ticket.queue.prompt` (associação que não vem carregada nesse fluxo de webhook) — configurar só a fila (`Queues.promptId`) cai num `if (!prompt) return` silencioso, sem log. Portado o modo mais simples do Baileys ("openai na conexão", via `whatsapp.promptId` direto, sem fila) — como não seta `queueId`, a mesma condição `!ticket.queue` cobre toda a conversa automaticamente, sem precisar de bloco de continuação separado | `23229db` | `MetaCloudWebhookService.ts` |
+| 4 | `WhatsappTemplatesPanel` e `CampaignModal` (frontend) filtravam conexões elegíveis com `providerType === "meta_cloud"` literal — Coexistence nunca aparecia no seletor de sync de templates nem como opção pra campanha via template, mesmo o backend (`SyncWhatsappTemplatesService.ts`) já suportando desde o deploy original | `baf4ceb` | `WhatsappTemplatesPanel/index.js`, `CampaignModal/index.js` |
+
+**Setup usado pro teste (Pop Photos Studio, whatsapp id=13):** `Whatsapps.promptId=3` (Agente Sofia, gemini) direto na conexão — modo mais simples e robusto, não depende de fila. Fila "Sofia" (id 19) + `WhatsappQueues` também foram vinculados numa tentativa anterior (fica registrado, mas não é o que faz a IA responder de fato).
+
+**Sincronização de templates testada e confirmada funcionando**: conexão tradicional (id 9) sincronizou 6 templates reais da Meta (`hello_world`, `atendimento_daple`, etc.); Coexistence (id 13) retornou 0 — comportamento correto, esse WABA novo simplesmente ainda não tem nenhum template criado no Gerenciador do WhatsApp.
+
+**Resultado final confirmado pelo usuário**: agente de IA (Sofia/Gemini) respondendo automaticamente via API em conversas Coexistence, mensagem real recebida no celular.
 
 ---
 
