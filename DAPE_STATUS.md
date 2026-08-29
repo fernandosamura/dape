@@ -785,6 +785,27 @@ DAPLE TEST não tinha número validado no WhatsApp Business App — teste real f
 
 **Resultado final confirmado pelo usuário**: agente de IA (Sofia/Gemini) respondendo automaticamente via API em conversas Coexistence, mensagem real recebida no celular.
 
+### ✅ Auditoria geral pós-fixes + 2 achados de produção (2026-08-29)
+
+Verificação sistemática de todos os módulos afetados pela sessão, a pedido do usuário. Nenhuma regressão encontrada. Achados reais durante o teste de envio de template real:
+
+| # | Achado | Fix | Commit |
+|---|--------|-----|--------|
+| 1 | **Segurança**: `logger.error({ err }, ...)` com `AxiosError` bruto gravava `err.config.headers.Authorization` (token de acesso Meta em texto puro) nos logs — confirmado com token real de cliente exposto ao investigar falha de envio de template. Afetava 6 pontos em `MetaCloudServices/` (tradicional e Coexistence igualmente). Novo helper `sanitizeAxiosError()` mantém status/corpo da resposta (útil pra diagnóstico) e descarta headers/config | `cddde64` | `sanitizeAxiosError.ts` + 6 arquivos |
+| 2 | **UX**: `SendTemplateModal.js` permitia clicar "Enviar" com variável de template vazia (`{{nome}}` etc) — Graph API rejeita com 400 sem nenhuma pista clara do motivo. Botão agora fica desabilitado com aviso até todas as variáveis serem preenchidas | `cddde64` | `SendTemplateModal.js` |
+
+**Checklist de verificação executado:**
+- Containers: todos `Up`, `/health` OK, frontend `200`
+- Sem erros/exceptions novos nos logs (só o seed antigo já conhecido, não-bloqueante)
+- Sessões Baileys (Legacy): sem erros em 13h, aguardando QR normalmente
+- `meta_cloud` (id 9) e `meta_cloud_coexistence` (id 13): confirmados sem tentativa de iniciar Baileys, exatamente como esperado
+- Módulo `whatsapp_coexistence`: overrides intactos (só companyId 2 e 3 + master), nenhuma empresa nova recebeu automaticamente
+- Crons/automações (DAPE Automation, DAPLE Billing) rodando normalmente
+- **Token de acesso Meta**: 0 ocorrências em log desde o deploy do fix (confirmado via grep)
+- POP 4081/POP 1871 (ids 4/6) não aparecem mais no banco — confirmado com o usuário: exclusão deliberada, não é bug
+
+**Nota:** achados 1 e 2 são pré-existentes, não específicos de Coexistence — afetam igualmente o fluxo Cloud API tradicional.
+
 ---
 
 ## Issues conhecidos
