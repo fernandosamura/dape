@@ -116,7 +116,12 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
   const footer = selected ? getTemplateFooter(selected.components) : null;
   const previewButtons = selected ? getTemplateButtons(selected.components) : [];
   const needsHeaderMedia = header && header.format !== "TEXT";
-  const canSend = !needsHeaderMedia || headerMediaUrl.trim().length > 0;
+  // A Graph API rejeita parametro de template vazio (erro 400) - sem essa
+  // checagem o botao ficava habilitado e so falhava depois da chamada real
+  // pra Meta, sem nenhuma pista clara do motivo pro atendente.
+  const hasEmptyVariable = variables.some((v) => !values[v] || !values[v].trim());
+  const canSend =
+    (!needsHeaderMedia || headerMediaUrl.trim().length > 0) && !hasEmptyVariable;
 
   return (
     <div style={s.overlay} onClick={onClose}>
@@ -218,6 +223,12 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
                 </div>
               )}
             </div>
+
+            {hasEmptyVariable && (
+              <div style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 4 }}>
+                Preencha todas as variáveis antes de enviar.
+              </div>
+            )}
 
             <div style={s.buttons}>
               <button style={s.btnCancel} onClick={() => setSelected(null)} disabled={sending}>

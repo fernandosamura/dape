@@ -4,6 +4,7 @@ import { writeFile } from "fs";
 import axios from "axios";
 import { extension as mimeExtension } from "mime-types";
 import { logger } from "../../utils/logger";
+import { sanitizeAxiosError } from "../../helpers/sanitizeAxiosError";
 import { uploadToR2 } from "../StorageServices/R2Service";
 
 const fs = require("fs");
@@ -67,7 +68,7 @@ export const downloadAndStoreMetaCloudMedia = async (
 
     return { mimetype, filename };
   } catch (err) {
-    logger.error({ err }, `[MetaCloud] Erro ao baixar mídia ${mediaId}`);
+    logger.error({ err: sanitizeAxiosError(err) }, `[MetaCloud] Erro ao baixar mídia ${mediaId}`);
     return null;
   }
 };

@@ -5,6 +5,7 @@ import AppError from "../../errors/AppError";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { logger } from "../../utils/logger";
 import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
+import { sanitizeAxiosError } from "../../helpers/sanitizeAxiosError";
 
 const GRAPH_API_URL = "https://graph.facebook.com/v20.0";
 
@@ -69,7 +70,7 @@ export const syncWhatsappTemplates = async (
     );
     templates = response.data?.data || [];
   } catch (err) {
-    logger.error({ err }, "[MetaCloud] Erro ao buscar templates na Meta");
+    logger.error({ err: sanitizeAxiosError(err) }, "[MetaCloud] Erro ao buscar templates na Meta");
     throw new AppError("ERR_META_CLOUD_TEMPLATE_SYNC_FAILED");
   }
 

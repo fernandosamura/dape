@@ -24,6 +24,7 @@ import { decrypt } from "../../helpers/cryptoHelper";
 import { getIO } from "../../libs/socket";
 import { cacheLayer } from "../../libs/cache";
 import { logger } from "../../utils/logger";
+import { sanitizeAxiosError } from "../../helpers/sanitizeAxiosError";
 
 const MEDIA_TYPES = ["image", "audio", "video", "document", "sticker"];
 
@@ -530,6 +531,6 @@ export const processMetaCloudWebhook = async (body: {
       }
     }
   } catch (err) {
-    logger.error({ err }, "[MetaCloud] Erro ao processar webhook");
+    logger.error({ err: sanitizeAxiosError(err) }, "[MetaCloud] Erro ao processar webhook");
   }
 };

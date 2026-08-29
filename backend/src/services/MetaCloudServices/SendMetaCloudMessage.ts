@@ -7,6 +7,7 @@ import Contact from "../../models/Contact";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { dapleShield } from "../../dape/shield/dapleShield.service";
 import { logger } from "../../utils/logger";
+import { sanitizeAxiosError } from "../../helpers/sanitizeAxiosError";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import { isMetaCloudProvider } from "../../helpers/isMetaCloudProvider";
 
@@ -155,7 +156,7 @@ const SendMetaCloudMessage = async ({
     return { externalId };
   } catch (err: any) {
     await dapleShield.reportSendError(ticket.whatsappId, ticket.companyId, err?.message || "send_failed");
-    logger.error({ err }, "[MetaCloud] Erro ao enviar mensagem");
+    logger.error({ err: sanitizeAxiosError(err) }, "[MetaCloud] Erro ao enviar mensagem");
     throw new AppError("ERR_META_CLOUD_SEND_FAILED");
   }
 };

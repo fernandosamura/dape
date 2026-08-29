@@ -5,6 +5,7 @@ import Whatsapp from "../../models/Whatsapp";
 import AppError from "../../errors/AppError";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { logger } from "../../utils/logger";
+import { sanitizeAxiosError } from "../../helpers/sanitizeAxiosError";
 import {
   isMetaCloudProvider,
   META_CLOUD_PROVIDER_TYPES
@@ -127,6 +128,6 @@ cron.schedule("0 */2 * * *", async () => {
   try {
     await syncAllWhatsappsHealth();
   } catch (err) {
-    logger.error({ err }, "[MetaCloud] Sync periódico de saúde falhou");
+    logger.error({ err: sanitizeAxiosError(err) }, "[MetaCloud] Sync periódico de saúde falhou");
   }
 });

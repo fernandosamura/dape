@@ -5,6 +5,7 @@ import WhatsappTemplate from "../../models/WhatsappTemplate";
 import Ticket from "../../models/Ticket";
 import { decrypt } from "../../helpers/cryptoHelper";
 import { logger } from "../../utils/logger";
+import { sanitizeAxiosError } from "../../helpers/sanitizeAxiosError";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import {
   extractTemplateVariables,
@@ -135,7 +136,7 @@ const SendMetaCloudTemplate = async ({
 
     return { externalId };
   } catch (err: unknown) {
-    logger.error({ err }, "[MetaCloud] Erro ao enviar template");
+    logger.error({ err: sanitizeAxiosError(err) }, "[MetaCloud] Erro ao enviar template");
     throw new AppError("ERR_META_CLOUD_TEMPLATE_SEND_FAILED");
   }
 };
