@@ -938,6 +938,7 @@ const MessageInputCustom = (props) => {
             onClose={() => setShowTemplateModal(false)}
             ticketId={ticketId}
             whatsappId={ticket?.whatsapp?.id}
+            contactName={ticket?.contact?.name}
             onSent={() => setShowTemplateModal(false)}
           />
 

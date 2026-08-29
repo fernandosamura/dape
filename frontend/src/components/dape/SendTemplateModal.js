@@ -30,7 +30,13 @@ const s = {
   error: { background: "#FEE2E2", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#991B1B", marginBottom: 12 },
 };
 
-export default function SendTemplateModal({ open, onClose, ticketId, whatsappId, onSent }) {
+// Mesma lista de aliases usada no backend (buildContactBodyParams em
+// whatsappTemplateVariables.ts) - so variaveis nomeadas reconhecidas como
+// "nome do contato" sao pre-preenchidas; o atendente ainda pode editar
+// antes de enviar.
+const CONTACT_NAME_VARIABLE_ALIASES = ["nome", "name", "customer_name", "cliente"];
+
+export default function SendTemplateModal({ open, onClose, ticketId, whatsappId, contactName, onSent }) {
   const [templates, setTemplates] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -84,7 +90,16 @@ export default function SendTemplateModal({ open, onClose, ticketId, whatsappId,
 
   function handleSelect(template) {
     setSelected(template);
-    setValues({});
+    const templateVariables = extractTemplateVariables(template.bodyText || "");
+    const autoValues = {};
+    if (contactName) {
+      templateVariables.forEach((v) => {
+        if (CONTACT_NAME_VARIABLE_ALIASES.includes(v.toLowerCase())) {
+          autoValues[v] = contactName;
+        }
+      });
+    }
+    setValues(autoValues);
     setHeaderMediaUrl("");
   }
 

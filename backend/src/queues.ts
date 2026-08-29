@@ -33,6 +33,10 @@ import { dapleShield, applySafeDelay } from "./dape/shield/dapleShield.service";
 import WhatsappTemplate from "./models/WhatsappTemplate";
 import SendMetaCloudTemplate from "./services/MetaCloudServices/SendMetaCloudTemplate";
 import { isMetaCloudProvider } from "./helpers/isMetaCloudProvider";
+import {
+  extractTemplateVariables,
+  buildContactBodyParams
+} from "./helpers/whatsappTemplateVariables";
 
 
 const nodemailer = require('nodemailer');
@@ -891,10 +895,26 @@ async function handleDispatchCampaign(job) {
       }
 
       try {
+        // Preenche automaticamente variaveis de nome (ex: {{nome}}) com o
+        // nome do contato desse envio especifico - sem isso a Graph API
+        // rejeita com 400 (parametro obrigatorio vazio) toda vez que o
+        // template tiver variavel, o que bloquearia a campanha inteira.
+        // Variaveis sem alias de nome reconhecido (ex: "atendente",
+        // "evento") continuam vazias - a campanha ainda nao tem UI pra
+        // configurar esse tipo de variavel estatica por disparo.
+        const templateVariables = extractTemplateVariables(
+          campaign.template.bodyText
+        );
+        const bodyParams = buildContactBodyParams(
+          templateVariables,
+          campaignShipping.contact?.name
+        );
+
         await SendMetaCloudTemplate({
           whatsapp: campaign.whatsapp,
           to: campaignShipping.number,
-          template: campaign.template
+          template: campaign.template,
+          bodyParams
         });
       } catch (err: any) {
         logger.error(

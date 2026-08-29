@@ -6,6 +6,10 @@ import WhatsappTemplate from "../models/WhatsappTemplate";
 import AppError from "../errors/AppError";
 import SendMetaCloudTemplate from "../services/MetaCloudServices/SendMetaCloudTemplate";
 import { isMetaCloudProvider } from "../helpers/isMetaCloudProvider";
+import {
+  extractTemplateVariables,
+  buildContactBodyParams
+} from "../helpers/whatsappTemplateVariables";
 
 import CreateTicketService from "../services/TicketServices/CreateTicketService";
 import DeleteTicketService from "../services/TicketServices/DeleteTicketService";
@@ -265,11 +269,21 @@ export const sendTemplate = async (
   const to = ticket.contact?.number;
   if (!to) throw new AppError("ERR_META_CLOUD_NO_NUMBER");
 
+  // Fallback de seguranca: preenche variaveis de nome (ex: {{nome}}) que o
+  // frontend nao tenha mandado com o nome do contato do ticket. O frontend
+  // ja faz isso como valor inicial editavel no modal - isso aqui so cobre
+  // quem chamar a API direto sem passar por ele.
+  const autoParams = buildContactBodyParams(
+    extractTemplateVariables(template.bodyText),
+    ticket.contact?.name
+  );
+  const mergedBodyParams = { ...autoParams, ...(bodyParams || {}) };
+
   const result = await SendMetaCloudTemplate({
     whatsapp,
     to,
     template,
-    bodyParams,
+    bodyParams: mergedBodyParams,
     headerMediaUrl,
     ticket
   });

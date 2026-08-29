@@ -44,6 +44,32 @@ export const renderTemplateBody = (
   );
 };
 
+// Nomes de variavel comumente usados pro nome do contato nos templates ja
+// aprovados (ex: "confirmacao_de_agendamento" usa "nome"). So variaveis
+// NOMEADAS entram aqui - variaveis posicionais ({{1}}, {{2}}) nao tem
+// significado semantico, preencher errado seria pior que deixar em branco.
+const CONTACT_NAME_VARIABLE_ALIASES = ["nome", "name", "customer_name", "cliente"];
+
+// Preenche automaticamente as variaveis de nome do contato a partir do
+// Contact - usado no disparo de campanha (um contato por envio, sem UI de
+// variavel por campanha) e como valor inicial no envio manual (ainda
+// editavel pelo atendente antes de enviar). Variaveis sem alias reconhecido
+// (ex: "atendente", "evento", "data") ficam de fora - precisam ser
+// preenchidas manualmente, nao tem como inferir do contato.
+export const buildContactBodyParams = (
+  variables: string[],
+  contactName?: string | null
+): Record<string, string> => {
+  if (!contactName) return {};
+  const params: Record<string, string> = {};
+  for (const v of variables) {
+    if (CONTACT_NAME_VARIABLE_ALIASES.includes(v.toLowerCase())) {
+      params[v] = contactName;
+    }
+  }
+  return params;
+};
+
 // Monta o componente "body" no formato que a Cloud API espera: posicional
 // (sem parameter_name) quando todas as variaveis sao numericas - formato
 // da grande maioria dos templates ja aprovados - ou nomeado (com
