@@ -806,6 +806,17 @@ Verificação sistemática de todos os módulos afetados pela sessão, a pedido 
 
 **Nota:** achados 1 e 2 são pré-existentes, não específicos de Coexistence — afetam igualmente o fluxo Cloud API tradicional.
 
+### ✅ Feature — preenchimento automático de variável de nome em templates (2026-08-29)
+
+**Achado durante a investigação do erro de template**: disparo de campanha via Cloud API/Coexistence (`queues.ts`) não passava `bodyParams` nenhum pro `SendMetaCloudTemplate` — todo template com variável nomeada (ex: `{{nome}}`) falhava com 400 (parâmetro vazio) pra **todos os destinatários da campanha**, não só um teste manual.
+
+**Fix (commit `c3eb435`):** novo helper `buildContactBodyParams()` em `whatsappTemplateVariables.ts` — preenche variáveis com alias reconhecido de nome (`nome`/`name`/`customer_name`/`cliente`) a partir do contato. Aplicado em 3 pontos:
+- `queues.ts` (disparo de campanha): usa `ContactListItem.name` de cada destinatário individualmente
+- `TicketController.sendTemplate` (fallback de segurança): usa `ticket.contact.name` pra quem chamar a API direto sem passar pelo modal
+- `SendTemplateModal.js` (frontend): pré-preenche o campo como valor inicial editável ao selecionar o template, usando `ticket.contact.name`
+
+**Limitação conhecida:** variáveis sem alias de nome reconhecido (ex: `{{atendente}}`, `{{evento}}`, `{{data}}` do template `confirmacao_de_agendamento`) continuam vazias — não tem como inferir do contato. Campanha ainda não tem UI pra configurar variável estática por disparo; isso ficaria pra uma feature futura se for pedido.
+
 ---
 
 ## Issues conhecidos
